@@ -1,0 +1,21 @@
+name: "🧪 CI - linters and tests"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  lint-and-test:
+    name: linters and tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v5
+
+      - name: "Install just"
+        uses: extractions/setup-just@v3
+
+      - name: "Run linters and tests"
+        run: just dc all

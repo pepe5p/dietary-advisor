@@ -1,0 +1,4 @@
+services:
+  dietary_advisor:
+    ports:
+      - "your-port:80"

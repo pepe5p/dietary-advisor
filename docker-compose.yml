@@ -1,0 +1,21 @@
+x-dietary-advisor: &dietary-advisor-config
+  environment:
+    - FLAVOR=localdev
+  image: dietaryadvisor-dev
+  pull_policy: never
+  volumes:
+    - "./:/code/"
+  env_file:
+    - .env
+
+
+services:
+  # Please do not set ports here. Use docker-compose.override.yml to set ports. You can find an example in docker-compose.override.yml.example
+  dietary_advisor:
+    <<: *dietary-advisor-config
+    build:
+      context: ./
+      args:
+        - BUILD_COMMIT_SHA=localdev
+    command: >-
+      bash -c "uv run --no-sync python main:app --host 0.0.0.0 --reload --port 80"
