@@ -1,0 +1,16 @@
+## EFSA Dietary Reference Values - paraphrased summary
+
+Section: protein
+EFSA established a Population Reference Intake (PRI) for protein of 0.83 g per kg body weight per day for adults; needs may be higher for older adults (1.0-1.2 g/kg) and during pregnancy or recovery.
+
+Section: carbohydrates
+A reference intake range for carbohydrates of 45-60 percent of total energy is recommended for adults and children, with added sugars to remain as low as possible.
+
+Section: dietary fibre
+An adequate intake of 25 g/day for fibre is sufficient for normal laxation in adults; higher intakes have been associated with additional cardiometabolic benefits.
+
+Section: total fat
+A reference intake range of 20-35 percent of total energy from fat is suggested for adults, with saturated fat intake kept as low as possible.
+
+Section: water
+Adequate water intake is set at 2.0 L/day for women and 2.5 L/day for men, including water from food and beverages.
