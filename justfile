@@ -87,33 +87,13 @@ dc command *args:
 
 [group("docker")]
 [doc("Build the dev/runtime docker image")]
-dbuild:
+build:
 	docker compose build {{CONTAINER_NAME}}
 
 [group("docker")]
 [doc("Run the CLI inside docker. Pass args, e.g.: just cli recommend L1_active_male --variant V4")]
 cli *args:
 	docker compose run --rm -w {{WORKDIR}} {{CONTAINER_NAME}} uv run --no-sync python -m dietary_advisor {{args}}
-
-[group("docker")]
-[doc("Run pytest inside docker (mirrors `just test` but in the container)")]
-dtest file=TEST_PATH:
-	docker compose run --rm -w {{WORKDIR}} {{CONTAINER_NAME}} just test {{file}}
-
-[group("docker")]
-[doc("Run full lint suite inside docker")]
-dlint_full:
-	docker compose run --rm -w {{WORKDIR}} {{CONTAINER_NAME}} just lint_full
-
-[group("docker")]
-[doc("Run lint + tests inside docker")]
-dall:
-	docker compose run --rm -w {{WORKDIR}} {{CONTAINER_NAME}} just all
-
-[group("docker")]
-[doc("Open a bash shell inside the container")]
-dshell:
-	docker compose run --rm -w {{WORKDIR}} {{CONTAINER_NAME}} bash
 
 [group("development")]
 [doc("Open bash console (useful when prefixed with dc, as it opens bash inside docker)")]

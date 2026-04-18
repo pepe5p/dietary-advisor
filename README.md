@@ -65,7 +65,7 @@ Key environment variables (all are read by `dietary_advisor.config.Settings`):
 ```bash
 docker compose build dietary_advisor
 # or, with just:
-just dbuild
+just build
 ```
 
 The image is single-purpose: it ships dev + runtime dependencies and is meant to be
@@ -110,7 +110,7 @@ on the host thanks to the `./:/code/` bind mount):
 ## Reproduce the full ablation study (one command)
 
 ```bash
-docker compose build dietary_advisor \
+just build \
   && just cli profile import-dir evaluation/profiles \
   && just cli ingest-corpus \
   && just cli evaluate --variants V0,V1,V2,V3,V4 --levels 1,2,3 --repeats 3
@@ -156,9 +156,9 @@ seed excerpts are tracked. Both PDFs and the ChromaDB index land under
 ## Tests, lint, coverage
 
 ```bash
-just dtest         # pytest in the container
-just dlint_full    # ruff + fawltydeps + mypy in the container
-just dall          # lint + tests in the container
+just dc test       # pytest in the container
+just dc lint_full  # ruff + fawltydeps + mypy in the container
+just dc all        # lint + tests in the container
 ```
 
 Bare equivalents:
@@ -178,7 +178,7 @@ smoke test that mocks every LLM call via `pydantic_ai.models.test.TestModel`
 ## Drop into a shell
 
 ```bash
-just dshell
+just dc bash
 # or:
 docker compose run --rm dietary_advisor bash
 ```
