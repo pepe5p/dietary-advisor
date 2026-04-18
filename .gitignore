@@ -172,3 +172,5 @@ evaluation/reports/*.csv
 evaluation/reports/*.png
 evaluation/reports/*.tex
 evaluation/reports/*.md
+# Local notes / scratch markdown
+notes/
