@@ -36,7 +36,7 @@ class VectorStore:
         self._embedding_fn = embedding_fn or embedding_functions.DefaultEmbeddingFunction()
         self._collection = self._client.get_or_create_collection(
             name=_COLLECTION,
-            embedding_function=self._embedding_fn,
+            embedding_function=self._embedding_fn,  # type: ignore[arg-type]
             metadata={"hnsw:space": "cosine"},
         )
 
@@ -57,7 +57,7 @@ class VectorStore:
             if page is not None:
                 meta["page"] = int(page)
             metas.append(meta)
-        self._collection.upsert(ids=ids, documents=docs, metadatas=metas)
+        self._collection.upsert(ids=ids, documents=docs, metadatas=metas)  # type: ignore[arg-type]
 
     def query(self, query: str, top_k: int = 6) -> list[dict[str, Any]]:
         result = self._collection.query(query_texts=[query], n_results=top_k)

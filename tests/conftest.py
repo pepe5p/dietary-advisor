@@ -35,7 +35,7 @@ def _isolate_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     get_api_keys.cache_clear()
 
 
-@pytest.fixture
+@pytest.fixture()
 def healthy_profile() -> UserProfile:
     return UserProfile(
         user_id="t_h",
@@ -47,7 +47,7 @@ def healthy_profile() -> UserProfile:
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def vegan_peanut_profile() -> UserProfile:
     return UserProfile(
         user_id="t_v",
@@ -60,7 +60,7 @@ def vegan_peanut_profile() -> UserProfile:
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def hypertensive_profile() -> UserProfile:
     return UserProfile(
         user_id="t_hyp",
@@ -72,7 +72,7 @@ def hypertensive_profile() -> UserProfile:
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def chicken_food() -> FoodItem:
     return FoodItem(
         name="Chicken breast",
@@ -86,7 +86,7 @@ def chicken_food() -> FoodItem:
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def rice_food() -> FoodItem:
     return FoodItem(
         name="White rice cooked",
@@ -102,7 +102,7 @@ def rice_food() -> FoodItem:
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def peanut_food() -> FoodItem:
     return FoodItem(
         name="Peanut butter",
@@ -116,7 +116,7 @@ def peanut_food() -> FoodItem:
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def salty_food() -> FoodItem:
     return FoodItem(
         name="Salted ham",

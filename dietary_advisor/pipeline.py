@@ -20,7 +20,6 @@ from dataclasses import dataclass, field
 
 from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.nutrition_agent import build_nutrition_agent
-from dietary_advisor.agents.rag_agent import build_rag_agent
 from dietary_advisor.config import get_settings
 from dietary_advisor.knowledge.retriever import HybridRetriever
 from dietary_advisor.profile_manager.service import ProfileService
@@ -31,7 +30,7 @@ from dietary_advisor.schemas.profile import UserProfile
 from dietary_advisor.tools.tdee import derive_macro_targets
 from dietary_advisor.tools.totaller import total_meal_plan
 from dietary_advisor.tools.usda_client import USDAClient
-from dietary_advisor.validation.reflection import ReflectionResult, reflect_and_refine
+from dietary_advisor.validation.reflection import reflect_and_refine, ReflectionResult
 from dietary_advisor.validation.validator import validate_meal_plan
 
 log = logging.getLogger(__name__)

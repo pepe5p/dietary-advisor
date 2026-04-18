@@ -12,7 +12,7 @@ from dietary_advisor.tools.milp_optimizer import (
 )
 
 
-@pytest.fixture
+@pytest.fixture()
 def small_food_set() -> list[FoodItem]:
     return [
         FoodItem(

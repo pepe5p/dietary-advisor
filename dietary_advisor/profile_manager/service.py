@@ -15,7 +15,6 @@ from dietary_advisor.schemas.constraints import ConstraintSource, HardConstraint
 from dietary_advisor.schemas.nutrition import NutrientName
 from dietary_advisor.schemas.profile import Condition, DietPattern, UserProfile
 
-
 # Clinical safety constants. These are conservative defaults sourced from the
 # literature in the kwerenda; they are *not* clinical guidelines themselves
 # and must be cross-validated by the RAG layer before patient-facing use.
@@ -107,9 +106,7 @@ class ProfileService:
           * one ingredient_exclusion per disliked food
           * any clinical-condition rules from `_CONDITION_RULES`
         """
-        out: list[HardConstraint] = [
-            HardConstraint.allergen(a.value) for a in profile.allergens
-        ]
+        out: list[HardConstraint] = [HardConstraint.allergen(a.value) for a in profile.allergens]
         if profile.diet_pattern != DietPattern.OMNIVORE:
             out.append(HardConstraint.diet(profile.diet_pattern.value))
         for disliked in profile.disliked_foods:

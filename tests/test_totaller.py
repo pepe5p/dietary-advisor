@@ -32,13 +32,25 @@ def test_totaller_aggregates_multiple_meals(chicken_food: FoodItem, rice_food: F
     plan = MealPlan(
         user_id="x",
         meals=[
-            Meal(kind=MealKind.LUNCH, recipe=Recipe(name="r", portions=[
-                Portion(food=chicken_food, grams=150),
-                Portion(food=rice_food, grams=200),
-            ])),
-            Meal(kind=MealKind.DINNER, recipe=Recipe(name="r2", portions=[
-                Portion(food=chicken_food, grams=100),
-            ])),
+            Meal(
+                kind=MealKind.LUNCH,
+                recipe=Recipe(
+                    name="r",
+                    portions=[
+                        Portion(food=chicken_food, grams=150),
+                        Portion(food=rice_food, grams=200),
+                    ],
+                ),
+            ),
+            Meal(
+                kind=MealKind.DINNER,
+                recipe=Recipe(
+                    name="r2",
+                    portions=[
+                        Portion(food=chicken_food, grams=100),
+                    ],
+                ),
+            ),
         ],
     )
     totals = total_meal_plan(plan).totals
@@ -65,9 +77,15 @@ def test_totaller_dict_keys_use_nutrient_value() -> None:
     food = FoodItem(name="a", nutrients_per_100g={NutrientName.SODIUM_MG: 500.0})
     plan = MealPlan(
         user_id="x",
-        meals=[Meal(kind=MealKind.LUNCH, recipe=Recipe(
-            name="r", portions=[Portion(food=food, grams=100)],
-        ))],
+        meals=[
+            Meal(
+                kind=MealKind.LUNCH,
+                recipe=Recipe(
+                    name="r",
+                    portions=[Portion(food=food, grams=100)],
+                ),
+            )
+        ],
     )
     d = total_meal_plan_dict(plan)
     assert "sodium_mg" in d

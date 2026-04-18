@@ -13,7 +13,7 @@ from rich.table import Table
 
 from dietary_advisor.config import get_settings
 from dietary_advisor.knowledge.ingest import ingest_corpus
-from dietary_advisor.pipeline import VARIANTS, Pipeline
+from dietary_advisor.pipeline import Pipeline, VARIANTS
 from dietary_advisor.profile_manager.service import ProfileService
 from dietary_advisor.profile_manager.store import ProfileStore
 from dietary_advisor.schemas.profile import UserProfile
@@ -41,12 +41,14 @@ def main(verbose: bool = typer.Option(False, "--verbose", "-v")) -> None:
 
 # ---------- recommend ----------------------------------------------------------------------------
 
+
 @app.command()
 def recommend(
     profile_id: str = typer.Argument(..., help="user_id of a profile already in the store."),
     query: str = typer.Option(
         "Plan one balanced day of meals.",
-        "--query", "-q",
+        "--query",
+        "-q",
         help="The user-facing prompt forwarded to the LLM.",
     ),
     variant: str = typer.Option("V4", "--variant", help=f"One of {sorted(VARIANTS)}"),
@@ -82,6 +84,7 @@ def recommend(
 def _render_result(result: object) -> None:
     """Pretty-print a `PipelineResult` to the console."""
     from dietary_advisor.pipeline import PipelineResult  # local import to avoid cycles
+
     assert isinstance(result, PipelineResult)
     console.rule(f"Variant {result.variant} - reflection iterations: {result.iterations}")
 
@@ -122,6 +125,7 @@ def _render_result(result: object) -> None:
 
 
 # ---------- evaluate ----------------------------------------------------------------------------
+
 
 @app.command()
 def evaluate(
@@ -164,6 +168,7 @@ def evaluate(
 
 # ---------- ingest-corpus ----------------------------------------------------------------------
 
+
 @app.command("ingest-corpus")
 def ingest_corpus_cmd(
     force: bool = typer.Option(False, "--force", help="Re-download every PDF even if cached."),
@@ -178,6 +183,7 @@ def ingest_corpus_cmd(
 
 
 # ---------- profile -----------------------------------------------------------------------------
+
 
 @profile_app.command("list")
 def profile_list() -> None:
@@ -245,6 +251,7 @@ def profile_delete(user_id: str) -> None:
 
 
 # ---------- info -------------------------------------------------------------------------------
+
 
 @app.command()
 def info() -> None:

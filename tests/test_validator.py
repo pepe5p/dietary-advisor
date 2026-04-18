@@ -79,9 +79,9 @@ def test_hsr_partial_pass(rice_food: FoodItem, peanut_food: FoodItem) -> None:
         Portion(food=peanut_food, grams=10),
     )
     constraints = [
-        HardConstraint.allergen("peanuts"),     # violated
-        HardConstraint.allergen("milk"),         # satisfied
-        HardConstraint.allergen("eggs"),         # satisfied
+        HardConstraint.allergen("peanuts"),  # violated
+        HardConstraint.allergen("milk"),  # satisfied
+        HardConstraint.allergen("eggs"),  # satisfied
         HardConstraint.allergen("crustaceans"),  # satisfied
     ]
     report = validate_meal_plan(plan, constraints)

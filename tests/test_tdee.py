@@ -40,7 +40,12 @@ def test_lose_goal_decreases_target_kcal() -> None:
 def test_target_kcal_is_capped_safely() -> None:
     # Aggressive 1.5 kg/week on a low-TDEE profile should be capped at -25%.
     p = UserProfile(
-        user_id="x", age=70, sex=Sex.FEMALE, height_cm=160, weight_kg=55, activity_factor=1.2,
+        user_id="x",
+        age=70,
+        sex=Sex.FEMALE,
+        height_cm=160,
+        weight_kg=55,
+        activity_factor=1.2,
     )
     p = p.model_copy(update={"goal": p.goal.model_copy(update={"kind": GoalKind.LOSE, "weekly_rate_kg": 1.5})})
     e = estimate_energy(p)

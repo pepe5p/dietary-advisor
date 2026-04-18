@@ -22,8 +22,7 @@ class HardRule(ABC):
     constraint: HardConstraint
 
     @abstractmethod
-    def check(self, plan: MealPlan, totals: NutrientTotals) -> list[Violation]:
-        ...
+    def check(self, plan: MealPlan, totals: NutrientTotals) -> list[Violation]: ...
 
 
 @dataclass
@@ -40,8 +39,7 @@ class AllergenExclusionRule(HardRule):
                         Violation(
                             constraint=self.constraint,
                             detail=(
-                                f"{portion.food.name!r} in {meal.kind.value} contains the "
-                                f"excluded allergen {target!r}."
+                                f"{portion.food.name!r} in {meal.kind.value} contains the excluded allergen {target!r}."
                             ),
                             offending_item=portion.food.name,
                         ),
@@ -86,8 +84,7 @@ class DietPatternRule(HardRule):
                         Violation(
                             constraint=self.constraint,
                             detail=(
-                                f"{portion.food.name!r} is not tagged {target!r} (tags: "
-                                f"{sorted(tags) or 'none'})."
+                                f"{portion.food.name!r} is not tagged {target!r} (tags: {sorted(tags) or 'none'})."
                             ),
                             offending_item=portion.food.name,
                         ),
@@ -111,10 +108,7 @@ class MaxNutrientRule(HardRule):
             return [
                 Violation(
                     constraint=self.constraint,
-                    detail=(
-                        f"Total {nutrient.value} = {actual:.2f} exceeds maximum "
-                        f"{self.constraint.value:.2f}."
-                    ),
+                    detail=(f"Total {nutrient.value} = {actual:.2f} exceeds maximum {self.constraint.value:.2f}."),
                     offending_value=actual,
                 ),
             ]
@@ -137,10 +131,7 @@ class MinNutrientRule(HardRule):
             return [
                 Violation(
                     constraint=self.constraint,
-                    detail=(
-                        f"Total {nutrient.value} = {actual:.2f} is below minimum "
-                        f"{self.constraint.value:.2f}."
-                    ),
+                    detail=(f"Total {nutrient.value} = {actual:.2f} is below minimum {self.constraint.value:.2f}."),
                     offending_value=actual,
                 ),
             ]

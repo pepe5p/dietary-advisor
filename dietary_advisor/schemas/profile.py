@@ -107,10 +107,7 @@ class UserProfile(BaseModel):
         default=1.55,
         ge=1.2,
         le=2.4,
-        description=(
-            "Mifflin-St Jeor PAL: 1.2 sedentary, 1.375 light, 1.55 moderate, "
-            "1.725 active, 1.9 very active."
-        ),
+        description=("Mifflin-St Jeor PAL: 1.2 sedentary, 1.375 light, 1.55 moderate, 1.725 active, 1.9 very active."),
     )
 
     allergens: list[Allergen] = Field(default_factory=list)

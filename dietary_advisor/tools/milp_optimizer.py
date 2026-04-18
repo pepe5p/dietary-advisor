@@ -70,11 +70,9 @@ def _filter_eligible_foods(
             if c.kind == "ingredient_exclusion" and c.target in f.name.lower():
                 ok = False
                 break
-            if c.kind == "diet_pattern":
-                # We require the food to be tagged with the diet pattern.
-                if c.target not in {t.lower() for t in f.tags}:
-                    ok = False
-                    break
+            if c.kind == "diet_pattern" and c.target not in {t.lower() for t in f.tags}:
+                ok = False
+                break
         if ok:
             eligible.append(f)
     return eligible
@@ -100,8 +98,7 @@ def optimize_portions(
     # Decision variables: continuous grams per food (we use an LP, not MILP, for
     # speed; integrality is rarely meaningful for "grams of broccoli").
     prob = pulp.LpProblem("diet", pulp.LpMinimize)
-    grams = {f.name: pulp.LpVariable(f"g_{i}", lowBound=_MIN_GRAMS, upBound=_MAX_GRAMS)
-             for i, f in enumerate(eligible)}
+    grams = {f.name: pulp.LpVariable(f"g_{i}", lowBound=_MIN_GRAMS, upBound=_MAX_GRAMS) for i, f in enumerate(eligible)}
 
     # Auxiliary variables for absolute deviation from target on each tracked macro.
     targets_d = targets.as_dict()
@@ -112,9 +109,7 @@ def optimize_portions(
         dev_neg[nutrient] = pulp.LpVariable(f"dn_{nutrient.value}", lowBound=0)
 
     def total_for(nutrient: NutrientName) -> pulp.LpAffineExpression:
-        return pulp.lpSum(
-            (f.nutrients_per_100g.get(nutrient, 0.0) / 100.0) * grams[f.name] for f in eligible
-        )
+        return pulp.lpSum((f.nutrients_per_100g.get(nutrient, 0.0) / 100.0) * grams[f.name] for f in eligible)
 
     # Tie totals to deviations: total - target = dp - dn.
     for nutrient, target_val in targets_d.items():
@@ -134,10 +129,7 @@ def optimize_portions(
         prob += total_for(nutrient) >= c.value, f"min_{c.target}"
 
     # Objective: weighted L1 deviation across tracked macros.
-    prob += pulp.lpSum(
-        weights.get(n, 1.0) * (dev_pos[n] + dev_neg[n]) / max(targets_d[n], 1.0)
-        for n in targets_d
-    )
+    prob += pulp.lpSum(weights.get(n, 1.0) * (dev_pos[n] + dev_neg[n]) / max(targets_d[n], 1.0) for n in targets_d)
 
     solver = pulp.PULP_CBC_CMD(msg=False)
     prob.solve(solver)
@@ -149,10 +141,7 @@ def optimize_portions(
     totals_out: dict[NutrientName, float] = {}
     for nutrient in targets_d:
         totals_out[nutrient] = round(
-            sum(
-                (f.nutrients_per_100g.get(nutrient, 0.0) / 100.0) * grams_out[f.name]
-                for f in eligible
-            ),
+            sum((f.nutrients_per_100g.get(nutrient, 0.0) / 100.0) * grams_out[f.name] for f in eligible),
             2,
         )
     return OptimisationResult(

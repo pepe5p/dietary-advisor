@@ -28,13 +28,22 @@ def test_user_profile_complexity_levels() -> None:
     assert healthy.complexity_level == 1
 
     veggie = UserProfile(
-        user_id="b", age=30, sex=Sex.FEMALE, height_cm=170, weight_kg=60,
-        diet_pattern=DietPattern.VEGAN, allergens=[Allergen.PEANUTS],
+        user_id="b",
+        age=30,
+        sex=Sex.FEMALE,
+        height_cm=170,
+        weight_kg=60,
+        diet_pattern=DietPattern.VEGAN,
+        allergens=[Allergen.PEANUTS],
     )
     assert veggie.complexity_level == 2
 
     clinical = UserProfile(
-        user_id="c", age=58, sex=Sex.MALE, height_cm=174, weight_kg=95,
+        user_id="c",
+        age=58,
+        sex=Sex.MALE,
+        height_cm=174,
+        weight_kg=95,
         conditions=[Condition.TYPE_2_DIABETES, Condition.HYPERTENSION],
     )
     assert clinical.complexity_level == 3
@@ -42,7 +51,11 @@ def test_user_profile_complexity_levels() -> None:
 
 def test_user_profile_normalises_dislikes_and_drops_none_when_clinical() -> None:
     p = UserProfile(
-        user_id="d", age=30, sex=Sex.MALE, height_cm=180, weight_kg=78,
+        user_id="d",
+        age=30,
+        sex=Sex.MALE,
+        height_cm=180,
+        weight_kg=78,
         disliked_foods=["  Liver ", "liver", "PORK"],
         conditions=[Condition.NONE, Condition.HYPERTENSION],
     )

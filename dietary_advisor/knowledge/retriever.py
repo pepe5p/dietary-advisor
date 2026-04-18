@@ -108,9 +108,9 @@ class HybridRetriever:
         for cid, (_, meta, text) in dense.items():
             text_meta[cid] = (text, meta)
         for cid in all_ids - text_meta.keys():
-            for d in self._docs:
-                if d["id"] == cid:
-                    text_meta[cid] = (d["text"], d["metadata"])
+            for doc in self._docs:
+                if doc["id"] == cid:
+                    text_meta[cid] = (doc["text"], doc["metadata"])
                     break
 
         ranked = sorted(fused.items(), key=lambda kv: kv[1], reverse=True)[:top_k]

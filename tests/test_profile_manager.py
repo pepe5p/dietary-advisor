@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from dietary_advisor.profile_manager.service import ProfileService
 from dietary_advisor.profile_manager.store import ProfileStore
@@ -44,7 +45,7 @@ def test_store_delete() -> None:
     assert not store.delete("del")
 
 
-def test_store_import_dir(tmp_path) -> None:
+def test_store_import_dir(tmp_path: Path) -> None:
     d = tmp_path / "profiles"
     d.mkdir()
     p = UserProfile(user_id="imp", age=25, sex=Sex.MALE, height_cm=175, weight_kg=70)
@@ -60,7 +61,11 @@ def test_service_derives_allergen_constraints() -> None:
     store = ProfileStore()
     service = ProfileService(store=store)
     p = UserProfile(
-        user_id="x", age=27, sex=Sex.FEMALE, height_cm=170, weight_kg=60,
+        user_id="x",
+        age=27,
+        sex=Sex.FEMALE,
+        height_cm=170,
+        weight_kg=60,
         allergens=[Allergen.PEANUTS, Allergen.MILK],
         diet_pattern=DietPattern.VEGAN,
         disliked_foods=["mushroom"],
@@ -77,13 +82,14 @@ def test_service_derives_clinical_rules_for_hypertension() -> None:
     store = ProfileStore()
     service = ProfileService(store=store)
     p = UserProfile(
-        user_id="hyp", age=58, sex=Sex.MALE, height_cm=174, weight_kg=95,
+        user_id="hyp",
+        age=58,
+        sex=Sex.MALE,
+        height_cm=174,
+        weight_kg=95,
         conditions=[Condition.HYPERTENSION],
     )
     constraints = service.derive_hard_constraints(p)
-    sodium_rules = [
-        c for c in constraints
-        if c.kind == "max_nutrient" and c.target == NutrientName.SODIUM_MG.value
-    ]
+    sodium_rules = [c for c in constraints if c.kind == "max_nutrient" and c.target == NutrientName.SODIUM_MG.value]
     assert sodium_rules
     assert sodium_rules[0].value == 2000.0

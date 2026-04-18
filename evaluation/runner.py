@@ -19,6 +19,7 @@ import pandas as pd
 from dietary_advisor.pipeline import Pipeline, PipelineResult, VariantConfig
 from dietary_advisor.profile_manager.service import ProfileService
 from dietary_advisor.profile_manager.store import ProfileStore
+from dietary_advisor.schemas.nutrition import NutrientName
 from evaluation.metrics import csr, faithfulness, hsr, nutrient_errors, ssr
 from evaluation.scenarios import Scenario, filter_scenarios
 
@@ -82,8 +83,9 @@ async def _run_one(pipeline: Pipeline, scenario: Scenario, service: ProfileServi
         **{f"err_{k}_pct": v for k, v in err.per_nutrient.items()},
         "Faithfulness": f,
         "kcal_target": result.targets.energy_kcal,
-        "kcal_actual": result.report.totals.get("energy_kcal", 0.0)
-        if isinstance(result.report.totals, dict) else 0.0,
+        "kcal_actual": result.report.totals.get(NutrientName.ENERGY_KCAL, 0.0)
+        if isinstance(result.report.totals, dict)
+        else 0.0,
         "elapsed_s": round(elapsed, 2),
         "error": None,
     }

@@ -31,22 +31,22 @@ FDC_BASE_URL = "https://api.nal.usda.gov/fdc/v1"
 # Factor converts USDA's reported value into the canonical unit.
 # Reference IDs: https://fdc.nal.usda.gov/portal-data/external/dataDictionary
 _USDA_NUTRIENT_MAP: dict[int, tuple[NutrientName, float]] = {
-    1008: (NutrientName.ENERGY_KCAL, 1.0),       # Energy (kcal)
-    2047: (NutrientName.ENERGY_KCAL, 1.0),       # Energy (Atwater general factors)
-    2048: (NutrientName.ENERGY_KCAL, 1.0),       # Energy (Atwater specific factors)
-    1003: (NutrientName.PROTEIN_G, 1.0),         # Protein (g)
-    1005: (NutrientName.CARBS_G, 1.0),           # Carbohydrate, by difference (g)
-    1004: (NutrientName.FAT_G, 1.0),             # Total lipid (g)
-    1258: (NutrientName.SATURATED_FAT_G, 1.0),   # Fatty acids, total saturated (g)
-    1079: (NutrientName.FIBER_G, 1.0),           # Fiber, total dietary (g)
-    2000: (NutrientName.SUGAR_G, 1.0),           # Sugars, total
-    1093: (NutrientName.SODIUM_MG, 1.0),         # Sodium, Na (mg)
-    1092: (NutrientName.POTASSIUM_MG, 1.0),      # Potassium, K (mg)
-    1087: (NutrientName.CALCIUM_MG, 1.0),        # Calcium, Ca (mg)
-    1089: (NutrientName.IRON_MG, 1.0),           # Iron, Fe (mg)
-    1162: (NutrientName.VITAMIN_C_MG, 1.0),      # Vitamin C (mg)
-    1114: (NutrientName.VITAMIN_D_UG, 1.0),      # Vitamin D (D2 + D3) (mcg)
-    1253: (NutrientName.CHOLESTEROL_MG, 1.0),    # Cholesterol (mg)
+    1008: (NutrientName.ENERGY_KCAL, 1.0),  # Energy (kcal)
+    2047: (NutrientName.ENERGY_KCAL, 1.0),  # Energy (Atwater general factors)
+    2048: (NutrientName.ENERGY_KCAL, 1.0),  # Energy (Atwater specific factors)
+    1003: (NutrientName.PROTEIN_G, 1.0),  # Protein (g)
+    1005: (NutrientName.CARBS_G, 1.0),  # Carbohydrate, by difference (g)
+    1004: (NutrientName.FAT_G, 1.0),  # Total lipid (g)
+    1258: (NutrientName.SATURATED_FAT_G, 1.0),  # Fatty acids, total saturated (g)
+    1079: (NutrientName.FIBER_G, 1.0),  # Fiber, total dietary (g)
+    2000: (NutrientName.SUGAR_G, 1.0),  # Sugars, total
+    1093: (NutrientName.SODIUM_MG, 1.0),  # Sodium, Na (mg)
+    1092: (NutrientName.POTASSIUM_MG, 1.0),  # Potassium, K (mg)
+    1087: (NutrientName.CALCIUM_MG, 1.0),  # Calcium, Ca (mg)
+    1089: (NutrientName.IRON_MG, 1.0),  # Iron, Fe (mg)
+    1162: (NutrientName.VITAMIN_C_MG, 1.0),  # Vitamin C (mg)
+    1114: (NutrientName.VITAMIN_D_UG, 1.0),  # Vitamin D (D2 + D3) (mcg)
+    1253: (NutrientName.CHOLESTEROL_MG, 1.0),  # Cholesterol (mg)
 }
 
 
@@ -72,9 +72,24 @@ _ALLERGEN_KEYWORDS: dict[str, tuple[str, ...]] = {
 
 # Vegetarian / vegan classifier hints.
 _MEAT_KEYWORDS: tuple[str, ...] = (
-    "beef", "pork", "chicken", "turkey", "lamb", "veal", "duck", "goose",
-    "bacon", "sausage", "ham", "salami", "prosciutto", "pepperoni",
-    "venison", "rabbit", "liver", "kidney",
+    "beef",
+    "pork",
+    "chicken",
+    "turkey",
+    "lamb",
+    "veal",
+    "duck",
+    "goose",
+    "bacon",
+    "sausage",
+    "ham",
+    "salami",
+    "prosciutto",
+    "pepperoni",
+    "venison",
+    "rabbit",
+    "liver",
+    "kidney",
 )
 _FISH_KEYWORDS: tuple[str, ...] = sum(
     (_ALLERGEN_KEYWORDS["fish"], _ALLERGEN_KEYWORDS["crustaceans"], _ALLERGEN_KEYWORDS["molluscs"]),
@@ -202,8 +217,15 @@ class USDAClient:
     def __exit__(self, *exc: object) -> None:
         self.close()
 
-    def _request(self, method: str, path: str, *, params: dict[str, Any] | None = None,
-                 json_body: dict[str, Any] | None = None, retries: int = 3) -> dict[str, Any]:
+    def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json_body: dict[str, Any] | None = None,
+        retries: int = 3,
+    ) -> dict[str, Any]:
         params = dict(params or {})
         params["api_key"] = self._api_key
         last_exc: Exception | None = None
@@ -215,8 +237,7 @@ class USDAClient:
             except (httpx.HTTPError, httpx.TimeoutException) as exc:
                 last_exc = exc
                 wait = min(2 ** (attempt - 1), 8)
-                log.warning("USDA request failed (attempt %d/%d): %s. Backing off %ds.",
-                            attempt, retries, exc, wait)
+                log.warning("USDA request failed (attempt %d/%d): %s. Backing off %ds.", attempt, retries, exc, wait)
                 time.sleep(wait)
         raise RuntimeError(f"USDA request {method} {path} failed after {retries} attempts: {last_exc}")
 

@@ -11,20 +11,21 @@ import logging
 from typing import Any
 
 from pydantic_ai import Agent, RunContext
+from pydantic_ai.models import Model
 
 from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.prompts import NUTRITION_AGENT_SYSTEM, REFLECTION_REFINER_SYSTEM
 from dietary_advisor.config import get_settings
 from dietary_advisor.schemas.constraints import ValidationReport
 from dietary_advisor.schemas.meal_plan import MealPlan
-from dietary_advisor.schemas.nutrition import FoodItem
+from dietary_advisor.schemas.nutrition import FoodItem, NutrientName
 from dietary_advisor.tools.milp_optimizer import OptimisationResult, optimize_portions
 from dietary_advisor.tools.totaller import total_meal_plan_dict
 
 log = logging.getLogger(__name__)
 
 
-def build_nutrition_agent(model: str | None = None) -> Agent[AgentDeps, MealPlan]:
+def build_nutrition_agent(model: str | Model | None = None) -> Agent[AgentDeps, MealPlan]:
     """Construct a fresh `Agent` instance bound to AgentDeps + MealPlan output."""
     settings = get_settings()
     agent: Agent[AgentDeps, MealPlan] = Agent(
@@ -55,8 +56,9 @@ def build_nutrition_agent(model: str | None = None) -> Agent[AgentDeps, MealPlan
                 "fdc_id": it.fdc_id,
                 "name": it.name,
                 "tags": it.tags,
-                "kcal_per_100g": it.nutrients_per_100g.get("energy_kcal", 0.0)
-                if isinstance(it.nutrients_per_100g, dict) else 0.0,
+                "kcal_per_100g": it.nutrients_per_100g.get(NutrientName.ENERGY_KCAL, 0.0)
+                if isinstance(it.nutrients_per_100g, dict)
+                else 0.0,
             }
             for it in items
         ]
@@ -99,7 +101,7 @@ def build_nutrition_agent(model: str | None = None) -> Agent[AgentDeps, MealPlan
     return agent
 
 
-def build_refiner_agent(model: str | None = None) -> Agent[AgentDeps, MealPlan]:
+def build_refiner_agent(model: str | Model | None = None) -> Agent[AgentDeps, MealPlan]:
     """Critique-and-refine agent for the Reflection Loop.
 
     Same toolset as the main nutrition agent, but a more targeted prompt that
@@ -123,8 +125,9 @@ def build_refiner_agent(model: str | None = None) -> Agent[AgentDeps, MealPlan]:
 
 def format_violations_prompt(plan: MealPlan, report: ValidationReport) -> str:
     """Render a violation list as a refinement prompt for the refiner agent."""
-    bullets = "\n".join(f"- {v.detail} (constraint: {v.constraint.kind}={v.constraint.target})"
-                        for v in report.violations)
+    bullets = "\n".join(
+        f"- {v.detail} (constraint: {v.constraint.kind}={v.constraint.target})" for v in report.violations
+    )
     return (
         "Previous MealPlan failed validation with the following hard violations:\n"
         f"{bullets}\n\n"

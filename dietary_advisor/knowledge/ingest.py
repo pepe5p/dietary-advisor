@@ -22,8 +22,8 @@ from pathlib import Path
 import httpx
 import pypdf
 
-from dietary_advisor.config import get_settings
-from dietary_advisor.knowledge.sources import SOURCES, CorpusSource
+from dietary_advisor.config import get_settings, Settings
+from dietary_advisor.knowledge.sources import CorpusSource, SOURCES
 from dietary_advisor.knowledge.store import VectorStore
 
 log = logging.getLogger(__name__)
@@ -114,12 +114,16 @@ def _detect_page(chunk: str) -> int | None:
     return int(m.group(1)) if m else None
 
 
-def _build_chunks_for(source: CorpusSource, raw_text: str, settings: object) -> list[dict[str, str | int | None]]:
-    chunks = _chunk(raw_text, chunk_size=settings.rag_chunk_size,  # type: ignore[attr-defined]
-                    overlap=settings.rag_chunk_overlap)  # type: ignore[attr-defined]
+def _build_chunks_for(source: CorpusSource, raw_text: str, settings: Settings) -> list[dict[str, str | int | None]]:
+    chunks = _chunk(
+        raw_text,
+        chunk_size=settings.rag_chunk_size,
+        overlap=settings.rag_chunk_overlap,
+    )
     out: list[dict[str, str | int | None]] = []
     for i, c in enumerate(chunks):
-        chunk_id = f"{source.doc_id}::{i:04d}::{hashlib.sha1(c.encode('utf-8')).hexdigest()[:10]}"
+        chunk_hash = hashlib.sha1(c.encode("utf-8"), usedforsecurity=False).hexdigest()[:10]
+        chunk_id = f"{source.doc_id}::{i:04d}::{chunk_hash}"
         out.append(
             {
                 "id": chunk_id,

@@ -12,6 +12,7 @@ dependencies = [
     "matplotlib>=3.10.8",
     "pandas>=3.0.2",
     "pulp>=3.3.0",
+    "pydantic>=2.0.0",
     "pydantic-ai>=1.84.1",
     "pydantic-settings>=2.13.1",
     "pypdf>=6.10.2",
@@ -67,6 +68,11 @@ select = [
     ]
 ignore = ["S101", "A003", "B904", "N818", "COM812"]
 
+[tool.ruff.lint.per-file-ignores]
+# typer encourages using `typer.Option`/`typer.Argument` as default arguments,
+# which conflicts with B008 ("function call in default argument").
+"dietary_advisor/cli.py" = ["B008"]
+
 [tool.ruff.lint.flake8-pytest-style]
 fixture-parentheses = true
 mark-parentheses = true
@@ -82,8 +88,15 @@ exclude_lines = [
 ]
 
 [tool.fawltydeps]
-code = ["dietary_advisor"]
+code = ["dietary_advisor", "evaluation"]
 deps = ["pyproject.toml"]
+ignore_undeclared = [
+    # First-party packages not declared in pyproject.toml.
+    "dietary_advisor",
+    "evaluation",
+    # `pydantic-ai` re-exports `pydantic_ai` from `pydantic-ai-slim`, which fawltydeps does not pick up.
+    "pydantic_ai",
+]
 ignore_unused = [
     # Dev dependencies. This list should contain ALL of them!
     "copier",
@@ -98,8 +111,10 @@ ignore_unused = [
     "dotenv-linter",
     "pytest-env",
     "python-dotenv",
-    # Runtime deps without direct imports (transitive use, e.g. logfire instrumented by pydantic-ai)
+    # Runtime deps without direct imports (transitive use, e.g. logfire instrumented by pydantic-ai;
+    # pydantic-ai re-exports symbols from pydantic-ai-slim, which is what fawltydeps detects)
     "logfire",
+    "pydantic-ai",
 ]
 
 [tool.mypy]
