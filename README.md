@@ -89,9 +89,10 @@ docker compose run --rm dietary_advisor \
 just cli ingest-corpus
 
 # 3. Run a single recommendation, e.g. V4 (full system) for a Type-2 diabetic
+#    Results print to the terminal; add `--json-out out/...json` to also
+#    persist the full structured result.
 just cli recommend L3_t2dm_male --variant V4 \
-    --query "Plan a 1-day, 1800 kcal menu suitable for me." \
-    --json-out out/L3_t2dm_male_V4.json
+    --query "Plan a 1-day, 1800 kcal menu suitable for me."
 
 # 4. Run the full ablation grid (V0..V4 x L1..L3 x all profiles, 1 repeat)
 just cli evaluate \
@@ -157,14 +158,14 @@ you just want to ask the system for a plan for *yourself*, the loop is:
 
    just cli recommend me \
        --query "Plan a 1-day, ~1700 kcal vegetarian menu I can cook in 30 min." \
-       --variant V4 \
-       --json-out out/me_V4.json
+       --variant V4
    ```
 
-   The console prints macro targets, the meal plan, the validator verdict
-   (HSR plus any hard-constraint violations), and a citation count. The full
-   structured result (plan, validation report, retrieved citations, derived
-   constraints) is written to `out/me_V4.json` for further inspection.
+   Everything is printed to the terminal: macro targets, the meal plan, the
+   validator verdict (HSR plus any hard-constraint violations), and a
+   citation count. If you want the full structured result on disk for further
+   inspection, add `--json-out out/me_V4.json` - it dumps plan, validation
+   report, retrieved citations, and derived constraints as JSON.
 
 4. **Iterate.** Re-run `recommend` with a different `--query` to ask follow-ups
    ("make breakfast lower-carb", "swap the lunch protein"), or with a lower
