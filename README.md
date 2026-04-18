@@ -73,32 +73,53 @@ invoked as a one-shot CLI runner via `docker compose run --rm dietary_advisor ..
 
 ## Quick start
 
-The convenience `just` recipes below all forward to `docker compose run --rm`
-under the hood. The bare-`docker compose` equivalent is shown for the first
-command and is identical in shape for the others.
+The supported workflow is to drop into the container shell once and then drive
+the CLI directly as `dietary-advisor <cmd>`. Inside the image, the CLI is
+exposed on `PATH` so the in-container UX is the same as a locally installed
+tool:
 
 ```bash
+just dc bash
+# you are now inside the container, at /code, with the venv pre-loaded:
+
 # 1. Load the 15 bundled test profiles into the local SQLite store
-just cli profile import-dir evaluation/profiles
-# Equivalent without just:
-docker compose run --rm dietary_advisor \
-    uv run --no-sync python -m dietary_advisor profile import-dir evaluation/profiles
+dietary-advisor profile import-dir evaluation/profiles
 
 # 2. Build the RAG corpus (downloads PDFs where possible, falls back to seed
 #    excerpts shipped under dietary_advisor/knowledge/seeds/)
-just cli ingest-corpus
+dietary-advisor ingest-corpus
 
 # 3. Run a single recommendation, e.g. V4 (full system) for a Type-2 diabetic
 #    Results print to the terminal; add `--json-out out/...json` to also
 #    persist the full structured result.
-just cli recommend L3_t2dm_male --variant V4 \
+dietary-advisor recommend L3_t2dm_male --variant V4 \
     --query "Plan a 1-day, 1800 kcal menu suitable for me."
 
 # 4. Run the full ablation grid (V0..V4 x L1..L3 x all profiles, 1 repeat)
-just cli evaluate \
+dietary-advisor evaluate \
     --variants V0,V1,V2,V3,V4 \
     --levels 1,2,3 \
     --output evaluation/reports/ablation.csv
+```
+
+### One-shot from the host
+
+For scripting or single commands you don't need the interactive shell. Each
+of the commands above also runs as a one-shot from the host via the `just cli`
+wrapper, which spins up a fresh container per invocation:
+
+```bash
+just cli profile import-dir evaluation/profiles
+just cli recommend L3_t2dm_male --variant V4 \
+    --query "Plan a 1-day, 1800 kcal menu suitable for me."
+```
+
+The bare-`docker compose` equivalent (no `just` on the host) is identical in
+shape:
+
+```bash
+docker compose run --rm dietary_advisor \
+    dietary-advisor profile import-dir evaluation/profiles
 ```
 
 The `evaluate` command produces three artefacts in `evaluation/reports/` (visible
@@ -110,19 +131,32 @@ on the host thanks to the `./:/code/` bind mount):
 
 ## Use the CLI interactively (as a human, not a benchmark)
 
-The commands above target the ablation study (bundled profiles, batch grid). If
-you just want to ask the system for a plan for *yourself*, the loop is:
+The commands in the quick start target the ablation study (bundled profiles,
+batch grid). If you just want to ask the system for a plan for *yourself*, the
+loop is:
 
-1. **Discover commands.** Every command and option is self-documented:
+1. **Drop into the container.** All subsequent commands assume you are inside
+   the container shell:
 
    ```bash
-   just cli --help
-   just cli recommend --help
-   just cli profile --help
-   just cli info            # sanity-check resolved settings (.env, model, data dir)
+   just dc bash
    ```
 
-2. **Describe yourself in a JSON profile.** Copy any file under
+   You will land in `/code` with the project bind-mounted from the host, the
+   pre-built venv on `PATH`, and `dietary-advisor` available as a real
+   command. Edits made on the host (e.g. to `my_profile.json` below) are
+   visible immediately - no rebuild needed.
+
+2. **Discover commands.** Every command and option is self-documented:
+
+   ```bash
+   dietary-advisor --help
+   dietary-advisor recommend --help
+   dietary-advisor profile --help
+   dietary-advisor info            # sanity-check resolved settings (.env, model, data dir)
+   ```
+
+3. **Describe yourself in a JSON profile.** Copy any file under
    `evaluation/profiles/` as a template and edit the fields - all of them are
    defined by `UserProfile` in `dietary_advisor/schemas/profile.py`. A minimal
    example (`my_profile.json` in the repo root, so the bind-mount picks it up):
@@ -149,14 +183,14 @@ you just want to ask the system for a plan for *yourself*, the loop is:
    `diet_pattern`, and `goal.kind` are enumerated in
    `dietary_advisor/schemas/profile.py` (the CLI tells you if a value is off).
 
-3. **Import the profile and ask for a plan.** `recommend` looks up the profile
-   by `user_id`, so the import step is a one-off:
+4. **Import the profile and ask for a plan.** `recommend` looks up the
+   profile by `user_id`, so the import step is a one-off:
 
    ```bash
-   just cli profile add my_profile.json
-   just cli profile show me            # verify what got stored
+   dietary-advisor profile add my_profile.json
+   dietary-advisor profile show me            # verify what got stored
 
-   just cli recommend me \
+   dietary-advisor recommend me \
        --query "Plan a 1-day, ~1700 kcal vegetarian menu I can cook in 30 min." \
        --variant V4
    ```
@@ -167,16 +201,21 @@ you just want to ask the system for a plan for *yourself*, the loop is:
    inspection, add `--json-out out/me_V4.json` - it dumps plan, validation
    report, retrieved citations, and derived constraints as JSON.
 
-4. **Iterate.** Re-run `recommend` with a different `--query` to ask follow-ups
-   ("make breakfast lower-carb", "swap the lunch protein"), or with a lower
-   `--variant` (e.g. `V0`, `V1`) to feel the effect of each symbolic component.
-   Re-run `just cli profile add my_profile.json` after editing the file - the
-   importer upserts on `user_id`. Use `just cli profile delete me` to start
-   over.
+5. **Iterate.** Re-run `recommend` with a different `--query` to ask
+   follow-ups ("make breakfast lower-carb", "swap the lunch protein"), or
+   with a lower `--variant` (e.g. `V0`, `V1`) to feel the effect of each
+   symbolic component. Re-run `dietary-advisor profile add my_profile.json`
+   after editing the file - the importer upserts on `user_id`. Use
+   `dietary-advisor profile delete me` to start over.
 
-For a richer pool of citations, run `just cli ingest-corpus` once before
-step 3 - it downloads the clinical-guideline PDFs where reachable and falls
-back to the bundled seed excerpts otherwise.
+For a richer pool of citations, run `dietary-advisor ingest-corpus` once
+before step 4 - it downloads the clinical-guideline PDFs where reachable and
+falls back to the bundled seed excerpts otherwise.
+
+> Prefer one-shots from the host? Every `dietary-advisor <args>` here works
+> as `just cli <args>` from the host (or `docker compose run --rm
+> dietary_advisor dietary-advisor <args>` without `just`). The interactive
+> shell just avoids paying the container-startup cost on every command.
 
 ## Reproduce the full ablation study (one command)
 
@@ -254,8 +293,14 @@ just dc bash
 docker compose run --rm dietary_advisor bash
 ```
 
-Inside the container the same `just` recipes work (`just test`, `just lint_full`,
-etc.), so you can iterate without leaving the shell.
+Inside the container both the CLI and the dev tooling are on `PATH`, so you
+can iterate without leaving the shell:
+
+```bash
+dietary-advisor recommend me --variant V4   # the CLI
+just test                                   # pytest
+just lint_full                              # ruff + fawltydeps + mypy
+```
 
 ## Architecture notes
 

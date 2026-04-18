@@ -51,6 +51,14 @@ COPY . /code
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
 
+# Expose the CLI as a real `dietary-advisor` command on PATH so that an
+# interactive shell inside the container (`just dc bash`) can invoke it as
+# `dietary-advisor recommend ...` instead of the verbose
+# `uv run --no-sync python -m dietary_advisor recommend ...`.
+RUN printf '#!/bin/sh\nexec uv run --no-sync python -m dietary_advisor "$@"\n' \
+        > /usr/local/bin/dietary-advisor \
+    && chmod +x /usr/local/bin/dietary-advisor
+
 # Persistent state (ChromaDB index, profile SQLite, USDA cache) lives under
 # /code/.data, which is bind-mounted from the host via docker-compose so
 # artefacts survive container restarts.
@@ -60,7 +68,8 @@ ENV DA_DATA_DIR=/code/.data \
 
 ENTRYPOINT ["/code/docker-entrypoint.sh"]
 
-# Default to printing CLI help; override via `docker compose run --rm
-# dietary_advisor uv run --no-sync python -m dietary_advisor <cmd>`
-# or via `just cli <cmd>`.
-CMD ["uv", "run", "--no-sync", "python", "-m", "dietary_advisor", "--help"]
+# Default to printing CLI help. Override via:
+#   docker compose run --rm dietary_advisor dietary-advisor <cmd>
+#   just cli <cmd>
+#   just dc bash   (then `dietary-advisor <cmd>` interactively)
+CMD ["dietary-advisor", "--help"]

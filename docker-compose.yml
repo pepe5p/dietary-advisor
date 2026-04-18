@@ -26,4 +26,4 @@ services:
       context: ./
       args:
         - BUILD_COMMIT_SHA=localdev
-    command: ["uv", "run", "--no-sync", "python", "-m", "dietary_advisor", "--help"]
+    command: ["dietary-advisor", "--help"]

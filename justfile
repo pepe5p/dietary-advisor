@@ -92,9 +92,9 @@ build:
 	docker compose build {{CONTAINER_NAME}}
 
 [group("docker")]
-[doc("Run the CLI inside docker. Pass args, e.g.: just cli recommend L1_active_male --variant V4")]
+[doc("Run the CLI inside docker as a one-shot. For interactive use prefer `just dc bash` and then `dietary-advisor ...`.")]
 cli *args:
-	docker compose run --rm -w {{WORKDIR}} {{CONTAINER_NAME}} uv run --no-sync python -m dietary_advisor "$@"
+	docker compose run --rm -w {{WORKDIR}} {{CONTAINER_NAME}} dietary-advisor "$@"
 
 [group("development")]
 [doc("Open bash console (useful when prefixed with dc, as it opens bash inside docker)")]
