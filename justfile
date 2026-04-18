@@ -1,4 +1,5 @@
 set dotenv-load
+set positional-arguments
 
 PATHS_TO_LINT := "dietary_advisor tests"
 TEST_PATH := "tests"
@@ -83,7 +84,7 @@ test file=TEST_PATH:
 [group("docker")]
 [doc("Run any just recipe inside docker (e.g. just dc test)")]
 dc command *args:
-	docker compose run --rm -w {{WORKDIR}} {{CONTAINER_NAME}} just {{command}} {{args}}
+	docker compose run --rm -w {{WORKDIR}} {{CONTAINER_NAME}} just "$@"
 
 [group("docker")]
 [doc("Build the dev/runtime docker image")]
@@ -93,7 +94,7 @@ build:
 [group("docker")]
 [doc("Run the CLI inside docker. Pass args, e.g.: just cli recommend L1_active_male --variant V4")]
 cli *args:
-	docker compose run --rm -w {{WORKDIR}} {{CONTAINER_NAME}} uv run --no-sync python -m dietary_advisor {{args}}
+	docker compose run --rm -w {{WORKDIR}} {{CONTAINER_NAME}} uv run --no-sync python -m dietary_advisor "$@"
 
 [group("development")]
 [doc("Open bash console (useful when prefixed with dc, as it opens bash inside docker)")]

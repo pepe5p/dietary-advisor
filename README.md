@@ -107,6 +107,76 @@ on the host thanks to the `./:/code/` bind mount):
 - `ablation.md` - aggregated Markdown summary table (mean/std per variant, per level)
 - `ablation.png` - matplotlib bar charts of HSR, CSR, MAE-kcal, Faithfulness
 
+## Use the CLI interactively (as a human, not a benchmark)
+
+The commands above target the ablation study (bundled profiles, batch grid). If
+you just want to ask the system for a plan for *yourself*, the loop is:
+
+1. **Discover commands.** Every command and option is self-documented:
+
+   ```bash
+   just cli --help
+   just cli recommend --help
+   just cli profile --help
+   just cli info            # sanity-check resolved settings (.env, model, data dir)
+   ```
+
+2. **Describe yourself in a JSON profile.** Copy any file under
+   `evaluation/profiles/` as a template and edit the fields - all of them are
+   defined by `UserProfile` in `dietary_advisor/schemas/profile.py`. A minimal
+   example (`my_profile.json` in the repo root, so the bind-mount picks it up):
+
+   ```json
+   {
+     "user_id": "me",
+     "name": "Your Name",
+     "age": 32,
+     "sex": "female",
+     "height_cm": 168,
+     "weight_kg": 64,
+     "activity_factor": 1.4,
+     "allergens": ["peanut"],
+     "conditions": ["none"],
+     "diet_pattern": "vegetarian",
+     "disliked_foods": ["olives"],
+     "preferred_foods": ["lentils", "yogurt"],
+     "goal": {"kind": "lose", "weekly_rate_kg": 0.25}
+   }
+   ```
+
+   Allowed values for `sex`, `activity_factor`, `allergens`, `conditions`,
+   `diet_pattern`, and `goal.kind` are enumerated in
+   `dietary_advisor/schemas/profile.py` (the CLI tells you if a value is off).
+
+3. **Import the profile and ask for a plan.** `recommend` looks up the profile
+   by `user_id`, so the import step is a one-off:
+
+   ```bash
+   just cli profile add my_profile.json
+   just cli profile show me            # verify what got stored
+
+   just cli recommend me \
+       --query "Plan a 1-day, ~1700 kcal vegetarian menu I can cook in 30 min." \
+       --variant V4 \
+       --json-out out/me_V4.json
+   ```
+
+   The console prints macro targets, the meal plan, the validator verdict
+   (HSR plus any hard-constraint violations), and a citation count. The full
+   structured result (plan, validation report, retrieved citations, derived
+   constraints) is written to `out/me_V4.json` for further inspection.
+
+4. **Iterate.** Re-run `recommend` with a different `--query` to ask follow-ups
+   ("make breakfast lower-carb", "swap the lunch protein"), or with a lower
+   `--variant` (e.g. `V0`, `V1`) to feel the effect of each symbolic component.
+   Re-run `just cli profile add my_profile.json` after editing the file - the
+   importer upserts on `user_id`. Use `just cli profile delete me` to start
+   over.
+
+For a richer pool of citations, run `just cli ingest-corpus` once before
+step 3 - it downloads the clinical-guideline PDFs where reachable and falls
+back to the bundled seed excerpts otherwise.
+
 ## Reproduce the full ablation study (one command)
 
 ```bash
