@@ -104,18 +104,18 @@ async def run_ablation_grid(
     rows: list[dict[str, object]] = []
 
     for variant in variants:
-        pipeline = Pipeline(variant, profile_service=service)
-        for scenario in scenarios:
-            for rep in range(repeats):
-                row = await _run_one(pipeline, scenario, service)
-                row["repeat"] = rep
-                row["variant_description"] = variant.description
-                rows.append(row)
-                log.info(
-                    "Done %s | %s (rep %d) | HSR=%s CSR=%s MAE=%s",
-                    variant.name, scenario.profile_id, rep,
-                    row.get("HSR"), row.get("CSR"), row.get("MAE_pct"),
-                )
+        with Pipeline(variant, profile_service=service) as pipeline:
+            for scenario in scenarios:
+                for rep in range(repeats):
+                    row = await _run_one(pipeline, scenario, service)
+                    row["repeat"] = rep
+                    row["variant_description"] = variant.description
+                    rows.append(row)
+                    log.info(
+                        "Done %s | %s (rep %d) | HSR=%s CSR=%s MAE=%s",
+                        variant.name, scenario.profile_id, rep,
+                        row.get("HSR"), row.get("CSR"), row.get("MAE_pct"),
+                    )
 
     return pd.DataFrame(rows)
 

@@ -124,17 +124,37 @@ class Pipeline:
         self._profile_service = profile_service or ProfileService.default()
         # Lazy-init heavy collaborators; only create them when the variant needs them.
         self._usda = usda
+        self._owns_usda = False  # Only close the USDA client we created ourselves.
         self._retriever = retriever
 
     def _ensure_usda(self) -> USDAClient:
         if self._usda is None:
             self._usda = USDAClient()
+            self._owns_usda = True
         return self._usda
 
     def _ensure_retriever(self) -> HybridRetriever:
         if self._retriever is None:
             self._retriever = HybridRetriever()
         return self._retriever
+
+    def close(self) -> None:
+        """Release any lazily-created collaborators (currently the USDA client).
+
+        Only collaborators the pipeline created itself are closed; ones passed
+        in through the constructor are left untouched, since their lifecycle
+        is owned by the caller. Idempotent.
+        """
+        if self._owns_usda and self._usda is not None:
+            self._usda.close()
+            self._usda = None
+            self._owns_usda = False
+
+    def __enter__(self) -> Pipeline:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
 
     def _build_constraints(
         self,

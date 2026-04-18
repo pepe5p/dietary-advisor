@@ -90,13 +90,11 @@ exclude_lines = [
 [tool.fawltydeps]
 code = ["dietary_advisor", "evaluation"]
 deps = ["pyproject.toml"]
-ignore_undeclared = [
-    # First-party packages not declared in pyproject.toml.
-    "dietary_advisor",
-    "evaluation",
-    # `pydantic-ai` re-exports `pydantic_ai` from `pydantic-ai-slim`, which fawltydeps does not pick up.
-    "pydantic_ai",
-]
+# Treat the project root as the base directory so that BOTH `dietary_advisor`
+# and `evaluation` are recognised as 1st-party packages (otherwise fawltydeps
+# deduces a separate base-dir per `code` entry and cross-imports between the
+# two top-level packages get flagged as undeclared third-party imports).
+base_dir = "."
 ignore_unused = [
     # Dev dependencies. This list should contain ALL of them!
     "copier",
@@ -111,11 +109,15 @@ ignore_unused = [
     "dotenv-linter",
     "pytest-env",
     "python-dotenv",
-    # Runtime deps without direct imports (transitive use, e.g. logfire instrumented by pydantic-ai;
-    # pydantic-ai re-exports symbols from pydantic-ai-slim, which is what fawltydeps detects)
+    # Runtime dep used transitively (e.g. instrumented by pydantic-ai), no direct import in our code.
     "logfire",
-    "pydantic-ai",
 ]
+
+# The `pydantic_ai` import is physically provided by the `pydantic-ai-slim` wheel,
+# which `pydantic-ai` depends on and re-exports. Tell fawltydeps about this mapping
+# explicitly so the import resolves to our declared `pydantic-ai` dep.
+[tool.fawltydeps.custom_mapping]
+pydantic-ai = ["pydantic_ai"]
 
 [tool.mypy]
 disallow_untyped_defs = true

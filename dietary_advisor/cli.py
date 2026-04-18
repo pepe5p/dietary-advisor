@@ -62,8 +62,8 @@ def recommend(
     if profile is None:
         raise typer.BadParameter(f"No profile with id {profile_id!r}. Use `profile list` to inspect.")
 
-    pipeline = Pipeline(variant, profile_service=service)
-    result = asyncio.run(pipeline.run(profile, query))
+    with Pipeline(variant, profile_service=service) as pipeline:
+        result = asyncio.run(pipeline.run(profile, query))
 
     _render_result(result)
     if json_out is not None:

@@ -59,8 +59,8 @@ async def test_pipeline_v0_produces_valid_meal_plan(
     store.upsert(healthy_profile)
     service = ProfileService(store=store)
 
-    pipeline = Pipeline(VARIANTS["V0"], profile_service=service)
-    result = await pipeline.run(healthy_profile, "Plan one balanced day.")
+    with Pipeline(VARIANTS["V0"], profile_service=service) as pipeline:
+        result = await pipeline.run(healthy_profile, "Plan one balanced day.")
     assert isinstance(result.plan, MealPlan)
     assert result.plan.user_id
     # V0 has no constraints, so the report should be vacuously satisfied.
@@ -78,8 +78,8 @@ async def test_pipeline_v2_runs_with_constraints(
     store.upsert(vegan_peanut_profile)
     service = ProfileService(store=store)
 
-    pipeline = Pipeline(VARIANTS["V2"], profile_service=service)
-    result = await pipeline.run(vegan_peanut_profile, "Plan a vegan day, no nuts.")
+    with Pipeline(VARIANTS["V2"], profile_service=service) as pipeline:
+        result = await pipeline.run(vegan_peanut_profile, "Plan a vegan day, no nuts.")
     # The TestModel-generated MealPlan does not respect constraints by
     # design; what we verify is that the validator correctly produced a
     # report and the constraint set was derived from the profile.

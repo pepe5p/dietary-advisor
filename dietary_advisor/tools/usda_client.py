@@ -14,6 +14,7 @@ import json
 import logging
 import sqlite3
 import time
+import weakref
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -155,18 +156,31 @@ def _parse_food_payload(payload: dict[str, Any]) -> FoodItem:
 
 
 class _SqliteCache:
-    """Bare-bones key-value cache with TTL."""
+    """Bare-bones key-value cache with TTL.
+
+    The underlying `sqlite3.Connection` is registered with `weakref.finalize`
+    so it is *always* closed - either explicitly via `close()` or, as a last
+    resort, when the cache object is garbage-collected. This avoids the
+    `ResourceWarning: unclosed database` pytest emits when a caller forgets
+    to release the cache.
+    """
 
     def __init__(self, path: Path) -> None:
         self._path = path
         path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(str(path))
+        self._conn: sqlite3.Connection | None = sqlite3.connect(str(path))
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS cache (key TEXT PRIMARY KEY, value TEXT NOT NULL, ts REAL NOT NULL)",
         )
         self._conn.commit()
+        # Safety net: close the connection at GC time even if `close()` is
+        # never called. `finalize` runs at most once and is detached by
+        # `close()` below to keep ordering deterministic.
+        self._finalizer = weakref.finalize(self, _close_sqlite_connection, self._conn)
 
     def get(self, key: str, ttl_s: float | None = None) -> Any | None:
+        if self._conn is None:
+            raise RuntimeError("USDA cache is closed")
         row = self._conn.execute("SELECT value, ts FROM cache WHERE key = ?", (key,)).fetchone()
         if row is None:
             return None
@@ -176,6 +190,8 @@ class _SqliteCache:
         return json.loads(value)
 
     def set(self, key: str, value: Any) -> None:
+        if self._conn is None:
+            raise RuntimeError("USDA cache is closed")
         self._conn.execute(
             "INSERT OR REPLACE INTO cache (key, value, ts) VALUES (?, ?, ?)",
             (key, json.dumps(value), time.time()),
@@ -183,7 +199,24 @@ class _SqliteCache:
         self._conn.commit()
 
     def close(self) -> None:
-        self._conn.close()
+        """Close the SQLite connection. Safe to call multiple times."""
+        # Run the finalizer (which closes the connection) and then drop our
+        # own reference so subsequent calls are no-ops.
+        if self._finalizer.alive:
+            self._finalizer()
+        self._conn = None
+
+
+def _close_sqlite_connection(conn: sqlite3.Connection) -> None:
+    """Module-level helper used by `weakref.finalize`.
+
+    Must NOT capture a reference to the owning object, otherwise the
+    finalizer would keep it alive forever.
+    """
+    try:
+        conn.close()
+    except sqlite3.Error:  # pragma: no cover - defensive: don't crash at GC
+        log.debug("Ignoring sqlite error during finalizer close", exc_info=True)
 
 
 class USDAClient:
@@ -205,8 +238,13 @@ class USDAClient:
             timeout=timeout_s or settings.request_timeout_s,
         )
         self._owned_client = client is None
+        self._closed = False
 
     def close(self) -> None:
+        """Release the HTTP client (if owned) and the SQLite cache. Idempotent."""
+        if self._closed:
+            return
+        self._closed = True
         if self._owned_client:
             self._client.close()
         self._cache.close()
