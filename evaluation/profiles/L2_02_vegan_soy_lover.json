@@ -1,0 +1,15 @@
+{
+  "user_id": "L2_02",
+  "name": "Noah Plant",
+  "age": 33,
+  "sex": "male",
+  "height_cm": 178,
+  "weight_kg": 72,
+  "activity_factor": 1.55,
+  "allergens": [],
+  "conditions": ["none"],
+  "diet_pattern": "vegan",
+  "disliked_foods": [],
+  "preferred_foods": ["tofu", "tempeh", "lentils"],
+  "goal": {"kind": "maintain"}
+}

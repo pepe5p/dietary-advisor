@@ -1,0 +1,15 @@
+{
+  "user_id": "L2_03",
+  "name": "Ines Coastal",
+  "age": 41,
+  "sex": "female",
+  "height_cm": 162,
+  "weight_kg": 64,
+  "activity_factor": 1.375,
+  "allergens": ["milk"],
+  "conditions": ["lactose_intolerance"],
+  "diet_pattern": "pescatarian",
+  "disliked_foods": [],
+  "preferred_foods": ["salmon", "rice"],
+  "goal": {"kind": "maintain"}
+}

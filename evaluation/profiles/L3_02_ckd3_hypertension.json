@@ -1,0 +1,16 @@
+{
+  "user_id": "L3_02",
+  "name": "Renal Rita",
+  "age": 67,
+  "sex": "female",
+  "height_cm": 160,
+  "weight_kg": 70,
+  "activity_factor": 1.2,
+  "allergens": [],
+  "conditions": ["ckd_stage_3", "hypertension"],
+  "diet_pattern": "omnivore",
+  "disliked_foods": [],
+  "preferred_foods": ["white rice", "apple"],
+  "goal": {"kind": "maintain"},
+  "notes": "eGFR 42; potassium and sodium restriction needed."
+}

@@ -36,6 +36,9 @@ dev = [
     "python-dotenv>=1.2.1,<2",
 ]
 
+[project.scripts]
+dietary-advisor = "dietary_advisor.cli:app"
+
 [tool.uv]
 package = false
 

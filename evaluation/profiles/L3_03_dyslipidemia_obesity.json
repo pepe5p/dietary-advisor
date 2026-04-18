@@ -1,0 +1,16 @@
+{
+  "user_id": "L3_03",
+  "name": "Cholesterol Carl",
+  "age": 52,
+  "sex": "male",
+  "height_cm": 175,
+  "weight_kg": 105,
+  "activity_factor": 1.375,
+  "allergens": [],
+  "conditions": ["dyslipidemia", "obesity"],
+  "diet_pattern": "mediterranean",
+  "disliked_foods": ["organ meats"],
+  "preferred_foods": ["olive oil", "fish", "vegetables"],
+  "goal": {"kind": "lose", "target_kg": 90, "weekly_rate_kg": 0.5},
+  "notes": "LDL 4.2 mmol/L; statin-naive."
+}

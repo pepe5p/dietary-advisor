@@ -1,0 +1,15 @@
+{
+  "user_id": "L3_05",
+  "name": "Hugh Pressure",
+  "age": 60,
+  "sex": "male",
+  "height_cm": 172,
+  "weight_kg": 88,
+  "activity_factor": 1.375,
+  "allergens": ["milk"],
+  "conditions": ["hypertension", "lactose_intolerance"],
+  "diet_pattern": "dash",
+  "disliked_foods": [],
+  "preferred_foods": ["banana", "oats"],
+  "goal": {"kind": "lose", "target_kg": 82, "weekly_rate_kg": 0.4}
+}

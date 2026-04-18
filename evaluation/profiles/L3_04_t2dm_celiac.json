@@ -1,0 +1,15 @@
+{
+  "user_id": "L3_04",
+  "name": "Tina Two-Diagnoses",
+  "age": 47,
+  "sex": "female",
+  "height_cm": 165,
+  "weight_kg": 78,
+  "activity_factor": 1.55,
+  "allergens": ["gluten"],
+  "conditions": ["type_2_diabetes", "celiac"],
+  "diet_pattern": "omnivore",
+  "disliked_foods": [],
+  "preferred_foods": ["quinoa", "berries"],
+  "goal": {"kind": "lose", "target_kg": 70, "weekly_rate_kg": 0.5}
+}
