@@ -1,21 +1,29 @@
 x-dietary-advisor: &dietary-advisor-config
-  environment:
-    - FLAVOR=localdev
   image: dietaryadvisor-dev
   pull_policy: never
-  volumes:
-    - "./:/code/"
   env_file:
-    - .env
+    - path: .env
+      required: false
+  working_dir: /code
+  volumes:
+    # Bind the project root so source edits, .data/, evaluation/reports/ and
+    # the downloaded corpus PDFs are visible from the host without rebuilds.
+    - "./:/code/"
+    # Anonymous volume that masks the host's macOS .venv with the
+    # container's Linux venv built during `docker compose build`.
+    - "/code/.venv"
 
 
 services:
-  # Please do not set ports here. Use docker-compose.override.yml to set ports. You can find an example in docker-compose.override.yml.example
+  # Single-service CLI runner. Use it via:
+  #   docker compose run --rm dietary_advisor <cmd>
+  # or via the convenience wrappers in the justfile (`just dc <recipe>`).
+  # No `ports` block by default; add one in docker-compose.override.yml if
+  # you ever want to expose a server port.
   dietary_advisor:
     <<: *dietary-advisor-config
     build:
       context: ./
       args:
         - BUILD_COMMIT_SHA=localdev
-    command: >-
-      bash -c "uv run --no-sync python main:app --host 0.0.0.0 --reload --port 80"
+    command: ["uv", "run", "--no-sync", "python", "-m", "dietary_advisor", "--help"]

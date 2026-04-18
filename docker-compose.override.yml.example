@@ -1,4 +1,8 @@
-services:
-  dietary_advisor:
-    ports:
-      - "your-port:80"
+# Optional local-only overrides. Copy to docker-compose.override.yml and edit.
+# The CLI is one-shot by default and exposes no ports; add ports here only if
+# you wire in a long-running server (e.g. a FastAPI inspector, Jupyter, etc.).
+#
+# services:
+#   dietary_advisor:
+#     ports:
+#       - "8888:8888"   # example: jupyter
