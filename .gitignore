@@ -174,3 +174,6 @@ evaluation/reports/*.tex
 evaluation/reports/*.md
 # Local notes / scratch markdown
 notes/
+
+# Local devcontainer
+.devcontainer/
