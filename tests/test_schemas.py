@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from pydantic import ValidationError
 
@@ -84,6 +86,13 @@ def test_food_item_allergen_check() -> None:
 def test_meal_plan_requires_meal() -> None:
     with pytest.raises(ValidationError):
         MealPlan(user_id="x", meals=[])
+
+
+def test_meal_plan_json_schema_groq_compatible() -> None:
+    """Groq rejects tool schemas with propertyNames + unresolved $defs/NutrientName."""
+    schema = json.dumps(MealPlan.model_json_schema())
+    assert "propertyNames" not in schema
+    assert "#/$defs/NutrientName" not in schema
 
 
 def test_hard_constraint_factories() -> None:

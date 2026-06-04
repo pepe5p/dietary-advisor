@@ -12,7 +12,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dietary_advisor.schemas.nutrition import NutrientName
+from dietary_advisor.schemas.nutrition import NutrientAmountMap, NutrientName
 
 
 class ConstraintSource(str, Enum):
@@ -108,7 +108,7 @@ class ValidationReport(BaseModel):
     violations: list[Violation] = Field(default_factory=list)
     # Per-nutrient totals, used by both the Validator and the evaluation harness
     # for MAE/MSE.
-    totals: dict[NutrientName, float] = Field(default_factory=dict)
+    totals: NutrientAmountMap = Field(default_factory=dict)
     # CSR is computed by `evaluation/metrics.py`; left None when produced by
     # the in-pipeline Validator (which only knows about HSR).
     csr: float | None = None

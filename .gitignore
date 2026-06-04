@@ -177,3 +177,5 @@ notes/
 
 # Local devcontainer
 .devcontainer/
+
+.cursor/

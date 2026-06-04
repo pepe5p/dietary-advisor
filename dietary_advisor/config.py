@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     rag_chunk_size: int = Field(default=900, ge=200, le=4000)
     rag_chunk_overlap: int = Field(default=120, ge=0, le=500)
 
+    # --- LLM HTTP (Groq free tier often returns 429 with long Retry-After backoff) ---
+    llm_request_timeout_s: float = Field(default=300.0, gt=0)
+    llm_max_retries: int = Field(default=6, ge=0, le=20)
+
     # --- Misc ---
     request_timeout_s: float = Field(default=60.0, gt=0)
 
@@ -76,6 +80,7 @@ class ApiKeys(BaseSettings):
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
     gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
+    groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
     usda_api_key: str = Field(default="DEMO_KEY", alias="USDA_API_KEY")
 
 

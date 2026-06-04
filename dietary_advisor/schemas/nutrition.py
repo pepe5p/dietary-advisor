@@ -8,8 +8,9 @@ unit-confusion arithmetic errors that vanilla LLMs notoriously produce
 from __future__ import annotations
 
 from enum import Enum
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, WithJsonSchema
 
 
 class NutrientName(str, Enum):
@@ -29,6 +30,21 @@ class NutrientName(str, Enum):
     VITAMIN_C_MG = "vitamin_c_mg"
     VITAMIN_D_UG = "vitamin_d_ug"
     CHOLESTEROL_MG = "cholesterol_mg"
+
+
+# LLM tool / structured-output JSON Schema: Pydantic emits propertyNames + $ref to
+# NutrientName for dict[NutrientName, float], which Groq (and some other providers)
+# reject when $defs are not inlined in the tool parameters fragment.
+NutrientAmountMap = Annotated[
+    dict[NutrientName, float],
+    WithJsonSchema(
+        {
+            "type": "object",
+            "additionalProperties": {"type": "number"},
+            "description": ("Nutrient amounts keyed by canonical name (e.g. energy_kcal, protein_g, sodium_mg)."),
+        }
+    ),
+]
 
 
 # Canonical unit per nutrient - asserted by validators.
@@ -96,7 +112,7 @@ class FoodItem(BaseModel):
     # Per-100g nutrients (canonical units). A dict keyed by NutrientName for
     # O(1) lookup in the Totaller. Values may be missing if the source DB does
     # not provide them.
-    nutrients_per_100g: dict[NutrientName, float] = Field(default_factory=dict)
+    nutrients_per_100g: NutrientAmountMap = Field(default_factory=dict)
 
     # Free-form tags (e.g. "vegetarian", "contains:milk"). The validator uses
     # `contains:<allergen>` tags to enforce HardConstraint allergen exclusions.

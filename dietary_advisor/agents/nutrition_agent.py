@@ -16,6 +16,7 @@ from pydantic_ai.models import Model
 from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.prompts import NUTRITION_AGENT_SYSTEM, REFLECTION_REFINER_SYSTEM
 from dietary_advisor.config import get_settings
+from dietary_advisor.llm import resolve_llm_model
 from dietary_advisor.schemas.constraints import ValidationReport
 from dietary_advisor.schemas.meal_plan import MealPlan
 from dietary_advisor.schemas.nutrition import FoodItem, NutrientName
@@ -29,27 +30,14 @@ def build_nutrition_agent(model: str | Model | None = None) -> Agent[AgentDeps, 
     """Construct a fresh `Agent` instance bound to AgentDeps + MealPlan output."""
     settings = get_settings()
     agent: Agent[AgentDeps, MealPlan] = Agent(
-        model or settings.llm_model,
+        resolve_llm_model(model or settings.llm_model),
         deps_type=AgentDeps,
         output_type=MealPlan,
         system_prompt=NUTRITION_AGENT_SYSTEM,
         retries=2,
     )
 
-    @agent.tool
-    async def lookup_food(ctx: RunContext[AgentDeps], query: str, max_results: int = 3) -> list[dict[str, Any]]:
-        """Search USDA FoodData Central and add the top results to the shortlist.
-
-        Returns a JSON-friendly summary so the LLM can make sensible portioning
-        decisions; the full `FoodItem` objects are kept in `ctx.deps.shortlist`.
-        """
-        if ctx.deps.usda is None:
-            return []
-        try:
-            items = ctx.deps.usda.search(query, page_size=max_results)
-        except Exception as exc:  # noqa: BLE001
-            log.warning("USDA search failed for %r: %s", query, exc)
-            return []
+    def _append_usda_hits(ctx: RunContext[AgentDeps], items: list[FoodItem]) -> list[dict[str, Any]]:
         ctx.deps.shortlist.extend(items)
         return [
             {
@@ -62,6 +50,39 @@ def build_nutrition_agent(model: str | Model | None = None) -> Agent[AgentDeps, 
             }
             for it in items
         ]
+
+    @agent.tool
+    async def lookup_food(ctx: RunContext[AgentDeps], query: str, max_results: int = 2) -> list[dict[str, Any]]:
+        """Search USDA FoodData Central and add the top results to the shortlist.
+
+        Returns a JSON-friendly summary so the LLM can make sensible portioning
+        decisions; the full `FoodItem` objects are kept in `ctx.deps.shortlist`.
+        """
+        if ctx.deps.usda is None:
+            return []
+        try:
+            items = ctx.deps.usda.search(query, page_size=max_results)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("USDA search failed for %r: %s", query, exc)
+            return []
+        return _append_usda_hits(ctx, items)
+
+    @agent.tool
+    async def lookup_foods(
+        ctx: RunContext[AgentDeps],
+        queries: list[str],
+        max_results_per_query: int = 2,
+    ) -> list[dict[str, Any]]:
+        """Batch USDA search: one tool call for several ingredient queries."""
+        if ctx.deps.usda is None or not queries:
+            return []
+        hits: list[FoodItem] = []
+        for query in queries[:6]:
+            try:
+                hits.extend(ctx.deps.usda.search(query, page_size=max_results_per_query))
+            except Exception as exc:  # noqa: BLE001
+                log.warning("USDA search failed for %r: %s", query, exc)
+        return _append_usda_hits(ctx, hits)
 
     @agent.tool
     async def total_meal_plan(ctx: RunContext[AgentDeps], plan: MealPlan) -> dict[str, float]:  # noqa: ARG001
@@ -109,7 +130,7 @@ def build_refiner_agent(model: str | Model | None = None) -> Agent[AgentDeps, Me
     """
     settings = get_settings()
     agent: Agent[AgentDeps, MealPlan] = Agent(
-        model or settings.llm_model,
+        resolve_llm_model(model or settings.llm_model),
         deps_type=AgentDeps,
         output_type=MealPlan,
         system_prompt=REFLECTION_REFINER_SYSTEM,

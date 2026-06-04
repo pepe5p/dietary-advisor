@@ -11,7 +11,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dietary_advisor.schemas.nutrition import FoodItem, NutrientName
+from dietary_advisor.schemas.nutrition import FoodItem, NutrientAmountMap, NutrientName
 
 
 class MealKind(str, Enum):
@@ -65,7 +65,7 @@ class NutrientTotals(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    totals: dict[NutrientName, float] = Field(default_factory=dict)
+    totals: NutrientAmountMap = Field(default_factory=dict)
 
     def get(self, name: NutrientName, default: float = 0.0) -> float:
         return self.totals.get(name, default)

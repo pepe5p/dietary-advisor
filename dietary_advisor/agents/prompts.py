@@ -23,8 +23,9 @@ Hard rules you MUST follow:
 
 Process:
 - Inspect the supplied profile and macro targets.
-- Use `lookup_food` 5-12 times to assemble a candidate ingredient set covering
-  protein, complex carbs, healthy fats, vegetables and fibre.
+- A USDA shortlist is prefetched for you (see the prompt). Prefer those foods.
+- Use `lookup_foods` or `lookup_food` only for missing staples (at most 3 extra
+  USDA searches total) — each search costs an LLM round-trip.
 - Call `optimize_portions` to get a quantitatively-good gram allocation, then
   *re-organise* the resulting portions into breakfast, lunch and dinner so
   the plan is culturally plausible.
