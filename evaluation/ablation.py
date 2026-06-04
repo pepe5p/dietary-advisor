@@ -6,7 +6,7 @@ in lists/strings without importing the orchestrator internals.
 
 from __future__ import annotations
 
-from dietary_advisor.pipeline import VARIANTS, VariantConfig
+from dietary_advisor.pipeline import VariantConfig, VARIANTS
 
 
 def variants_from_ids(ids: list[str]) -> list[VariantConfig]:

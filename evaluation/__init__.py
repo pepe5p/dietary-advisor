@@ -1,1 +1,17 @@
-"""Evaluation harness for the ablation study (V0 baseline through V4 full system)."""
+"""Ablation evaluation harness: quantitative, structural, and qualitative validation."""
+
+from evaluation.validation import (
+    macro_errors,
+    NutrientErrors,
+    QualitativeResult,
+    score_soft_preferences,
+    structural_csr,
+)
+
+__all__ = [
+    "NutrientErrors",
+    "QualitativeResult",
+    "macro_errors",
+    "score_soft_preferences",
+    "structural_csr",
+]

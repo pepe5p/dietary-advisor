@@ -28,7 +28,7 @@ implicit conventions that aren't obvious from the code.
 | `dietary_advisor/knowledge/` | Hybrid RAG over clinical guideline PDFs (with seed-text fallback). |
 | `dietary_advisor/agents/` | `pydantic-ai` agents: nutrition, RAG, profile, refiner. |
 | `dietary_advisor/validation/` | Rule-based validator + reflection loop. |
-| `evaluation/` | Test profiles, scenarios, metrics (HSR/SSR/CSR, MAE/MSE, Faithfulness), batch runner, report generator. |
+| `evaluation/` | Frozen `EvalProfile` cases, scenarios, three-stage validation (MAE/MSE, structural CSR, G-Eval judge), batch runner, report generator. |
 | `tests/` | Unit + smoke tests. Pipeline smoke test mocks LLMs via `pydantic_ai.models.test.TestModel` - no API key required. |
 
 ## Runtime model - read this before running anything
@@ -105,6 +105,6 @@ container.
 - Read `dietary_advisor/pipeline.py` first - it's the single call graph that
   ties everything together.
 - For ablation/evaluation questions, see `evaluation/runner.py` and
-  `evaluation/metrics.py`.
+  `evaluation/validation/`.
 - Reference docs and source URLs for clinical guidelines live in
   `dietary_advisor/knowledge/sources.py`.

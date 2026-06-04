@@ -221,7 +221,6 @@ falls back to the bundled seed excerpts otherwise.
 
 ```bash
 just build \
-  && just cli profile import-dir evaluation/profiles \
   && just cli ingest-corpus \
   && just cli evaluate --variants V0,V1,V2,V3,V4 --levels 1,2,3 --repeats 3
 ```
@@ -239,11 +238,8 @@ just cli profile show L1_active_male      # dump JSON
 just cli profile delete L1_active_male
 ```
 
-Profiles live in `evaluation/profiles/` with file-name conventions:
-
-- `L1_*` - healthy adults (no clinical conditions, no allergens)
-- `L2_*` - dietary preferences and/or allergens (vegan, vegetarian, peanut allergy, ...)
-- `L3_*` - clinical conditions (T2DM, hypertension, CKD, hyperlipidaemia, ...)
+Ablation profiles are frozen in [`evaluation/profiles/cases.py`](evaluation/profiles/cases.py)
+as `EvalProfile` entries (`L1_*` … `L3_*` case ids encode complexity level).
 
 ## Clinical knowledge corpus
 

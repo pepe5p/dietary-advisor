@@ -1,5 +1,11 @@
 """Pydantic-based DSL: the symbolic interface between the LLM and the deterministic core."""
 
+from dietary_advisor.schemas.agent_output import (
+    AgentMeal,
+    AgentMealPlan,
+    AgentRecipe,
+    PortionRef,
+)
 from dietary_advisor.schemas.constraints import (
     HardConstraint,
     SoftConstraint,
@@ -31,6 +37,9 @@ from dietary_advisor.schemas.profile import (
 )
 
 __all__ = [
+    "AgentMeal",
+    "AgentMealPlan",
+    "AgentRecipe",
     "Allergen",
     "Citation",
     "Condition",
@@ -46,6 +55,7 @@ __all__ = [
     "NutrientName",
     "NutrientTotals",
     "Portion",
+    "PortionRef",
     "Recipe",
     "Sex",
     "SoftConstraint",

@@ -12,6 +12,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from pydantic_ai.models import Model
+
 from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.nutrition_agent import build_refiner_agent, format_violations_prompt
 from dietary_advisor.config import get_settings
@@ -37,7 +39,7 @@ async def reflect_and_refine(
     deps: AgentDeps,
     *,
     max_loops: int | None = None,
-    model: str | None = None,
+    model: str | Model | None = None,
 ) -> ReflectionResult:
     """Iteratively call the refiner agent until validation passes or budget is hit."""
     settings = get_settings()

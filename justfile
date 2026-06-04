@@ -1,7 +1,7 @@
 set dotenv-load
 set positional-arguments
 
-PATHS_TO_LINT := "dietary_advisor tests"
+PATHS_TO_LINT := "dietary_advisor evaluation tests"
 TEST_PATH := "tests"
 ANSWERS_FILE := ".copier/.copier-answers.copier-python-project.yml"
 CONTAINER_NAME := "dietary_advisor"
@@ -51,8 +51,8 @@ lint_ff: deps ruff
 
 [group("lint")]
 [doc("Automatically fix lint problems (only reported by ruff)")]
-lint_fix:
-	uv run ruff check {{PATHS_TO_LINT}} --fix
+lint_fix *args:
+	uv run ruff check {{PATHS_TO_LINT}} --fix {{args}}
 	uv run ruff format {{PATHS_TO_LINT}}
 
 [group("lint")]

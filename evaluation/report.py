@@ -6,7 +6,6 @@ from pathlib import Path
 
 import matplotlib
 
-# Use a non-interactive backend for headless reproducibility.
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt  # noqa: E402
@@ -14,7 +13,7 @@ import pandas as pd  # noqa: E402
 
 from evaluation.runner import variant_summary  # noqa: E402
 
-_METRIC_ORDER = ["HSR", "SSR", "CSR", "MAE_pct", "MSE_pct", "Faithfulness", "iterations", "elapsed_s"]
+_METRIC_ORDER = ["CSR", "MAE_pct", "MSE_pct", "SoftScore", "iterations", "elapsed_s"]
 
 
 def write_markdown_summary(df: pd.DataFrame, dest: Path) -> None:
@@ -41,19 +40,20 @@ def write_latex_summary(df: pd.DataFrame, dest: Path) -> None:
 
 
 def write_plots(df: pd.DataFrame, dest: Path) -> None:
-    """Render a 2x2 matplotlib figure with the four headline metrics."""
+    """Render a 2x2 matplotlib figure with headline metrics."""
     summary = variant_summary(df)
     if summary.empty:
         return
     fig, axes = plt.subplots(2, 2, figsize=(12, 8), sharex=True)
     metrics_to_plot = [
-        ("HSR", "Hard Satisfaction Rate", axes[0][0], False),
-        ("CSR", "Constraint Satisfaction Rate", axes[0][1], False),
+        ("CSR", "Structural CSR (hard constraints)", axes[0][0], False),
+        ("SoftScore", "Soft preference score (G-Eval)", axes[0][1], False),
         ("MAE_pct", "Mean Absolute Macro Error (%)", axes[1][0], True),
-        ("Faithfulness", "Faithfulness", axes[1][1], False),
+        ("MSE_pct", "Mean Squared Macro Error (%)", axes[1][1], True),
     ]
     for metric, title, ax, lower_is_better in metrics_to_plot:
         if metric not in summary.columns:
+            ax.set_visible(False)
             continue
         pivot = summary.pivot(index="variant", columns="level", values=metric)
         pivot.plot(kind="bar", ax=ax, rot=0)

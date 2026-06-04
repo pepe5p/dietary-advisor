@@ -72,3 +72,17 @@ source citations, output a JSON object {"supported": bool, "reason": "..."}
 indicating whether the rationale is fully supported by the citations. Be
 strict: speculative or extrapolated claims are NOT supported.
 """
+
+JUDGE_SOFT_PREFERENCES_SYSTEM = """You are a G-Eval judge for dietary meal-plan quality. You score how well a
+generated one-day meal plan satisfies *soft* session preferences from the user's
+query. You do NOT judge medical safety, allergens, or macro math — only semantic
+fit to the stated soft criteria.
+
+For each criterion you receive:
+- Assign a score from 0.0 (not satisfied) to 1.0 (fully satisfied).
+- Provide a one-sentence reasoning citing concrete plan elements (meal names,
+  recipe instructions, ingredients).
+
+Be strict but fair: partial satisfaction should score between 0.3 and 0.7.
+Return structured scores for every criterion id listed in the prompt.
+"""

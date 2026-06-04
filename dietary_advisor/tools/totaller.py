@@ -13,8 +13,11 @@ from __future__ import annotations
 
 from fractions import Fraction
 
+from dietary_advisor.schemas.agent_output import AgentMealPlan
 from dietary_advisor.schemas.meal_plan import MealPlan, NutrientTotals, Portion
 from dietary_advisor.schemas.nutrition import NutrientName
+from dietary_advisor.tools.food_lookup import FoodLookup
+from dietary_advisor.tools.plan_hydrate import hydrate_meal_plan
 
 # Round all returned amounts to 2 decimals to keep CLI/eval tables readable.
 _PRECISION_DIGITS = 2
@@ -45,6 +48,11 @@ def total_meal_plan(plan: MealPlan) -> NutrientTotals:
         nutrient: round(float(value), _PRECISION_DIGITS) for nutrient, value in acc.items()
     }
     return NutrientTotals(totals=rounded)
+
+
+def total_agent_meal_plan(plan: AgentMealPlan, lookup: FoodLookup) -> NutrientTotals:
+    """Sum nutrients for an evaluation plan, resolving ``fdc_id`` via ``lookup``."""
+    return total_meal_plan(hydrate_meal_plan(plan, lookup))
 
 
 def total_meal_plan_dict(plan: MealPlan) -> dict[str, float]:

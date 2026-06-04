@@ -133,7 +133,7 @@ def evaluate(
     levels: str = typer.Option("1,2,3", "--levels", help="Comma-separated complexity levels."),
     output: Path = typer.Option(Path("evaluation/reports/ablation.csv"), "--output"),
     repeats: int = typer.Option(1, "--repeats", help="Repeat each (variant,profile,query) N times."),
-    profile_dir: Path = typer.Option(Path("evaluation/profiles"), "--profile-dir"),
+    no_judge: bool = typer.Option(False, "--no-judge", help="Skip G-Eval soft-preference scoring."),
 ) -> None:
     """Run the full ablation grid and write a CSV (and Markdown summary) report."""
     # Local imports keep `cli --help` fast even when matplotlib isn't built.
@@ -150,7 +150,7 @@ def evaluate(
             variants=chosen,
             levels=level_ids,
             repeats=repeats,
-            profile_dir=profile_dir,
+            run_judge=not no_judge,
         ),
     )
     output.parent.mkdir(parents=True, exist_ok=True)
