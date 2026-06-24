@@ -60,7 +60,7 @@ def write_plots(df: pd.DataFrame, dest: Path) -> None:
         ax.set_title(title + (" (lower is better)" if lower_is_better else ""))
         ax.set_ylabel(metric)
         ax.grid(axis="y", alpha=0.3)
-    fig.suptitle("Ablation: V0 -> V4 across patient complexity levels", fontsize=14)
+    fig.suptitle("Leave-one-out ablation across patient complexity levels", fontsize=14)
     fig.tight_layout()
     dest.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(dest, dpi=150)

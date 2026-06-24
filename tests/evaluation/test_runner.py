@@ -4,26 +4,19 @@ from __future__ import annotations
 
 import pytest
 
-from dietary_advisor.pipeline import PipelineResult, VARIANTS
-from dietary_advisor.schemas.constraints import ValidationReport
+from dietary_advisor.pipeline import PipelineResult, VariantConfig
 from dietary_advisor.schemas.meal_plan import Meal, MealKind, MealPlan, Portion, Recipe
-from dietary_advisor.tools.tdee import derive_macro_targets
+from dietary_advisor.tools.food_db import OffFoodDb
 from evaluation.profiles.cases import get_case
 from evaluation.runner import run_ablation_grid
-from tests.evaluation.conftest import FDC_RICE
+from tests.conftest import LONG_INSTRUCTIONS
 
 
 @pytest.mark.asyncio()
-async def test_run_ablation_grid_with_mock_run_fn(
-    rice_food: object,
-    mock_lookup: object,
-) -> None:
-    from dietary_advisor.schemas.nutrition import FoodItem
-
-    food = rice_food  # type: ignore[assignment]
-    assert isinstance(food, FoodItem)
+async def test_run_ablation_grid_with_mock_run_fn(off_db: OffFoodDb, any_code: str) -> None:
     eval_profile = get_case("L1_01")
-    targets = derive_macro_targets(eval_profile.profile)
+    targets = eval_profile.profile.targets
+    food = off_db.get_food(any_code)
 
     meal_plan = MealPlan(
         user_id="L1_01",
@@ -31,10 +24,9 @@ async def test_run_ablation_grid_with_mock_run_fn(
             Meal(
                 kind=MealKind.LUNCH,
                 recipe=Recipe(
-                    name="Rice",
-                    portions=[
-                        Portion(food=food.model_copy(update={"fdc_id": FDC_RICE}), grams=200.0),
-                    ],
+                    name="Real food",
+                    portions=[Portion(food=food, grams=200.0)],
+                    instructions=LONG_INSTRUCTIONS,
                 ),
             ),
         ],
@@ -43,20 +35,19 @@ async def test_run_ablation_grid_with_mock_run_fn(
     async def fake_run(profile: object, query: str) -> PipelineResult:  # noqa: ARG001
         return PipelineResult(
             plan=meal_plan,
-            report=ValidationReport(hard_satisfied=True, violations=[]),
             targets=targets,
-            constraints=list(eval_profile.hard_constraints),
             iterations=1,
-            variant="V0",
+            variant="baseline",
         )
 
+    baseline = VariantConfig(food_enabled=False, totaller_enabled=False, rag_enabled=False, reflection_enabled=False)
     df = await run_ablation_grid(
-        variants=[VARIANTS["V0"]],
+        variants=[baseline],
         levels=[1],
         repeats=1,
         run_judge=False,
         run_fn=fake_run,
-        lookup=mock_lookup,  # type: ignore[arg-type]
+        lookup=off_db,
     )
     l1 = df[df["case_id"] == "L1_01"]
     assert len(l1) == 1

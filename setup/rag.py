@@ -1,14 +1,10 @@
 """Download, parse and chunk the clinical-guideline corpus, then index it.
 
-Run via the CLI: ``dietary-advisor ingest-corpus``.
+Run via the CLI: ``python -m setup`` (see ``just setup``).
 
 The script is idempotent and re-entrant: it only re-downloads files whose
 remote ETag has changed (best-effort) and only re-indexes chunks whose hash
 isn't already present in the Chroma collection.
-
-If a remote PDF cannot be fetched, the script falls back to the bundled
-plain-text seed in `knowledge/seeds/<doc_id>.txt` so that downstream code
-never sees an empty corpus.
 """
 
 from __future__ import annotations
@@ -22,20 +18,16 @@ from pathlib import Path
 import httpx
 import pypdf
 
-from dietary_advisor.config import get_settings, Settings
-from dietary_advisor.knowledge.sources import CorpusSource, SOURCES
+from dietary_advisor.config import Settings
 from dietary_advisor.knowledge.store import VectorStore
+from setup.sources import CorpusSource, SOURCES
 
 log = logging.getLogger(__name__)
-
-_SEEDS_DIR = Path(__file__).parent / "seeds"
-_SECTION_RE = re.compile(r"^\s*Section:\s*(.+)$", re.MULTILINE)
 
 
 @dataclass
 class IngestStats:
     fetched: list[str]
-    seeded: list[str]
     failed: list[str]
     chunks_indexed: int
 
@@ -104,11 +96,6 @@ def _chunk(text: str, chunk_size: int, overlap: int) -> list[str]:
     return chunks
 
 
-def _detect_section(chunk: str) -> str | None:
-    m = _SECTION_RE.search(chunk)
-    return m.group(1).strip() if m else None
-
-
 def _detect_page(chunk: str) -> int | None:
     m = re.search(r"<<PAGE (\d+)>>", chunk)
     return int(m.group(1)) if m else None
@@ -130,47 +117,40 @@ def _build_chunks_for(source: CorpusSource, raw_text: str, settings: Settings) -
                 "text": c,
                 "doc_id": source.doc_id,
                 "title": source.title,
-                "section": _detect_section(c) or source.section,
                 "page": _detect_page(c),
-                "tags": ",".join(source.tags),
             },
         )
     return out
 
 
-def ingest_corpus(*, force_redownload: bool = False) -> IngestStats:
-    """End-to-end ingest: download/seed, chunk, embed, index."""
-    settings = get_settings()
+def build_rag_corpus(settings: Settings, *, force: bool = False) -> IngestStats:
+    """Ensure the RAG corpus is downloaded, chunked, embedded, and indexed."""
     corpus_dir = settings.corpus_dir
     corpus_dir.mkdir(parents=True, exist_ok=True)
     store = VectorStore()
 
     fetched: list[str] = []
-    seeded: list[str] = []
     failed: list[str] = []
     total_chunks = 0
 
     for source in SOURCES:
-        text = ""
         pdf_path = corpus_dir / f"{source.doc_id}.pdf"
-        if source.url and (force_redownload or not pdf_path.exists()):
+        if force or not pdf_path.exists():
             ok = _download(source.url, pdf_path, timeout_s=settings.request_timeout_s)
             if ok:
                 fetched.append(source.doc_id)
             else:
                 failed.append(source.doc_id)
-        if pdf_path.exists():
-            text = _extract_text_from_pdf(pdf_path)
 
+        if not pdf_path.exists():
+            continue
+
+        text = _extract_text_from_pdf(pdf_path)
         if not text:
-            seed = _SEEDS_DIR / f"{source.doc_id}.txt"
-            if seed.exists():
-                text = seed.read_text(encoding="utf-8")
-                if source.doc_id not in fetched:
-                    seeded.append(source.doc_id)
-            else:
-                log.warning("No content available for %s (no seed and no PDF).", source.doc_id)
-                continue
+            log.warning("No extractable text in %s.", pdf_path)
+            if source.doc_id not in failed:
+                failed.append(source.doc_id)
+            continue
 
         chunks = _build_chunks_for(source, text, settings)
         if not chunks:
@@ -178,4 +158,4 @@ def ingest_corpus(*, force_redownload: bool = False) -> IngestStats:
         store.upsert_chunks(chunks)
         total_chunks += len(chunks)
 
-    return IngestStats(fetched=fetched, seeded=seeded, failed=failed, chunks_indexed=total_chunks)
+    return IngestStats(fetched=fetched, failed=failed, chunks_indexed=total_chunks)

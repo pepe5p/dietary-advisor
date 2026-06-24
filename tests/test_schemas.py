@@ -7,7 +7,6 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from dietary_advisor.schemas.constraints import HardConstraint
 from dietary_advisor.schemas.meal_plan import (
     Meal,
     MealKind,
@@ -15,60 +14,32 @@ from dietary_advisor.schemas.meal_plan import (
     Portion,
     Recipe,
 )
-from dietary_advisor.schemas.nutrition import FoodItem, NutrientName
-from dietary_advisor.schemas.profile import (
-    Allergen,
-    Condition,
-    DietPattern,
-    Sex,
-    UserProfile,
-)
+from dietary_advisor.schemas.nutrition import FoodItem, MacroTargets, NutrientName
+from dietary_advisor.schemas.profile import UserProfile
+from tests.conftest import LONG_INSTRUCTIONS
 
-
-def test_user_profile_complexity_levels() -> None:
-    healthy = UserProfile(user_id="a", age=30, sex=Sex.MALE, height_cm=180, weight_kg=78)
-    assert healthy.complexity_level == 1
-
-    veggie = UserProfile(
-        user_id="b",
-        age=30,
-        sex=Sex.FEMALE,
-        height_cm=170,
-        weight_kg=60,
-        diet_pattern=DietPattern.VEGAN,
-        allergens=[Allergen.PEANUTS],
-    )
-    assert veggie.complexity_level == 2
-
-    clinical = UserProfile(
-        user_id="c",
-        age=58,
-        sex=Sex.MALE,
-        height_cm=174,
-        weight_kg=95,
-        conditions=[Condition.TYPE_2_DIABETES, Condition.HYPERTENSION],
-    )
-    assert clinical.complexity_level == 3
+_TARGETS = MacroTargets(energy_kcal=2200.0, protein_g=120.0, carbs_g=250.0, fat_g=65.0)
 
 
 def test_user_profile_normalises_dislikes_and_drops_none_when_clinical() -> None:
     p = UserProfile(
         user_id="d",
         age=30,
-        sex=Sex.MALE,
+        sex="male",
         height_cm=180,
         weight_kg=78,
         disliked_foods=["  Liver ", "liver", "PORK"],
-        conditions=[Condition.NONE, Condition.HYPERTENSION],
+        conditions=["none", "hypertension"],
+        targets=_TARGETS,
     )
     assert p.disliked_foods == ["liver", "pork"]
-    assert Condition.NONE not in p.conditions
-    assert Condition.HYPERTENSION in p.conditions
+    assert "none" not in p.conditions
+    assert "hypertension" in p.conditions
 
 
 def test_user_profile_rejects_out_of_range() -> None:
     with pytest.raises(ValidationError):
-        UserProfile(user_id="x", age=200, sex=Sex.MALE, height_cm=180, weight_kg=78)
+        UserProfile(user_id="x", age=200, sex="male", height_cm=180, weight_kg=78, targets=_TARGETS)
 
 
 def test_food_item_rejects_negative_nutrients() -> None:
@@ -76,11 +47,19 @@ def test_food_item_rejects_negative_nutrients() -> None:
         FoodItem(name="Bad", nutrients_per_100g={NutrientName.PROTEIN_G: -1.0})
 
 
-def test_food_item_allergen_check() -> None:
-    f = FoodItem(name="PB", tags=["vegan", "contains:peanuts"])
-    assert f.contains_allergen("peanuts")
-    assert f.contains_allergen("PEANUTS")
-    assert not f.contains_allergen("milk")
+def test_food_item_off_record_requires_code() -> None:
+    with pytest.raises(ValidationError):
+        FoodItem(name="Bad", from_open_food_facts=True)
+
+
+def test_food_item_off_record_with_code_is_valid() -> None:
+    item = FoodItem(code="123", name="Rice", from_open_food_facts=True)
+    assert item.code == "123"
+
+
+def test_food_item_llm_generated_may_omit_code() -> None:
+    item = FoodItem(name="Homemade stew", from_open_food_facts=False)
+    assert item.code is None
 
 
 def test_meal_plan_requires_meal() -> None:
@@ -95,16 +74,6 @@ def test_meal_plan_json_schema_groq_compatible() -> None:
     assert "#/$defs/NutrientName" not in schema
 
 
-def test_hard_constraint_factories() -> None:
-    c = HardConstraint.allergen("peanuts")
-    assert c.kind == "allergen_exclusion"
-    assert c.target == "peanuts"
-
-    c2 = HardConstraint.max_nutrient(NutrientName.SODIUM_MG, value=2000)
-    assert c2.kind == "max_nutrient"
-    assert c2.value == 2000
-
-
 def test_meal_plan_construction(chicken_food: FoodItem, rice_food: FoodItem) -> None:
     plan = MealPlan(
         user_id="x",
@@ -117,8 +86,15 @@ def test_meal_plan_construction(chicken_food: FoodItem, rice_food: FoodItem) -> 
                         Portion(food=chicken_food, grams=150),
                         Portion(food=rice_food, grams=200),
                     ],
+                    instructions=LONG_INSTRUCTIONS,
                 ),
             ),
         ],
     )
     assert plan.meals[0].recipe.portions[0].grams == 150
+
+
+def test_recipe_rejects_short_instructions(chicken_food: FoodItem) -> None:
+    """A one-liner like "Cook." should not pass as a real recipe."""
+    with pytest.raises(ValidationError):
+        Recipe(name="r", portions=[Portion(food=chicken_food, grams=100)], instructions="Cook.")

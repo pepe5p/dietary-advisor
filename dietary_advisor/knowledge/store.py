@@ -8,6 +8,7 @@ the ablation study can swap to OpenAI embeddings if desired.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,8 @@ from chromadb.api.types import EmbeddingFunction
 from chromadb.utils import embedding_functions
 
 from dietary_advisor.config import get_settings
+
+log = logging.getLogger(__name__)
 
 _COLLECTION = "guidelines"
 
@@ -33,7 +36,16 @@ class VectorStore:
         self._dir = persist_dir or settings.chroma_dir
         self._dir.mkdir(parents=True, exist_ok=True)
         self._client = chromadb.PersistentClient(path=str(self._dir))
-        self._embedding_fn = embedding_fn or embedding_functions.DefaultEmbeddingFunction()
+        if embedding_fn is None:
+            # Chroma hardcodes the bundled MiniLM download under $HOME, which is
+            # ephemeral in the container. Point it at settings.onnx_model_dir
+            # (on the bind-mounted data dir) so the ~80 MB model is fetched once
+            # and survives restarts. DefaultEmbeddingFunction builds a fresh
+            # ONNXMiniLM_L6_V2 per call, so the redirect has to live on the class.
+            onnx_ef = embedding_functions.ONNXMiniLM_L6_V2
+            onnx_ef.DOWNLOAD_PATH = settings.onnx_model_dir / onnx_ef.MODEL_NAME
+            embedding_fn = embedding_functions.DefaultEmbeddingFunction()
+        self._embedding_fn = embedding_fn
         self._collection = self._client.get_or_create_collection(
             name=_COLLECTION,
             embedding_function=self._embedding_fn,  # type: ignore[arg-type]
@@ -50,8 +62,6 @@ class VectorStore:
             meta = {
                 "doc_id": c["doc_id"],
                 "title": c["title"],
-                "section": c.get("section") or "",
-                "tags": c.get("tags") or "",
             }
             page = c.get("page")
             if page is not None:
@@ -75,6 +85,7 @@ class VectorStore:
                     "distance": float(dists[i]) if i < len(dists) else None,
                 },
             )
+        log.info("vector_store.query(%r, top_k=%d) -> %d hit(s)", query, top_k, len(out))
         return out
 
     def all_documents(self) -> list[dict[str, Any]]:

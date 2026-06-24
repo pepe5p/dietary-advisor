@@ -1,9 +1,9 @@
-"""Evaluation contract: meal plans reference USDA cache IDs, not embedded nutrients.
+"""Evaluation contract: meal plans reference product barcodes, not embedded nutrients.
 
 The production nutrition agent still returns :class:`~dietary_advisor.schemas.meal_plan.MealPlan`
 with full :class:`~dietary_advisor.schemas.nutrition.FoodItem` payloads. The ablation harness
-hydrates :class:`AgentMealPlan` via :class:`~dietary_advisor.tools.food_lookup.FoodLookup`
-before running the Totaller and structural Validator.
+hydrates :class:`AgentMealPlan` via :class:`~dietary_advisor.tools.food_db.OffFoodDb`
+before running the Totaller and structural Validator, so the LLM cannot fake nutrients.
 """
 
 from __future__ import annotations
@@ -14,11 +14,11 @@ from dietary_advisor.schemas.meal_plan import Citation, MealKind
 
 
 class PortionRef(BaseModel):
-    """A portion keyed by cached USDA ``fdc_id`` and mass in grams."""
+    """A portion keyed by Open Food Facts barcode ``code`` and mass in grams."""
 
     model_config = ConfigDict(extra="forbid")
 
-    fdc_id: int = Field(gt=0, description="USDA FoodData Central ID from the prefetch cache.")
+    code: str = Field(min_length=1, description="Open Food Facts barcode from the product DB.")
     grams: float = Field(gt=0, description="Edible mass in grams.")
 
 
@@ -27,7 +27,7 @@ class AgentRecipe(BaseModel):
 
     name: str = Field(min_length=1)
     portions: list[PortionRef] = Field(min_length=1)
-    instructions: str | None = None
+    instructions: str = Field(min_length=1)
 
 
 class AgentMeal(BaseModel):
@@ -38,7 +38,7 @@ class AgentMeal(BaseModel):
 
 
 class AgentMealPlan(BaseModel):
-    """Structured plan for evaluation: ingredients by ``fdc_id``, no aggregate macros."""
+    """Structured plan for evaluation: ingredients by barcode ``code``, no aggregate macros."""
 
     model_config = ConfigDict(extra="forbid")
 

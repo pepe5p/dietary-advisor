@@ -1,6 +1,6 @@
 """Meta-agent (Agent-Oriented Planning).
 
-In the full V4 pipeline the orchestration is actually performed by
+In the full pipeline the orchestration is actually performed by
 `pipeline.py` (a deterministic Python flow), because deterministic
 orchestration is more reproducible for the ablation study than letting an
 LLM dispatch tool calls. This module exposes a Meta-Agent only as an

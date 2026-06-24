@@ -162,11 +162,8 @@ cython_debug/
 .idea/
 
 # --- Project-specific ---
-# Local data (vector store, sqlite caches, profile db)
+# Local data (vector store, sqlite caches, profile db, RAG corpus PDFs)
 .data/
-# RAG corpus PDFs (downloaded by `dietary-advisor ingest-corpus`)
-dietary_advisor/knowledge/corpus/*.pdf
-dietary_advisor/knowledge/corpus/*.txt
 # Evaluation outputs
 evaluation/reports/*.csv
 evaluation/reports/*.png

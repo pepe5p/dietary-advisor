@@ -3,18 +3,22 @@
 from __future__ import annotations
 
 from dietary_advisor.schemas.meal_plan import Meal, MealKind, MealPlan, Portion, Recipe
+from dietary_advisor.tools.food_db import OffFoodDb
 from evaluation.validation.hydrate import hydrate_meal_plan, meal_plan_to_eval_plan
-from tests.evaluation.conftest import agent_plan_rice_lunch, FDC_RICE
+from tests.conftest import LONG_INSTRUCTIONS
+from tests.evaluation.conftest import agent_plan_single
 
 
-def test_hydrate_resolves_fdc_id(mock_lookup: object) -> None:
-    plan = agent_plan_rice_lunch()
-    hydrated = hydrate_meal_plan(plan, mock_lookup)  # type: ignore[arg-type]
+def test_hydrate_resolves_code(off_db: OffFoodDb, any_code: str) -> None:
+    plan = agent_plan_single(any_code)
+    hydrated = hydrate_meal_plan(plan, off_db)
     assert len(hydrated.meals) == 1
-    assert hydrated.meals[0].recipe.portions[0].food.fdc_id == FDC_RICE
+    food = hydrated.meals[0].recipe.portions[0].food
+    assert food.code == any_code
+    assert food.nutrients_per_100g  # real product has resolved nutrients
 
 
-def test_meal_plan_to_eval_plan_extracts_fdc_id(rice_food: object) -> None:
+def test_meal_plan_to_eval_plan_extracts_code(rice_food: object) -> None:
     from dietary_advisor.schemas.nutrition import FoodItem
 
     food = rice_food  # type: ignore[assignment]
@@ -26,17 +30,18 @@ def test_meal_plan_to_eval_plan_extracts_fdc_id(rice_food: object) -> None:
                 kind=MealKind.LUNCH,
                 recipe=Recipe(
                     name="r",
-                    portions=[Portion(food=food.model_copy(update={"fdc_id": FDC_RICE}), grams=100.0)],
+                    portions=[Portion(food=food.model_copy(update={"code": "123456"}), grams=100.0)],
+                    instructions=LONG_INSTRUCTIONS,
                 ),
             ),
         ],
     )
     conv = meal_plan_to_eval_plan(meal_plan)
     assert not conv.warnings
-    assert conv.plan.meals[0].recipe.portions[0].fdc_id == FDC_RICE
+    assert conv.plan.meals[0].recipe.portions[0].code == "123456"
 
 
-def test_meal_plan_to_eval_plan_warns_missing_fdc_id(rice_food: object) -> None:
+def test_meal_plan_to_eval_plan_warns_missing_code(rice_food: object) -> None:
     from dietary_advisor.schemas.nutrition import FoodItem
 
     food = rice_food  # type: ignore[assignment]
@@ -46,7 +51,7 @@ def test_meal_plan_to_eval_plan_warns_missing_fdc_id(rice_food: object) -> None:
         meals=[
             Meal(
                 kind=MealKind.LUNCH,
-                recipe=Recipe(name="r", portions=[Portion(food=food, grams=100.0)]),
+                recipe=Recipe(name="r", portions=[Portion(food=food, grams=100.0)], instructions=LONG_INSTRUCTIONS),
             ),
         ],
     )

@@ -1,13 +1,13 @@
 """Hybrid retriever: dense (Chroma) + sparse (BM25) with weighted fusion.
 
-Following the kwerenda's recommendation in sec. "Hybrid RAG", we combine the
-semantic recall of dense embeddings with the lexical precision of BM25 - this
-is particularly important for clinical text where exact terms (e.g.
-"hypoglycaemia") matter and embedding models often miss them.
+Dense embeddings give semantic recall; BM25 adds lexical precision. Both matter
+for clinical text, where exact terms (e.g. "hypoglycaemia") are decisive and
+embedding models often miss them.
 """
 
 from __future__ import annotations
 
+import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -18,6 +18,8 @@ from rank_bm25 import BM25Okapi
 from dietary_advisor.config import get_settings
 from dietary_advisor.knowledge.store import VectorStore
 from dietary_advisor.schemas.meal_plan import Citation
+
+log = logging.getLogger(__name__)
 
 _TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
 
@@ -40,7 +42,6 @@ class RetrievedChunk:
         page = self.metadata.get("page")
         return Citation(
             source=str(self.metadata.get("doc_id") or self.metadata.get("title") or "unknown"),
-            section=str(self.metadata.get("section") or "") or None,
             page=int(page) if page is not None else None,
             snippet=snippet,
         )
@@ -120,6 +121,7 @@ class HybridRetriever:
             if not text:
                 continue
             out.append(RetrievedChunk(id=cid, text=text, metadata=meta, score=round(score, 4)))
+        log.info("retriever.retrieve(%r) -> %d chunk(s)", query, len(out))
         return out
 
     def retrieve_citations(self, query: str, top_k: int | None = None) -> list[Citation]:

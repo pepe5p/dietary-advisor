@@ -1,7 +1,7 @@
 set dotenv-load
 set positional-arguments
 
-PATHS_TO_LINT := "dietary_advisor evaluation tests"
+PATHS_TO_LINT := "dietary_advisor evaluation setup tests"
 TEST_PATH := "tests"
 ANSWERS_FILE := ".copier/.copier-answers.copier-python-project.yml"
 CONTAINER_NAME := "dietary_advisor"
@@ -13,6 +13,21 @@ default: help
 [doc("Show this help message")]
 @help:
 	just --list
+
+[group("cli")]
+[doc("Run the dietary-advisor tool (recommend, chat, info)")]
+@run *args:
+	uv run python -m dietary_advisor "$@"
+
+[group("cli")]
+[doc("Run the leave-one-out ablation evaluation grid")]
+evaluate *args:
+	uv run python -m dietary_advisor evaluate "$@"
+
+[group("cli")]
+[doc("Run local data setup (Open Food Facts product DB, RAG corpus ingest)")]
+@setup *args:
+	uv run python -m setup "$@"
 
 [group("development")]
 [doc("Run all checks and tests (lints, mypy, tests...)")]
@@ -92,9 +107,9 @@ build:
 	docker compose build {{CONTAINER_NAME}}
 
 [group("docker")]
-[doc("Run the CLI inside docker as a one-shot. For interactive use prefer `just dc bash` and then `dietary-advisor ...`.")]
+[doc("Run the CLI inside docker as a one-shot. For interactive use prefer `just dc bash` and then `just run ...`.")]
 cli *args:
-	docker compose run --rm -w {{WORKDIR}} {{CONTAINER_NAME}} dietary-advisor "$@"
+	docker compose run --rm -w {{WORKDIR}} {{CONTAINER_NAME}} just run "$@"
 
 [group("development")]
 [doc("Open bash console (useful when prefixed with dc, as it opens bash inside docker)")]

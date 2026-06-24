@@ -11,13 +11,16 @@ floating-point creep when summing many small portions, then snaps to a
 
 from __future__ import annotations
 
+import logging
 from fractions import Fraction
 
 from dietary_advisor.schemas.agent_output import AgentMealPlan
 from dietary_advisor.schemas.meal_plan import MealPlan, NutrientTotals, Portion
 from dietary_advisor.schemas.nutrition import NutrientName
-from dietary_advisor.tools.food_lookup import FoodLookup
+from dietary_advisor.tools.food_db import OffFoodDb
 from dietary_advisor.tools.plan_hydrate import hydrate_meal_plan
+
+log = logging.getLogger(__name__)
 
 # Round all returned amounts to 2 decimals to keep CLI/eval tables readable.
 _PRECISION_DIGITS = 2
@@ -26,8 +29,8 @@ _PRECISION_DIGITS = 2
 def total_portion(portion: Portion) -> dict[NutrientName, Fraction]:
     """Exact per-nutrient totals for a single portion.
 
-    USDA per-100g entries are scaled by `grams / 100` using Fractions so the
-    sum of N portions is bit-exact regardless of order.
+    Per-100g entries are scaled by `grams / 100` using Fractions so the sum of
+    N portions is bit-exact regardless of order.
     """
     scale = Fraction(portion.grams).limit_denominator(10_000_000) / Fraction(100)
     out: dict[NutrientName, Fraction] = {}
@@ -47,11 +50,19 @@ def total_meal_plan(plan: MealPlan) -> NutrientTotals:
     rounded: dict[NutrientName, float] = {
         nutrient: round(float(value), _PRECISION_DIGITS) for nutrient, value in acc.items()
     }
+    log.info(
+        "totaller.total_meal_plan(%d meal(s)) -> kcal=%.0f protein=%.1fg carbs=%.1fg fat=%.1fg",
+        len(plan.meals),
+        rounded.get(NutrientName.ENERGY_KCAL, 0.0),
+        rounded.get(NutrientName.PROTEIN_G, 0.0),
+        rounded.get(NutrientName.CARBS_G, 0.0),
+        rounded.get(NutrientName.FAT_G, 0.0),
+    )
     return NutrientTotals(totals=rounded)
 
 
-def total_agent_meal_plan(plan: AgentMealPlan, lookup: FoodLookup) -> NutrientTotals:
-    """Sum nutrients for an evaluation plan, resolving ``fdc_id`` via ``lookup``."""
+def total_agent_meal_plan(plan: AgentMealPlan, lookup: OffFoodDb) -> NutrientTotals:
+    """Sum nutrients for an evaluation plan, resolving ``code`` via ``lookup``."""
     return total_meal_plan(hydrate_meal_plan(plan, lookup))
 
 

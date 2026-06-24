@@ -11,9 +11,15 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from dietary_advisor.schemas.constraints import HardConstraint, Violation
 from dietary_advisor.schemas.meal_plan import MealPlan, NutrientTotals
-from dietary_advisor.schemas.nutrition import NutrientName
+from dietary_advisor.schemas.nutrition import FoodItem, NutrientName
+from evaluation.constraints import HardConstraint, Violation
+
+
+def food_contains_allergen(food: FoodItem, allergen: str) -> bool:
+    """Cheap allergen check based on canonical `contains:<allergen>` tags."""
+    target = f"contains:{allergen.lower()}"
+    return any(t.lower() == target for t in food.tags)
 
 
 class HardRule(ABC):
@@ -34,7 +40,7 @@ class AllergenExclusionRule(HardRule):
         target = self.constraint.target.lower()
         for meal in plan.meals:
             for portion in meal.recipe.portions:
-                if portion.food.contains_allergen(target):
+                if food_contains_allergen(portion.food, target):
                     out.append(
                         Violation(
                             constraint=self.constraint,
@@ -138,6 +144,28 @@ class MinNutrientRule(HardRule):
         return []
 
 
+@dataclass
+class MealCountRule(HardRule):
+    """The plan must contain exactly `value` meals (the requested number)."""
+
+    constraint: HardConstraint
+
+    def check(self, plan: MealPlan, totals: NutrientTotals) -> list[Violation]:  # noqa: ARG002
+        if self.constraint.value is None:
+            return []
+        required = int(self.constraint.value)
+        actual = len(plan.meals)
+        if actual != required:
+            return [
+                Violation(
+                    constraint=self.constraint,
+                    detail=f"Plan has {actual} meal(s) but exactly {required} were requested.",
+                    offending_value=float(actual),
+                ),
+            ]
+        return []
+
+
 def rule_from_constraint(constraint: HardConstraint) -> HardRule:
     """Factory dispatch from constraint kind to rule implementation."""
     match constraint.kind:
@@ -151,6 +179,8 @@ def rule_from_constraint(constraint: HardConstraint) -> HardRule:
             return MaxNutrientRule(constraint)
         case "min_nutrient":
             return MinNutrientRule(constraint)
+        case "meal_count":
+            return MealCountRule(constraint)
     raise ValueError(f"Unknown constraint kind: {constraint.kind}")
 
 

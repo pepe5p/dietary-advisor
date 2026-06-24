@@ -90,11 +90,8 @@ docs/
 *.temp
 
 # --- Project-specific ---
-# Local persistent state (vector store, sqlite caches) - bind-mounted at runtime
+# Local persistent state (vector store, sqlite caches, RAG corpus PDFs) - bind-mounted at runtime
 .data/
-# RAG corpus PDFs (downloaded by `dietary-advisor ingest-corpus` at runtime)
-dietary_advisor/knowledge/corpus/*.pdf
-dietary_advisor/knowledge/corpus/*.txt
 # Evaluation outputs
 evaluation/reports/*
 # Thesis source documents (large, not needed in the image)

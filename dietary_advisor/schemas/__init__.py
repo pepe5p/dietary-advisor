@@ -6,12 +6,6 @@ from dietary_advisor.schemas.agent_output import (
     AgentRecipe,
     PortionRef,
 )
-from dietary_advisor.schemas.constraints import (
-    HardConstraint,
-    SoftConstraint,
-    ValidationReport,
-    Violation,
-)
 from dietary_advisor.schemas.meal_plan import (
     Citation,
     Meal,
@@ -27,26 +21,15 @@ from dietary_advisor.schemas.nutrition import (
     Nutrient,
     NutrientName,
 )
-from dietary_advisor.schemas.profile import (
-    Allergen,
-    Condition,
-    DietPattern,
-    Goal,
-    Sex,
-    UserProfile,
-)
+from dietary_advisor.schemas.profile import ActivityLevel, UserProfile
 
 __all__ = [
+    "ActivityLevel",
     "AgentMeal",
     "AgentMealPlan",
     "AgentRecipe",
-    "Allergen",
     "Citation",
-    "Condition",
-    "DietPattern",
     "FoodItem",
-    "Goal",
-    "HardConstraint",
     "MacroTargets",
     "Meal",
     "MealKind",
@@ -57,9 +40,5 @@ __all__ = [
     "Portion",
     "PortionRef",
     "Recipe",
-    "Sex",
-    "SoftConstraint",
     "UserProfile",
-    "ValidationReport",
-    "Violation",
 ]

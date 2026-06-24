@@ -36,7 +36,6 @@ def build_rag_agent(model: str | None = None) -> Agent[AgentDeps, list[dict[str,
                 "text": c.text,
                 "doc_id": c.metadata.get("doc_id"),
                 "title": c.metadata.get("title"),
-                "section": c.metadata.get("section"),
                 "page": c.metadata.get("page"),
                 "score": c.score,
             }

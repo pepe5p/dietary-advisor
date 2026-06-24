@@ -1,16 +1,22 @@
-"""Top-level orchestrator with feature flags for the V0-V4 ablation variants.
+"""Top-level orchestrator with feature flags for the four supporting modules.
 
 The pipeline is intentionally a *deterministic Python flow* rather than an
-LLM-driven Meta-Agent: that keeps the variant comparison clean (no second
-hidden LLM behaviour to worry about). Each feature flag toggles exactly one
-module, mapping 1:1 to the four thesis modules.
+LLM-driven Meta-Agent: that keeps module comparisons clean (no second hidden
+LLM behaviour to worry about). By default all four modules are enabled (the
+full system); each can be individually disabled for ablation, on top of a
+baseline LLM that always considers the patient's fixed profile (allergens,
+conditions, goals).
 
-Variants:
-    V0 - Baseline:      bare LLM, no tools, no RAG, no validator
-    V1 - +Totaller:     LLM + deterministic totaller + USDA-grounded foods
-    V2 - +Profile:      V1 + profile-derived hard constraints (allergens, ...)
-    V3 - +RAG:          V2 + clinical-guideline retrieval + condition rules
-    V4 - +Reflection:   V3 + Generate-Score-Refine loop (full system)
+Production never derives or checks hard constraints - that is an
+evaluation-only concept (see `evaluation.constraints`/`evaluation.validation`);
+the agent must infer restrictions from the profile itself, the same way a
+human nutritionist would.
+
+The four toggleable modules (desc.md):
+    Food DB    - Open Food Facts food data (truth source for nutrients)
+    Totaller   - deterministic nutrient summation, exposed to the agent as a tool
+    RAG        - clinical-guideline retrieval
+    Reflection - Generate-Review-Refine self-correction loop (plain self-review)
 """
 
 from __future__ import annotations
@@ -18,74 +24,74 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
+from pydantic_ai.messages import ModelMessage
+
 from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.nutrition_agent import build_nutrition_agent
+from dietary_advisor.agents.runner import run_agent_logged
 from dietary_advisor.config import get_settings
 from dietary_advisor.knowledge.retriever import HybridRetriever
 from dietary_advisor.llm import resolve_llm_model
-from dietary_advisor.profile_manager.service import ProfileService
-from dietary_advisor.schemas.constraints import HardConstraint, ValidationReport
-from dietary_advisor.schemas.meal_plan import Citation, MealPlan
-from dietary_advisor.schemas.nutrition import FoodItem, MacroTargets
+from dietary_advisor.schemas.meal_plan import Citation, MealPlan, ShoppingList
+from dietary_advisor.schemas.nutrition import MacroTargets
 from dietary_advisor.schemas.profile import UserProfile
-from dietary_advisor.tools.tdee import derive_macro_targets
-from dietary_advisor.tools.totaller import total_meal_plan
-from dietary_advisor.tools.usda_client import USDAClient
-from dietary_advisor.tools.usda_prefetch import prefetch_usda_shortlist, summarize_shortlist
+from dietary_advisor.telemetry import collect_from_result, RunTelemetry
+from dietary_advisor.tools.food_db import OffFoodDb
+from dietary_advisor.tools.shopping_list import build_shopping_list
 from dietary_advisor.validation.reflection import reflect_and_refine, ReflectionResult
-from dietary_advisor.validation.validator import validate_meal_plan
 
 log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class VariantConfig:
-    """Feature flags that distinguish a variant from the V0 baseline."""
+    """Feature flags controlling which supporting modules are active.
 
-    name: str
-    totaller_enabled: bool = False
-    profile_constraints_enabled: bool = False
-    rag_enabled: bool = False
-    reflection_enabled: bool = False
-    description: str = ""
+    Each flag maps 1:1 to one of the four supporting modules in `desc.md`. All
+    default to enabled (the full system). The patient profile is always
+    considered (it is part of the baseline task), so it is not a flag.
+    """
+
+    food_enabled: bool = True
+    totaller_enabled: bool = True
+    rag_enabled: bool = True
+    reflection_enabled: bool = True
 
     @property
-    def needs_usda(self) -> bool:
-        return self.totaller_enabled
+    def needs_food_db(self) -> bool:
+        return self.food_enabled
 
+    @property
+    def label(self) -> str:
+        """Short identifier for this config, used in reports and logs."""
+        disabled = []
+        if not self.food_enabled:
+            disabled.append("no-off")
+        if not self.totaller_enabled:
+            disabled.append("no-totaller")
+        if not self.rag_enabled:
+            disabled.append("no-rag")
+        if not self.reflection_enabled:
+            disabled.append("no-reflective-loop")
+        if not disabled:
+            return "full"
+        if len(disabled) == 4:
+            return "baseline"
+        return "+".join(disabled)
 
-VARIANTS: dict[str, VariantConfig] = {
-    "V0": VariantConfig(
-        name="V0",
-        description="Baseline: bare LLM, no tools, no RAG, no validator.",
-    ),
-    "V1": VariantConfig(
-        name="V1",
-        totaller_enabled=True,
-        description="V0 + USDA-grounded foods + deterministic Totaller.",
-    ),
-    "V2": VariantConfig(
-        name="V2",
-        totaller_enabled=True,
-        profile_constraints_enabled=True,
-        description="V1 + profile-derived hard constraints (allergens, diet pattern).",
-    ),
-    "V3": VariantConfig(
-        name="V3",
-        totaller_enabled=True,
-        profile_constraints_enabled=True,
-        rag_enabled=True,
-        description="V2 + clinical-guideline RAG + condition-derived rules.",
-    ),
-    "V4": VariantConfig(
-        name="V4",
-        totaller_enabled=True,
-        profile_constraints_enabled=True,
-        rag_enabled=True,
-        reflection_enabled=True,
-        description="Full system: V3 + Generate-Score-Refine reflection loop.",
-    ),
-}
+    @property
+    def description(self) -> str:
+        """Human-readable list of the modules enabled in this config."""
+        enabled = []
+        if self.food_enabled:
+            enabled.append("Food DB")
+        if self.totaller_enabled:
+            enabled.append("Totaller")
+        if self.rag_enabled:
+            enabled.append("RAG")
+        if self.reflection_enabled:
+            enabled.append("Reflection loop")
+        return f"Enabled: {', '.join(enabled)}." if enabled else "Baseline: no symbolic modules enabled."
 
 
 @dataclass
@@ -93,12 +99,17 @@ class PipelineResult:
     """Bundle returned by `Pipeline.run`."""
 
     plan: MealPlan
-    report: ValidationReport
     targets: MacroTargets
-    constraints: list[HardConstraint]
     citations: list[Citation] = field(default_factory=list)
     iterations: int = 0
-    variant: str = "V0"
+    variant: str = "full"
+    shopping_list: ShoppingList = field(default_factory=ShoppingList)
+    # Full nutrition-agent conversation, threaded back in as `message_history`
+    # on the next turn to support multi-turn discussion / plan revision.
+    messages: list[ModelMessage] = field(default_factory=list)
+    # Tool-call counts and token usage across the main agent run + reflection
+    # loop, surfaced by the CLI under `--verbose`.
+    telemetry: RunTelemetry = field(default_factory=RunTelemetry)
 
 
 class Pipeline:
@@ -111,29 +122,25 @@ class Pipeline:
 
     def __init__(
         self,
-        variant: VariantConfig | str,
+        variant: VariantConfig | None = None,
         *,
         model: str | None = None,
-        profile_service: ProfileService | None = None,
-        usda: USDAClient | None = None,
+        food_db: OffFoodDb | None = None,
         retriever: HybridRetriever | None = None,
     ) -> None:
-        if isinstance(variant, str):
-            variant = VARIANTS[variant]
-        self.variant = variant
+        self.variant = variant if variant is not None else VariantConfig()
         self._settings = get_settings()
         self._model = resolve_llm_model(model or self._settings.llm_model)
-        self._profile_service = profile_service or ProfileService.default()
         # Lazy-init heavy collaborators; only create them when the variant needs them.
-        self._usda = usda
-        self._owns_usda = False  # Only close the USDA client we created ourselves.
+        self._food_db = food_db
+        self._owns_food_db = False  # Only close the food DB we created ourselves.
         self._retriever = retriever
 
-    def _ensure_usda(self) -> USDAClient:
-        if self._usda is None:
-            self._usda = USDAClient()
-            self._owns_usda = True
-        return self._usda
+    def _ensure_food_db(self) -> OffFoodDb:
+        if self._food_db is None:
+            self._food_db = OffFoodDb()
+            self._owns_food_db = True
+        return self._food_db
 
     def _ensure_retriever(self) -> HybridRetriever:
         if self._retriever is None:
@@ -141,16 +148,16 @@ class Pipeline:
         return self._retriever
 
     def close(self) -> None:
-        """Release any lazily-created collaborators (currently the USDA client).
+        """Release any lazily-created collaborators (currently the food DB).
 
         Only collaborators the pipeline created itself are closed; ones passed
         in through the constructor are left untouched, since their lifecycle
         is owned by the caller. Idempotent.
         """
-        if self._owns_usda and self._usda is not None:
-            self._usda.close()
-            self._usda = None
-            self._owns_usda = False
+        if self._owns_food_db and self._food_db is not None:
+            self._food_db.close()
+            self._food_db = None
+            self._owns_food_db = False
 
     def __enter__(self) -> Pipeline:
         return self
@@ -158,32 +165,19 @@ class Pipeline:
     def __exit__(self, *exc: object) -> None:
         self.close()
 
-    def _build_constraints(
-        self,
-        profile: UserProfile,
-        rag_citations: list[Citation],
-    ) -> list[HardConstraint]:
-        constraints: list[HardConstraint] = []
-        if self.variant.profile_constraints_enabled:
-            constraints.extend(self._profile_service.derive_hard_constraints(profile))
-        # RAG-derived constraints are already baked into _CONDITION_RULES; the
-        # extra rationale we add here is purely for explainability in the
-        # eventual ValidationReport.
-        if self.variant.rag_enabled:
-            for c in constraints:
-                if c.rationale is None and rag_citations:
-                    object.__setattr__(c, "rationale", rag_citations[0].snippet[:160])
-        return constraints
-
     async def _retrieve_context(self, profile: UserProfile, query: str) -> list[Citation]:
         if not self.variant.rag_enabled:
+            log.debug("RAG disabled for variant %s; skipping retrieval.", self.variant.label)
             return []
         retriever = self._ensure_retriever()
         # Build a profile-conditioned query for better recall on Level-3 cases.
-        cond_terms = " ".join(c.value for c in profile.conditions)
-        diet_term = profile.diet_pattern.value if profile.diet_pattern.value != "omnivore" else ""
+        cond_terms = " ".join(profile.conditions)
+        diet_term = profile.diet_pattern if profile.diet_pattern != "omnivore" else ""
         full_query = " ".join(filter(None, [query, cond_terms, diet_term, "dietary recommendation"]))
-        return [c.to_citation() for c in retriever.retrieve(full_query)]
+        log.debug("Retrieving clinical guidelines for query: %r", full_query)
+        citations = [c.to_citation() for c in retriever.retrieve(full_query)]
+        log.info("RAG retrieved %d citation(s).", len(citations))
+        return citations
 
     async def run(
         self,
@@ -191,35 +185,48 @@ class Pipeline:
         user_query: str,
         *,
         targets: MacroTargets | None = None,
+        available_ingredients: list[str] | None = None,
+        message_history: list[ModelMessage] | None = None,
     ) -> PipelineResult:
-        targets = targets or derive_macro_targets(profile)
+        targets = targets or profile.targets
+        is_followup = bool(message_history)
+        log.info(
+            "Running pipeline variant=%s follow_up=%s query=%r",
+            self.variant.label,
+            is_followup,
+            user_query,
+        )
         rag_citations = await self._retrieve_context(profile, user_query)
-        constraints = self._build_constraints(profile, rag_citations)
 
         deps = AgentDeps(
             profile=profile,
             targets=targets,
-            constraints=constraints,
-            profile_service=self._profile_service,
-            usda=self._ensure_usda() if self.variant.needs_usda else None,
+            food_db=self._ensure_food_db() if self.variant.needs_food_db else None,
             retriever=self._ensure_retriever() if self.variant.rag_enabled else None,
         )
-        if deps.usda is not None:
-            prefetch_usda_shortlist(deps)
 
-        agent = build_nutrition_agent(model=self._model)
-        prompt = self._compose_prompt(
-            profile,
-            user_query,
-            targets,
-            constraints,
-            rag_citations,
-            shortlist=deps.shortlist,
-        )
-        result = await agent.run(prompt, deps=deps)
+        agent = build_nutrition_agent(model=self._model, totaller_enabled=self.variant.totaller_enabled)
+        # A follow-up turn (message_history present) already carries the profile,
+        # targets and previous plan in context, so we send a lean revision prompt
+        # instead of re-stating everything.
+        if is_followup:
+            prompt = self._compose_followup_prompt(user_query, available_ingredients=available_ingredients)
+        else:
+            prompt = self._compose_prompt(
+                profile,
+                user_query,
+                targets,
+                rag_citations,
+                available_ingredients=available_ingredients,
+            )
+        log.info("Invoking nutrition agent (model=%s, totaller=%s)...", self._model, self.variant.totaller_enabled)
+        result = await run_agent_logged(agent, prompt, deps=deps, label="nutrition", message_history=message_history)
         plan = result.output
+        messages = list(result.all_messages())
+        telemetry = collect_from_result(result)
+        log.info("Agent returned plan with %d meal(s), %d citation(s).", len(plan.meals), len(plan.citations))
 
-        # Always merge in the RAG citations so Faithfulness can be evaluated even
+        # Always merge in the RAG citations so grounding can be evaluated even
         # when the LLM forgot to copy them through.
         if rag_citations:
             existing = {(c.source, c.snippet) for c in plan.citations}
@@ -227,31 +234,38 @@ class Pipeline:
                 if (c.source, c.snippet) not in existing:
                     plan.citations.append(c)
 
+        iterations = 0
         if self.variant.reflection_enabled:
-            refl: ReflectionResult = await reflect_and_refine(plan, deps, model=self._model)
-            return PipelineResult(
-                plan=refl.plan,
-                report=refl.report,
-                targets=targets,
-                constraints=constraints,
-                citations=rag_citations,
-                iterations=refl.iterations,
-                variant=self.variant.name,
+            log.info("Starting reflection loop...")
+            refl: ReflectionResult = await reflect_and_refine(
+                plan,
+                deps,
+                model=self._model,
+                totaller_enabled=self.variant.totaller_enabled,
             )
+            plan = refl.plan
+            iterations = refl.iterations
+            telemetry = telemetry.merge(refl.telemetry)
+            log.info("Reflection loop finished after %d iteration(s).", iterations)
 
-        report = (
-            validate_meal_plan(plan, constraints)
-            if constraints
-            else ValidationReport(hard_satisfied=True, totals=total_meal_plan(plan).totals)
+        log.info(
+            "Pipeline complete: variant=%s meals=%d citations=%d iterations=%d requests=%d tool_calls=%d",
+            self.variant.label,
+            len(plan.meals),
+            len(plan.citations),
+            iterations,
+            telemetry.requests,
+            telemetry.total_tool_calls,
         )
         return PipelineResult(
             plan=plan,
-            report=report,
             targets=targets,
-            constraints=constraints,
             citations=rag_citations,
-            iterations=0,
-            variant=self.variant.name,
+            iterations=iterations,
+            variant=self.variant.label,
+            shopping_list=build_shopping_list(plan),
+            messages=messages,
+            telemetry=telemetry,
         )
 
     def _compose_prompt(
@@ -259,33 +273,20 @@ class Pipeline:
         profile: UserProfile,
         user_query: str,
         targets: MacroTargets,
-        constraints: list[HardConstraint],
         rag_citations: list[Citation],
         *,
-        shortlist: list[FoodItem] | None = None,
+        available_ingredients: list[str] | None = None,
     ) -> str:
         sections = [
             f"User query: {user_query}",
-            f"Profile (complexity level {profile.complexity_level}):",
+            "Profile:",
             profile.model_dump_json(indent=2),
             "Macro targets (single day):",
             targets.model_dump_json(indent=2),
         ]
-        if shortlist:
-            sections.append("Prefetched USDA shortlist (use these; minimize extra lookups):")
-            sections.append(summarize_shortlist(shortlist))
-        if constraints:
-            sections.append("Hard constraints (MUST be satisfied; the validator will check):")
-            sections.append(
-                "\n".join(
-                    f"- {c.kind}::{c.target}"
-                    + (f" (<= {c.value})" if c.kind == "max_nutrient" else "")
-                    + (f" (>= {c.value})" if c.kind == "min_nutrient" else "")
-                    for c in constraints
-                ),
-            )
-        else:
-            sections.append("No hard constraints declared.")
+        if available_ingredients:
+            sections.append("Available ingredients to use first (the user has these on hand):")
+            sections.append("\n".join(f"- {name}" for name in available_ingredients))
         if rag_citations:
             sections.append("Clinical-guideline excerpts (use these to ground your rationale):")
             for c in rag_citations[:6]:
@@ -293,4 +294,21 @@ class Pipeline:
                     f"[{c.source}{f' p.{c.page}' if c.page else ''}] {c.snippet}",
                 )
         sections.append("Return ONLY a valid MealPlan object.")
+        return "\n\n".join(sections)
+
+    def _compose_followup_prompt(
+        self,
+        user_query: str,
+        *,
+        available_ingredients: list[str] | None = None,
+    ) -> str:
+        sections = [
+            f"Follow-up request: {user_query}",
+            "Revise the current meal plan to satisfy this request while keeping the "
+            "rest of the plan intact. Make minimal targeted changes.",
+        ]
+        if available_ingredients:
+            sections.append("Available ingredients to use first:")
+            sections.append("\n".join(f"- {name}" for name in available_ingredients))
+        sections.append("Return ONLY the full, updated MealPlan object.")
         return "\n\n".join(sections)

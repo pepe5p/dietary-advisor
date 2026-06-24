@@ -8,13 +8,15 @@ from pathlib import Path
 import pytest
 
 from dietary_advisor.config import get_api_keys, get_settings
-from dietary_advisor.schemas.nutrition import FoodItem, NutrientName
-from dietary_advisor.schemas.profile import (
-    Allergen,
-    Condition,
-    DietPattern,
-    Sex,
-    UserProfile,
+from dietary_advisor.schemas.nutrition import FoodItem, MacroTargets, NutrientName
+from dietary_advisor.schemas.profile import UserProfile
+
+# Realistic placeholder `Recipe.instructions` text for tests that don't care
+# about the specific recipe content.
+LONG_INSTRUCTIONS = (
+    "1. Prep all ingredients: wash, chop and measure them out. "
+    "2. Cook each component using the appropriate method and time. "
+    "3. Combine and plate before serving."
 )
 
 
@@ -23,10 +25,7 @@ def _isolate_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Force every Settings-derived path under `tmp_path` and reset the cache."""
     monkeypatch.setenv("DA_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("DA_CHROMA_DIR", str(tmp_path / "data" / "chroma"))
-    monkeypatch.setenv("DA_PROFILE_DB", str(tmp_path / "data" / "profiles.sqlite"))
-    monkeypatch.setenv("DA_USDA_CACHE", str(tmp_path / "data" / "usda_cache.sqlite"))
     monkeypatch.setenv("DA_CORPUS_DIR", str(tmp_path / "corpus"))
-    monkeypatch.setenv("USDA_API_KEY", os.environ.get("USDA_API_KEY", "DEMO_KEY"))
     # Provide a dummy key so pydantic-ai's openai provider can be instantiated
     # in tests; we still override the model itself with TestModel before any
     # network call is attempted.
@@ -40,10 +39,10 @@ def healthy_profile() -> UserProfile:
     return UserProfile(
         user_id="t_h",
         age=30,
-        sex=Sex.MALE,
+        sex="male",
         height_cm=180,
         weight_kg=78,
-        activity_factor=1.55,
+        targets=MacroTargets(energy_kcal=2500.0, protein_g=125.0, carbs_g=310.0, fat_g=70.0),
     )
 
 
@@ -52,11 +51,12 @@ def vegan_peanut_profile() -> UserProfile:
     return UserProfile(
         user_id="t_v",
         age=27,
-        sex=Sex.FEMALE,
+        sex="female",
         height_cm=168,
         weight_kg=62,
-        allergens=[Allergen.PEANUTS],
-        diet_pattern=DietPattern.VEGAN,
+        allergens=["peanuts"],
+        diet_pattern="vegan",
+        targets=MacroTargets(energy_kcal=2000.0, protein_g=90.0, carbs_g=250.0, fat_g=55.0),
     )
 
 
@@ -65,10 +65,11 @@ def hypertensive_profile() -> UserProfile:
     return UserProfile(
         user_id="t_hyp",
         age=58,
-        sex=Sex.MALE,
+        sex="male",
         height_cm=174,
         weight_kg=95,
-        conditions=[Condition.HYPERTENSION],
+        conditions=["hypertension"],
+        targets=MacroTargets(energy_kcal=2200.0, protein_g=140.0, carbs_g=220.0, fat_g=65.0),
     )
 
 

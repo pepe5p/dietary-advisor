@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from dietary_advisor.schemas.constraints import HardConstraint
 from dietary_advisor.schemas.meal_plan import MealKind
 from dietary_advisor.schemas.nutrition import MacroTargets
 from dietary_advisor.schemas.profile import UserProfile
+from evaluation.constraints import HardConstraint
 
 
 def case_complexity(case_id: str) -> int:

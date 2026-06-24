@@ -21,21 +21,21 @@ class EvalPlanConversion:
 
 
 def meal_plan_to_eval_plan(meal_plan: MealPlan) -> EvalPlanConversion:
-    """Extract ``fdc_id`` + ``grams`` from a pipeline plan for evaluation metrics."""
+    """Extract ``code`` + ``grams`` from a pipeline plan for evaluation metrics."""
     warnings: list[str] = []
     agent_meals: list[AgentMeal] = []
     for meal in meal_plan.meals:
         refs: list[PortionRef] = []
         for portion in meal.recipe.portions:
-            fdc_id = portion.food.fdc_id
-            if fdc_id is None:
+            code = portion.food.code
+            if not code:
                 warnings.append(
-                    f"portion in {meal.kind.value}/{meal.recipe.name!r} missing fdc_id ({portion.food.name!r})",
+                    f"portion in {meal.kind.value}/{meal.recipe.name!r} missing code ({portion.food.name!r})",
                 )
                 continue
-            refs.append(PortionRef(fdc_id=fdc_id, grams=portion.grams))
+            refs.append(PortionRef(code=code, grams=portion.grams))
         if not refs:
-            warnings.append(f"meal {meal.kind.value}/{meal.recipe.name!r} has no portions with fdc_id")
+            warnings.append(f"meal {meal.kind.value}/{meal.recipe.name!r} has no portions with code")
             continue
         agent_meals.append(
             AgentMeal(
@@ -48,7 +48,7 @@ def meal_plan_to_eval_plan(meal_plan: MealPlan) -> EvalPlanConversion:
             ),
         )
     if not agent_meals:
-        warnings.append("no meals with resolvable fdc_id portions")
+        warnings.append("no meals with resolvable code portions")
     return EvalPlanConversion(
         plan=AgentMealPlan(
             user_id=meal_plan.user_id,

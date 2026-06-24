@@ -31,13 +31,19 @@ class Portion(BaseModel):
 
 
 class Recipe(BaseModel):
-    """A simple recipe = ordered list of weighted portions plus optional notes."""
+    """A recipe = ordered list of weighted portions plus preparation steps."""
 
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=1)
     portions: list[Portion] = Field(min_length=1)
-    instructions: str | None = None
+    instructions: str = Field(
+        min_length=120,
+        description=(
+            "Full step-by-step preparation method (prep, cook method/temperature/"
+            "time, assembly) - detailed enough to cook from without any other reference."
+        ),
+    )
 
 
 class Meal(BaseModel):
@@ -55,7 +61,6 @@ class Citation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     source: str = Field(description="Document identifier, e.g. 'NICE_NG28'.")
-    section: str | None = None
     page: int | None = None
     snippet: str = Field(min_length=1, description="Verbatim quote (<=300 chars).")
 
@@ -84,5 +89,34 @@ class MealPlan(BaseModel):
     )
     citations: list[Citation] = Field(
         default_factory=list,
-        description="RAG citations supporting `rationale`. Used to compute Faithfulness.",
+        description="RAG citations grounding `rationale` in the clinical-guideline corpus.",
     )
+
+
+class ShoppingListItem(BaseModel):
+    """One consolidated ingredient line: total mass needed across the whole plan."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1)
+    total_grams: float = Field(gt=0)
+    code: str | None = None
+    from_open_food_facts: bool = Field(
+        default=False,
+        description="True when this ingredient is a verified Open Food Facts product rather than LLM-invented.",
+    )
+    # Deterministically derived from `total_grams` and the ingredient's
+    # per-100g nutrients (same Fraction-based math as the Totaller), so the
+    # shopping list can be read as a standalone macro summary per ingredient.
+    energy_kcal: float = Field(default=0.0, ge=0.0)
+    protein_g: float = Field(default=0.0, ge=0.0)
+    carbs_g: float = Field(default=0.0, ge=0.0)
+    fat_g: float = Field(default=0.0, ge=0.0)
+
+
+class ShoppingList(BaseModel):
+    """Deterministically derived grocery list for a `MealPlan`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[ShoppingListItem] = Field(default_factory=list)

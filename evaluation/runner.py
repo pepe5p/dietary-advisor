@@ -11,38 +11,45 @@ from collections.abc import Awaitable, Callable
 import pandas as pd
 
 from dietary_advisor.pipeline import Pipeline, PipelineResult, VariantConfig
-from dietary_advisor.profile_manager.service import ProfileService
+from dietary_advisor.schemas.agent_output import AgentMealPlan
 from dietary_advisor.schemas.nutrition import NutrientName
 from dietary_advisor.schemas.profile import UserProfile
-from dietary_advisor.tools.food_lookup import FoodLookup
+from dietary_advisor.tools.food_db import OffFoodDb
 from dietary_advisor.tools.totaller import total_agent_meal_plan
-from dietary_advisor.tools.usda_client import USDAClient
-from evaluation.profiles.cases import EVAL_CASES, get_case
+from evaluation.profiles.cases import get_case
 from evaluation.profiles.eval_profile import case_complexity, EvalProfile
 from evaluation.scenarios import filter_scenarios, Scenario
-from evaluation.validation.hydrate import meal_plan_to_eval_plan
+from evaluation.validation.hydrate import hydrate_meal_plan, meal_plan_to_eval_plan
 from evaluation.validation.qualitative import score_soft_preferences
 from evaluation.validation.quantitative import macro_errors
 from evaluation.validation.structural import structural_csr
+from evaluation.validation.validator import validate_meal_plan
 
 log = logging.getLogger(__name__)
 
 RunFn = Callable[[UserProfile, str], Awaitable[PipelineResult]]
 
 
-def _profile_service_from_cases() -> ProfileService:
-    """Seed the profile store with frozen evaluation cases (idempotent)."""
-    service = ProfileService.default()
-    for eval_profile in EVAL_CASES.values():
-        service.upsert(eval_profile.profile)
-    return service
+def _hard_constraint_result(
+    eval_plan: AgentMealPlan,
+    eval_profile: EvalProfile,
+    lookup: OffFoodDb,
+) -> tuple[int, bool]:
+    """Hydrate + run the ground-truth Validator, returning (n_violations, hard_satisfied)."""
+    try:
+        hydrated = hydrate_meal_plan(eval_plan, lookup)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Hydration failed while validating hard constraints for %s: %s", eval_profile.case_id, exc)
+        return 0, False
+    report = validate_meal_plan(hydrated, list(eval_profile.hard_constraints))
+    return len(report.violations), report.hard_satisfied
 
 
 async def _score_row(
     result: PipelineResult,
     scenario: Scenario,
     eval_profile: EvalProfile,
-    lookup: FoodLookup,
+    lookup: OffFoodDb,
     *,
     run_judge: bool,
     variant_name: str,
@@ -56,6 +63,7 @@ async def _score_row(
     csr = structural_csr(eval_plan, eval_profile, lookup)
     err = macro_errors(eval_plan, eval_profile.macro_targets, lookup)
     nutrient_totals = total_agent_meal_plan(eval_plan, lookup).totals
+    n_violations, hard_satisfied = _hard_constraint_result(eval_plan, eval_profile, lookup)
 
     soft_score: float | None = None
     soft_detail: str | None = None
@@ -77,8 +85,8 @@ async def _score_row(
         "iterations": result.iterations,
         "n_meals": len(eval_plan.meals),
         "n_constraints": len(eval_profile.hard_constraints),
-        "n_violations": len(result.report.violations),
-        "hard_satisfied": result.report.hard_satisfied,
+        "n_violations": n_violations,
+        "hard_satisfied": hard_satisfied,
         "CSR": csr,
         "MAE_pct": err.mae,
         "MSE_pct": err.mse,
@@ -97,7 +105,7 @@ async def _run_one(
     *,
     scenario: Scenario,
     eval_profile: EvalProfile,
-    lookup: FoodLookup,
+    lookup: OffFoodDb,
     run_judge: bool,
     variant_name: str,
     run: RunFn,
@@ -129,18 +137,17 @@ async def _run_one(
 
 
 async def _run_ablation_grid_with_lookup(
-    lookup: FoodLookup,
+    lookup: OffFoodDb,
     *,
     variants: list[VariantConfig],
     scenarios: list[Scenario],
     repeats: int,
     run_judge: bool,
     run_fn: RunFn | None,
-    service: ProfileService,
 ) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for variant in variants:
-        with Pipeline(variant, profile_service=service) as pipeline:
+        with Pipeline(variant) as pipeline:
 
             async def _default_run(profile: UserProfile, query: str) -> PipelineResult:
                 return await pipeline.run(profile, query)
@@ -155,7 +162,7 @@ async def _run_ablation_grid_with_lookup(
                         eval_profile=eval_profile,
                         lookup=lookup,
                         run_judge=run_judge,
-                        variant_name=variant.name,
+                        variant_name=variant.label,
                         run=run,
                     )
                     row["repeat"] = rep
@@ -163,7 +170,7 @@ async def _run_ablation_grid_with_lookup(
                     rows.append(row)
                     log.info(
                         "Done %s | %s (rep %d) | CSR=%s MAE=%s Soft=%s",
-                        variant.name,
+                        variant.label,
                         scenario.case_id,
                         rep,
                         row.get("CSR"),
@@ -180,10 +187,9 @@ async def run_ablation_grid(
     repeats: int = 1,
     run_judge: bool = True,
     run_fn: RunFn | None = None,
-    lookup: FoodLookup | None = None,
+    lookup: OffFoodDb | None = None,
 ) -> pd.DataFrame:
     """Run every (variant, scenario, repeat) combination and return a DataFrame."""
-    service = _profile_service_from_cases()
     scenarios = filter_scenarios(levels)
 
     if lookup is not None:
@@ -194,11 +200,10 @@ async def run_ablation_grid(
             repeats=repeats,
             run_judge=run_judge,
             run_fn=run_fn,
-            service=service,
         )
         return pd.DataFrame(rows)
 
-    with USDAClient() as client:
+    with OffFoodDb() as client:
         rows = await _run_ablation_grid_with_lookup(
             client,
             variants=variants,
@@ -206,7 +211,6 @@ async def run_ablation_grid(
             repeats=repeats,
             run_judge=run_judge,
             run_fn=run_fn,
-            service=service,
         )
     return pd.DataFrame(rows)
 
@@ -220,10 +224,10 @@ def variant_summary(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def cli_main() -> None:  # pragma: no cover
-    from evaluation.ablation import all_variants
+    from evaluation.ablation import leave_one_out_variants
 
     df = asyncio.run(
-        run_ablation_grid(variants=all_variants(), levels=[1, 2, 3], repeats=1),
+        run_ablation_grid(variants=leave_one_out_variants(), levels=[1, 2, 3], repeats=1),
     )
     print(variant_summary(df).to_string(index=False))  # noqa: T201
 

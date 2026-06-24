@@ -19,6 +19,7 @@ from dietary_advisor.tools.totaller import (
     total_meal_plan_dict,
     total_portion,
 )
+from tests.conftest import LONG_INSTRUCTIONS
 
 
 def test_total_portion_is_exact() -> None:
@@ -40,6 +41,7 @@ def test_totaller_aggregates_multiple_meals(chicken_food: FoodItem, rice_food: F
                         Portion(food=chicken_food, grams=150),
                         Portion(food=rice_food, grams=200),
                     ],
+                    instructions=LONG_INSTRUCTIONS,
                 ),
             ),
             Meal(
@@ -49,6 +51,7 @@ def test_totaller_aggregates_multiple_meals(chicken_food: FoodItem, rice_food: F
                     portions=[
                         Portion(food=chicken_food, grams=100),
                     ],
+                    instructions=LONG_INSTRUCTIONS,
                 ),
             ),
         ],
@@ -67,7 +70,7 @@ def test_totaller_handles_many_small_portions() -> None:
     portions = [Portion(food=food, grams=1.0) for _ in range(100)]
     plan = MealPlan(
         user_id="x",
-        meals=[Meal(kind=MealKind.SNACK, recipe=Recipe(name="r", portions=portions))],
+        meals=[Meal(kind=MealKind.SNACK, recipe=Recipe(name="r", portions=portions, instructions=LONG_INSTRUCTIONS))],
     )
     totals = total_meal_plan(plan).totals
     assert totals[NutrientName.PROTEIN_G] == pytest.approx(100.0)
@@ -83,6 +86,7 @@ def test_totaller_dict_keys_use_nutrient_value() -> None:
                 recipe=Recipe(
                     name="r",
                     portions=[Portion(food=food, grams=100)],
+                    instructions=LONG_INSTRUCTIONS,
                 ),
             )
         ],

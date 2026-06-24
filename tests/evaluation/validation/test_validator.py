@@ -1,8 +1,7 @@
-"""Tests for the deterministic validator + executable hard rules."""
+"""Tests for the ground-truth (evaluation-only) validator + executable hard rules."""
 
 from __future__ import annotations
 
-from dietary_advisor.schemas.constraints import HardConstraint
 from dietary_advisor.schemas.meal_plan import (
     Meal,
     MealKind,
@@ -11,13 +10,15 @@ from dietary_advisor.schemas.meal_plan import (
     Recipe,
 )
 from dietary_advisor.schemas.nutrition import FoodItem, NutrientName
-from dietary_advisor.validation.validator import validate_meal_plan
+from evaluation.constraints import HardConstraint
+from evaluation.validation.validator import validate_meal_plan
+from tests.conftest import LONG_INSTRUCTIONS
 
 
 def _plan_with(*portions: Portion, kind: MealKind = MealKind.LUNCH) -> MealPlan:
     return MealPlan(
         user_id="x",
-        meals=[Meal(kind=kind, recipe=Recipe(name="r", portions=list(portions)))],
+        meals=[Meal(kind=kind, recipe=Recipe(name="r", portions=list(portions), instructions=LONG_INSTRUCTIONS))],
     )
 
 
@@ -71,6 +72,20 @@ def test_ingredient_exclusion(salty_food: FoodItem) -> None:
         [HardConstraint(kind="ingredient_exclusion", target="ham")],
     )
     assert not report.hard_satisfied
+
+
+def test_meal_count_violation_when_too_few(rice_food: FoodItem) -> None:
+    plan = _plan_with(Portion(food=rice_food, grams=200))  # exactly 1 meal
+    report = validate_meal_plan(plan, [HardConstraint.meal_count(3)])
+    assert not report.hard_satisfied
+    assert "3" in report.violations[0].detail
+
+
+def test_meal_count_satisfied_on_exact_match(rice_food: FoodItem) -> None:
+    plan = _plan_with(Portion(food=rice_food, grams=200))  # exactly 1 meal
+    report = validate_meal_plan(plan, [HardConstraint.meal_count(1)])
+    assert report.hard_satisfied
+    assert not report.violations
 
 
 def test_hsr_partial_pass(rice_food: FoodItem, peanut_food: FoodItem) -> None:

@@ -27,21 +27,30 @@ class Settings(BaseSettings):
     # pydantic-ai model identifier, e.g. "openai:gpt-4o-mini",
     # "anthropic:claude-3-5-sonnet-latest", "ollama:llama3.1".
     llm_model: str = Field(default="openai:gpt-4o-mini")
-    # Optional secondary "judge" model used for the LLM-as-judge Faithfulness
-    # metric. When unset, the judge falls back to llm_model.
+    # Optional secondary "judge" model used for the G-Eval soft-preference judge
+    # (evaluation stage 3). When unset, the judge falls back to llm_model.
     judge_model: str | None = None
 
     # --- Storage ---
     data_dir: Path = Field(default=Path(".data"))
-    chroma_dir: Path = Field(default=Path(".data/chroma"))
-    profile_db: Path = Field(default=Path(".data/profiles.sqlite"))
-    usda_cache: Path = Field(default=Path(".data/usda_cache.sqlite"))
-    corpus_dir: Path = Field(default=Path("dietary_advisor/knowledge/corpus"))
+    chroma_dir: Path = Field(default=Path(".data/rag/chroma"))
+    corpus_dir: Path = Field(default=Path(".data/rag/corpus"))
+    # Chroma downloads its bundled MiniLM ONNX model (~80 MB) on first use.
+    # Its default cache is under $HOME, which is ephemeral in the container;
+    # keeping it under the bind-mounted .data means it's fetched only once.
+    onnx_model_dir: Path = Field(default=Path(".data/rag/onnx_models"))
+
+    # --- Open Food Facts (local product DB, built by `setup`) ---
+    off_db: Path = Field(default=Path(".data/off/off_pl.duckdb"))
+    # Local cache of the full OFF Parquet export (~7.6 GB). Downloaded once and
+    # filtered locally; streaming it remotely trips Hugging Face rate limits.
+    off_raw_parquet: Path = Field(default=Path(".data/off/food.parquet"))
+    off_source_url: str = Field(
+        default="https://huggingface.co/datasets/openfoodfacts/product-database/resolve/main/food.parquet"
+    )
 
     # --- Reflection loop (Generate-Score-Refine) ---
     reflection_max_loops: int = Field(default=3, ge=0, le=10)
-    entailment_threshold: float = Field(default=0.8, ge=0.0, le=1.0)
-    factuality_threshold: float = Field(default=-1.0)
 
     # --- RAG ---
     rag_top_k: int = Field(default=6, ge=1, le=50)
@@ -58,10 +67,10 @@ class Settings(BaseSettings):
 
     def ensure_dirs(self) -> None:
         """Create the local data directories (idempotent)."""
-        for p in (self.data_dir, self.chroma_dir, self.corpus_dir):
+        for p in (self.data_dir, self.chroma_dir, self.corpus_dir, self.onnx_model_dir):
             p.mkdir(parents=True, exist_ok=True)
-        # Parent dirs for sqlite files.
-        for f in (self.profile_db, self.usda_cache):
+        # Parent dirs for duckdb files and the OFF Parquet cache.
+        for f in (self.off_db, self.off_raw_parquet):
             f.parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -81,7 +90,6 @@ class ApiKeys(BaseSettings):
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
     gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
-    usda_api_key: str = Field(default="DEMO_KEY", alias="USDA_API_KEY")
 
 
 @lru_cache(maxsize=1)

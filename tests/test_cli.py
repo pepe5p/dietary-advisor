@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 from typer.testing import CliRunner
 
 from dietary_advisor.cli import app
@@ -25,36 +22,27 @@ def test_cli_info() -> None:
     assert "llm_model" in result.stdout
 
 
-def test_cli_profile_lifecycle(tmp_path: Path) -> None:
-    p = {
-        "user_id": "cli_t",
-        "age": 30,
-        "sex": "male",
-        "height_cm": 180,
-        "weight_kg": 78,
-        "allergens": [],
-        "conditions": ["none"],
-        "diet_pattern": "omnivore",
-    }
-    profile_file = tmp_path / "p.json"
-    profile_file.write_text(json.dumps(p), encoding="utf-8")
-
-    add = runner.invoke(app, ["profile", "add", str(profile_file)])
-    assert add.exit_code == 0, add.stdout
-
-    listed = runner.invoke(app, ["profile", "list"])
-    assert listed.exit_code == 0
-    assert "cli_t" in listed.stdout
-
-    show = runner.invoke(app, ["profile", "show", "cli_t"])
-    assert show.exit_code == 0
-    assert '"user_id"' in show.stdout
-
-    delete = runner.invoke(app, ["profile", "delete", "cli_t"])
-    assert delete.exit_code == 0
-    assert "Deleted" in delete.stdout
-
-
-def test_cli_recommend_missing_profile() -> None:
-    result = runner.invoke(app, ["recommend", "does_not_exist"])
+def test_cli_recommend_unknown_profile_id() -> None:
+    result = runner.invoke(app, ["recommend", "--profile-id", "does_not_exist"])
     assert result.exit_code != 0
+
+
+def test_cli_recommend_requires_profile_or_profile_id() -> None:
+    result = runner.invoke(app, ["recommend"])
+    assert result.exit_code != 0
+    assert "Pass exactly one of --profile or --profile-id" in result.output
+
+
+def test_cli_recommend_rejects_both_profile_and_profile_id() -> None:
+    result = runner.invoke(
+        app,
+        ["recommend", "--profile-id", "L1_01", "--profile", '{"user_id": "x"}'],
+    )
+    assert result.exit_code != 0
+    assert "Pass exactly one of --profile or --profile-id" in result.output
+
+
+def test_cli_recommend_rejects_invalid_profile_json() -> None:
+    result = runner.invoke(app, ["recommend", "--profile", "not-json"])
+    assert result.exit_code != 0
+    assert "Invalid --profile JSON" in result.output

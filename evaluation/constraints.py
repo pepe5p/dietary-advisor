@@ -1,8 +1,12 @@
-"""Constraint schemas: the explicit rules the deterministic Validator enforces.
+"""Constraint schemas: the ground-truth rules the evaluation Validator enforces.
 
 Hard constraints (HSR) are non-negotiable - violating them is a critical failure
 (e.g. exposing an allergic patient to peanuts). Soft constraints (SSR) shape
 ranking and may be partially relaxed.
+
+These are evaluation-only: the production pipeline never sees them (the agent
+must infer restrictions from the profile itself); they exist solely as the
+frozen ground truth attached to each `EvalProfile` for scoring CSR.
 """
 
 from __future__ import annotations
@@ -35,14 +39,17 @@ class HardConstraint(BaseModel):
         "max_nutrient",
         "min_nutrient",
         "ingredient_exclusion",
+        "meal_count",
     ]
     # `target` semantics depend on `kind`:
     #   allergen_exclusion: the allergen string (e.g. "peanuts")
     #   diet_pattern:       the diet pattern string (e.g. "vegetarian")
     #   max_nutrient/min_nutrient: the NutrientName value (e.g. "sodium_mg")
     #   ingredient_exclusion: the ingredient name (lowercased)
+    #   meal_count:         the literal "meal_count" (count carried in `value`)
     target: str = Field(min_length=1)
-    # Numeric threshold for max_nutrient / min_nutrient; ignored otherwise.
+    # Numeric threshold for max_nutrient / min_nutrient, or the exact required
+    # number of meals for meal_count; ignored otherwise.
     value: float | None = None
     source: ConstraintSource = ConstraintSource.PROFILE
     rationale: str | None = None
@@ -75,6 +82,15 @@ class HardConstraint(BaseModel):
     ) -> HardConstraint:
         return cls(kind="min_nutrient", target=nutrient.value, value=value, source=source, rationale=rationale)
 
+    @classmethod
+    def meal_count(
+        cls,
+        count: int,
+        source: ConstraintSource = ConstraintSource.PROFILE,
+        rationale: str | None = None,
+    ) -> HardConstraint:
+        return cls(kind="meal_count", target="meal_count", value=float(count), source=source, rationale=rationale)
+
 
 class SoftConstraint(BaseModel):
     """A preference that nudges ranking but doesn't fail HSR if violated."""
@@ -100,17 +116,15 @@ class Violation(BaseModel):
 
 
 class ValidationReport(BaseModel):
-    """Full result returned by `validate_meal_plan`. Drives the Reflection Loop."""
+    """Full result returned by `validate_meal_plan`."""
 
     model_config = ConfigDict(extra="forbid")
 
     hard_satisfied: bool
     violations: list[Violation] = Field(default_factory=list)
-    # Per-nutrient totals, used by both the Validator and the evaluation harness
-    # for MAE/MSE.
+    # Per-nutrient totals, used by the evaluation harness for MAE/MSE too.
     totals: NutrientAmountMap = Field(default_factory=dict)
-    # CSR is computed by `evaluation/metrics.py`; left None when produced by
-    # the in-pipeline Validator (which only knows about HSR).
+    # CSR is computed by `evaluation/validation/structural.py`.
     csr: float | None = None
     hsr: float | None = None
     ssr: float | None = None

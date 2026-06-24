@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from dietary_advisor.profile_manager.service import ProfileService
-from dietary_advisor.tools.tdee import derive_macro_targets
 from evaluation.profiles.cases import all_cases, EVAL_CASES, get_case
+from evaluation.profiles.derive import derive_hard_constraints
 from evaluation.profiles.eval_profile import case_complexity
 
 
@@ -20,18 +19,16 @@ def test_get_case_returns_same_profile() -> None:
     assert c.profile.user_id == "L1_01"
 
 
-def test_frozen_macro_targets_match_derive() -> None:
-    """Guard: if TDEE logic changes, cases.py must be updated intentionally."""
+def test_case_macro_targets_match_profile_targets() -> None:
+    """Guard: EvalProfile.macro_targets must stay in sync with UserProfile.targets."""
     for eval_profile in all_cases():
-        derived = derive_macro_targets(eval_profile.profile)
-        assert eval_profile.macro_targets.energy_kcal == derived.energy_kcal
-        assert eval_profile.macro_targets.protein_g == derived.protein_g
+        assert eval_profile.macro_targets == eval_profile.profile.targets
 
 
-def test_hard_constraints_match_service() -> None:
-    svc = ProfileService.default()
+def test_hard_constraints_match_derivation() -> None:
+    """Guard: the frozen `hard_constraints` in cases.py must match what derives from the profile."""
     for eval_profile in all_cases():
-        derived = svc.derive_hard_constraints(eval_profile.profile)
+        derived = derive_hard_constraints(eval_profile.profile)
         assert len(eval_profile.hard_constraints) == len(derived)
         derived_keys = {(c.kind, c.target) for c in derived}
         for c in eval_profile.hard_constraints:

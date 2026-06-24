@@ -1,21 +1,13 @@
-"""Validation loop (Pętla Walidacyjna): code-based hard rules + Generate-Score-Refine."""
+"""Reflection loop (Pętla Walidacyjna): plain Generate-Review-Refine self-correction.
 
-from dietary_advisor.validation.rules import (
-    AllergenExclusionRule,
-    DietPatternRule,
-    HardRule,
-    MaxNutrientRule,
-    MinNutrientRule,
-    rules_from_constraints,
-)
-from dietary_advisor.validation.validator import validate_meal_plan
+Hard-constraint validation is an evaluation-only concept and lives in
+`evaluation.validation` instead - see that package for the code-based rules
+and Validator.
+"""
+
+from dietary_advisor.validation.reflection import reflect_and_refine, ReflectionResult
 
 __all__ = [
-    "AllergenExclusionRule",
-    "DietPatternRule",
-    "HardRule",
-    "MaxNutrientRule",
-    "MinNutrientRule",
-    "rules_from_constraints",
-    "validate_meal_plan",
+    "ReflectionResult",
+    "reflect_and_refine",
 ]

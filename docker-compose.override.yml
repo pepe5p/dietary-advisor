@@ -1,0 +1,5 @@
+# Dev-container overrides. Keep the CLI service alive so VS Code / Cursor can
+# attach a shell to it; the base service's default command exits immediately.
+services:
+  dietary_advisor:
+    command: ["sleep", "infinity"]
