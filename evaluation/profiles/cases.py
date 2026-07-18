@@ -4,8 +4,8 @@ Each case owns a self-contained `UserProfile` literal (the same shape a human
 would pass via `dietary-advisor --profile`), independent of the CLI's
 built-in profiles in `dietary_advisor.profiles`. This decouples the eval
 ground truth from the CLI's example-profile store: editing one has no effect
-on the other. The `hard_constraints`/`macro_targets`/`default_query` fields
-are the frozen ground-truth evaluation data for each case.
+on the other. The `hard_constraints` are the frozen ground-truth evaluation
+data for each case.
 """
 
 from __future__ import annotations
@@ -195,15 +195,11 @@ EVAL_CASES: dict[str, EvalProfile] = {
         case_id="L1_01",
         profile=_L1_01_PROFILE,
         hard_constraints=(),
-        macro_targets=_L1_01_PROFILE.targets,
-        default_query="Plan one balanced day of meals to maintain my weight.",
     ),
     "L1_02": EvalProfile(
         case_id="L1_02",
         profile=_L1_02_PROFILE,
         hard_constraints=(),
-        macro_targets=_L1_02_PROFILE.targets,
-        default_query="Suggest a healthy day of meals around 2000 kcal.",
     ),
     "L1_03": EvalProfile(
         case_id="L1_03",
@@ -211,22 +207,16 @@ EVAL_CASES: dict[str, EvalProfile] = {
         hard_constraints=(
             HardConstraint(kind="ingredient_exclusion", target="liver", source=ConstraintSource.PROFILE),
         ),
-        macro_targets=_L1_03_PROFILE.targets,
-        default_query="I want to lose weight slowly; design a single day's meals.",
     ),
     "L1_04": EvalProfile(
         case_id="L1_04",
         profile=_L1_04_PROFILE,
         hard_constraints=(),
-        macro_targets=_L1_04_PROFILE.targets,
-        default_query="Design a meal plan that helps me gain lean mass.",
     ),
     "L1_05": EvalProfile(
         case_id="L1_05",
         profile=_L1_05_PROFILE,
         hard_constraints=(),
-        macro_targets=_L1_05_PROFILE.targets,
-        default_query="Design a high-protein day for an active adult.",
     ),
     "L2_01": EvalProfile(
         case_id="L2_01",
@@ -237,15 +227,11 @@ EVAL_CASES: dict[str, EvalProfile] = {
             HardConstraint.diet("vegetarian", source=ConstraintSource.PROFILE),
             HardConstraint(kind="ingredient_exclusion", target="mushrooms", source=ConstraintSource.PROFILE),
         ),
-        macro_targets=_L2_01_PROFILE.targets,
-        default_query="Plan a vegetarian day, avoiding all nuts.",
     ),
     "L2_02": EvalProfile(
         case_id="L2_02",
         profile=_L2_02_PROFILE,
         hard_constraints=(HardConstraint.diet("vegan", source=ConstraintSource.PROFILE),),
-        macro_targets=_L2_02_PROFILE.targets,
-        default_query="Plan a fully plant-based day with adequate protein.",
     ),
     "L2_03": EvalProfile(
         case_id="L2_03",
@@ -255,8 +241,6 @@ EVAL_CASES: dict[str, EvalProfile] = {
             HardConstraint.diet("pescatarian", source=ConstraintSource.PROFILE),
             HardConstraint.allergen("milk", source=ConstraintSource.SAFETY),
         ),
-        macro_targets=_L2_03_PROFILE.targets,
-        default_query="Plan a pescatarian, dairy-free day.",
     ),
     "L2_04": EvalProfile(
         case_id="L2_04",
@@ -265,8 +249,6 @@ EVAL_CASES: dict[str, EvalProfile] = {
             HardConstraint.allergen("gluten", source=ConstraintSource.PROFILE),
             HardConstraint.allergen("gluten", source=ConstraintSource.SAFETY),
         ),
-        macro_targets=_L2_04_PROFILE.targets,
-        default_query="Plan a strictly gluten-free day.",
     ),
     "L2_05": EvalProfile(
         case_id="L2_05",
@@ -276,8 +258,6 @@ EVAL_CASES: dict[str, EvalProfile] = {
             HardConstraint.allergen("soybeans", source=ConstraintSource.PROFILE),
             HardConstraint.diet("vegan", source=ConstraintSource.PROFILE),
         ),
-        macro_targets=_L2_05_PROFILE.targets,
-        default_query="Plan a vegan day with no eggs or soy products.",
     ),
     "L3_01": EvalProfile(
         case_id="L3_01",
@@ -305,8 +285,6 @@ EVAL_CASES: dict[str, EvalProfile] = {
                 rationale="WHO recommends <2 g/day sodium for adults with hypertension.",
             ),
         ),
-        macro_targets=_L3_01_PROFILE.targets,
-        default_query="I have type 2 diabetes and high blood pressure - plan a safe day of meals.",
     ),
     "L3_02": EvalProfile(
         case_id="L3_02",
@@ -331,8 +309,6 @@ EVAL_CASES: dict[str, EvalProfile] = {
                 rationale="WHO recommends <2 g/day sodium for adults with hypertension.",
             ),
         ),
-        macro_targets=_L3_02_PROFILE.targets,
-        default_query="I have stage 3 chronic kidney disease and hypertension - plan one day of meals.",
     ),
     "L3_03": EvalProfile(
         case_id="L3_03",
@@ -353,8 +329,6 @@ EVAL_CASES: dict[str, EvalProfile] = {
                 rationale="Common dyslipidaemia threshold: <300 mg dietary cholesterol/day.",
             ),
         ),
-        macro_targets=_L3_03_PROFILE.targets,
-        default_query="I have high LDL cholesterol and obesity - design a Mediterranean day.",
     ),
     "L3_04": EvalProfile(
         case_id="L3_04",
@@ -377,8 +351,6 @@ EVAL_CASES: dict[str, EvalProfile] = {
             ),
             HardConstraint.allergen("gluten", source=ConstraintSource.SAFETY),
         ),
-        macro_targets=_L3_04_PROFILE.targets,
-        default_query="I have type 2 diabetes and celiac disease - plan one gluten-free day.",
     ),
     "L3_05": EvalProfile(
         case_id="L3_05",
@@ -394,8 +366,6 @@ EVAL_CASES: dict[str, EvalProfile] = {
             ),
             HardConstraint.allergen("milk", source=ConstraintSource.SAFETY),
         ),
-        macro_targets=_L3_05_PROFILE.targets,
-        default_query="I have hypertension and lactose intolerance - plan a DASH-style day.",
     ),
 }
 

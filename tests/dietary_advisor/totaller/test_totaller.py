@@ -8,13 +8,11 @@ import pytest
 
 from dietary_advisor.schemas.meal_plan import (
     Meal,
-    MealKind,
     MealPlan,
     Portion,
-    Recipe,
 )
 from dietary_advisor.schemas.nutrition import FoodItem, NutrientName
-from dietary_advisor.tools.totaller import (
+from dietary_advisor.totaller import (
     total_meal_plan,
     total_meal_plan_dict,
     total_portion,
@@ -34,25 +32,21 @@ def test_totaller_aggregates_multiple_meals(chicken_food: FoodItem, rice_food: F
         user_id="x",
         meals=[
             Meal(
-                kind=MealKind.LUNCH,
-                recipe=Recipe(
-                    name="r",
-                    portions=[
-                        Portion(food=chicken_food, grams=150),
-                        Portion(food=rice_food, grams=200),
-                    ],
-                    instructions=LONG_INSTRUCTIONS,
-                ),
+                kind="lunch",
+                name="r",
+                portions=[
+                    Portion(food=chicken_food, grams=150),
+                    Portion(food=rice_food, grams=200),
+                ],
+                recipe=LONG_INSTRUCTIONS,
             ),
             Meal(
-                kind=MealKind.DINNER,
-                recipe=Recipe(
-                    name="r2",
-                    portions=[
-                        Portion(food=chicken_food, grams=100),
-                    ],
-                    instructions=LONG_INSTRUCTIONS,
-                ),
+                kind="dinner",
+                name="r2",
+                portions=[
+                    Portion(food=chicken_food, grams=100),
+                ],
+                recipe=LONG_INSTRUCTIONS,
             ),
         ],
     )
@@ -70,7 +64,7 @@ def test_totaller_handles_many_small_portions() -> None:
     portions = [Portion(food=food, grams=1.0) for _ in range(100)]
     plan = MealPlan(
         user_id="x",
-        meals=[Meal(kind=MealKind.SNACK, recipe=Recipe(name="r", portions=portions, instructions=LONG_INSTRUCTIONS))],
+        meals=[Meal(kind="snack", name="r", portions=portions, recipe=LONG_INSTRUCTIONS)],
     )
     totals = total_meal_plan(plan).totals
     assert totals[NutrientName.PROTEIN_G] == pytest.approx(100.0)
@@ -82,12 +76,10 @@ def test_totaller_dict_keys_use_nutrient_value() -> None:
         user_id="x",
         meals=[
             Meal(
-                kind=MealKind.LUNCH,
-                recipe=Recipe(
-                    name="r",
-                    portions=[Portion(food=food, grams=100)],
-                    instructions=LONG_INSTRUCTIONS,
-                ),
+                kind="lunch",
+                name="r",
+                portions=[Portion(food=food, grams=100)],
+                recipe=LONG_INSTRUCTIONS,
             )
         ],
     )

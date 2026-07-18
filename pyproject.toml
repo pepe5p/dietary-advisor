@@ -8,6 +8,7 @@ readme = "README.md"
 dependencies = [
     "chromadb>=1.5.8",
     "duckdb>=1.5.4",
+    "fastembed>=0.8.0",
     "groq>=1.2.0",
     "httpx>=0.28.1",
     "logfire>=4.32.1",
@@ -41,6 +42,7 @@ dev = [
 [project.scripts]
 dietary-advisor = "dietary_advisor.cli:app"
 dietary-advisor-setup = "setup.cli:app"
+dietary-advisor-evaluate = "evaluation.cli:app"
 
 [tool.uv]
 package = false
@@ -51,23 +53,23 @@ line-length = 120
 [tool.ruff.lint]
 #  See https://docs.astral.sh/ruff/rules/ for more information.
 select = [
-    "PT",   # flake8-pytest-style
-    "B",    # flake8-bugbear
-    "S",    # flake8-bandit
-    "A",    # flake8-builtins
-    "COM",  # flake8-commas
-    "C4",   # flake8-comprehensions
-    "T10",  # flake8-debugger
-    "I",    # isort
-    "T20",  # flake8-print
-    "SIM",  # flake8-simplify
-    "LOG",  # flake8-logging
-    "G",    # flake8-logging-format
-    "N",    # pep8-naming
-    "E",    # pycodestyle
-    "W",    # pycodestyle
-    "F",    # pyflakes
-    ]
+    "PT",  # flake8-pytest-style
+    "B",   # flake8-bugbear
+    "S",   # flake8-bandit
+    "A",   # flake8-builtins
+    "COM", # flake8-commas
+    "C4",  # flake8-comprehensions
+    "T10", # flake8-debugger
+    "I",   # isort
+    "T20", # flake8-print
+    "SIM", # flake8-simplify
+    "LOG", # flake8-logging
+    "G",   # flake8-logging-format
+    "N",   # pep8-naming
+    "E",   # pycodestyle
+    "W",   # pycodestyle
+    "F",   # pyflakes
+]
 ignore = ["S101", "A003", "B904", "N818", "COM812"]
 
 [tool.ruff.lint.per-file-ignores]
@@ -75,6 +77,7 @@ ignore = ["S101", "A003", "B904", "N818", "COM812"]
 # which conflicts with B008 ("function call in default argument").
 "dietary_advisor/cli.py" = ["B008"]
 "setup/cli.py" = ["B008"]
+"evaluation/cli.py" = ["B008"]
 
 [tool.ruff.lint.flake8-pytest-style]
 fixture-parentheses = true
@@ -82,16 +85,13 @@ mark-parentheses = true
 
 [tool.ruff.lint.isort]
 order-by-type = false
-known-first-party = ["dietary_advisor", "setup"]
+known-first-party = ["dietary_advisor", "setup", "evaluation", "repl"]
 
 [tool.coverage.report]
-exclude_lines = [
-    "if TYPE_CHECKING:",
-    "raise NotImplementedError()",
-]
+exclude_lines = ["if TYPE_CHECKING:", "raise NotImplementedError()"]
 
 [tool.fawltydeps]
-code = ["dietary_advisor", "evaluation", "setup"]
+code = ["dietary_advisor", "evaluation", "setup", "repl"]
 deps = ["pyproject.toml"]
 # Treat the project root as the base directory so that BOTH `dietary_advisor`
 # and `evaluation` are recognised as 1st-party packages (otherwise fawltydeps
@@ -138,3 +138,5 @@ asyncio_mode = "auto"
 FLAVOR = "test"
 DEBUG = "True"
 SERVICE_NAME = "dietary-advisor"
+DA_LLM_MODEL = "test"
+DA_JUDGE_MODEL = "test"

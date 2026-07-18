@@ -15,9 +15,8 @@ import duckdb
 import pytest
 
 from dietary_advisor.config import get_settings
+from dietary_advisor.food_db import FoodDb, OffFoodDb
 from dietary_advisor.schemas.agent_output import AgentMeal, AgentMealPlan, AgentRecipe, PortionRef
-from dietary_advisor.schemas.meal_plan import MealKind
-from dietary_advisor.tools.food_db import OffFoodDb
 from tests.conftest import LONG_INSTRUCTIONS
 
 # Placeholder barcode for plans that are never hydrated against the DB
@@ -47,6 +46,12 @@ def off_db() -> Iterator[OffFoodDb]:
     db = OffFoodDb(path)
     yield db
     db.close()
+
+
+@pytest.fixture()
+def food_db(off_db: OffFoodDb) -> FoodDb:
+    """The `FoodDb` facade over the real OFF reader; the lookup surface eval code takes."""
+    return FoodDb(off_db=off_db)
 
 
 @pytest.fixture()
@@ -91,8 +96,9 @@ def agent_plan_single(
     *,
     grams: float = 200.0,
     user_id: str = "test",
-    kind: MealKind = MealKind.LUNCH,
+    kind: str = "lunch",
     name: str = "Dish",
+    food_name: str = "Test food",
     instructions: str = LONG_INSTRUCTIONS,
 ) -> AgentMealPlan:
     return AgentMealPlan(
@@ -100,35 +106,22 @@ def agent_plan_single(
         meals=[
             AgentMeal(
                 kind=kind,
-                recipe=AgentRecipe(name=name, portions=[PortionRef(code=code, grams=grams)], instructions=instructions),
+                recipe=AgentRecipe(
+                    name=name,
+                    portions=[PortionRef(code=code, name=food_name, grams=grams)],
+                    instructions=instructions,
+                ),
             ),
         ],
     )
 
 
 def agent_plan_rice_lunch(grams: float = 200.0, user_id: str = "test", code: str = PLACEHOLDER_CODE) -> AgentMealPlan:
-    return agent_plan_single(code, grams=grams, user_id=user_id, name="Rice bowl", instructions=LONG_INSTRUCTIONS)
-
-
-def agent_plan_with_dinner(code: str = PLACEHOLDER_CODE, user_id: str = "test") -> AgentMealPlan:
-    return AgentMealPlan(
+    return agent_plan_single(
+        code,
+        grams=grams,
         user_id=user_id,
-        meals=[
-            AgentMeal(
-                kind=MealKind.BREAKFAST,
-                recipe=AgentRecipe(
-                    name="Breakfast",
-                    portions=[PortionRef(code=code, grams=100.0)],
-                    instructions=LONG_INSTRUCTIONS,
-                ),
-            ),
-            AgentMeal(
-                kind=MealKind.DINNER,
-                recipe=AgentRecipe(
-                    name="Dinner",
-                    portions=[PortionRef(code=code, grams=200.0)],
-                    instructions=LONG_INSTRUCTIONS,
-                ),
-            ),
-        ],
+        name="Rice bowl",
+        food_name="Rice",
+        instructions=LONG_INSTRUCTIONS,
     )

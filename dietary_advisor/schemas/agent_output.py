@@ -1,24 +1,34 @@
-"""Evaluation contract: meal plans reference product barcodes, not embedded nutrients.
+"""Agent output contract: the structured plan the nutrition agent must produce.
 
-The production nutrition agent still returns :class:`~dietary_advisor.schemas.meal_plan.MealPlan`
-with full :class:`~dietary_advisor.schemas.nutrition.FoodItem` payloads. The ablation harness
-hydrates :class:`AgentMealPlan` via :class:`~dietary_advisor.tools.food_db.OffFoodDb`
-before running the Totaller and structural Validator, so the LLM cannot fake nutrients.
+`PortionRef` deliberately carries no nutrients - the agent has no ability to
+invent or estimate them. It can only reference a `code` (and matching `name`)
+copied verbatim from a `lookup_food`/`lookup_foods` result; an output
+validator on the agent rejects any other code. `dietary_advisor.hydration`
+is the one place a reference resolves back to a real, DB-verified
+`FoodItem`, both in production (`Pipeline.run`) and in the evaluation
+harness.
 """
 
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dietary_advisor.schemas.meal_plan import Citation, MealKind
+from dietary_advisor.schemas.meal_plan import Citation
 
 
 class PortionRef(BaseModel):
-    """A portion keyed by Open Food Facts barcode ``code`` and mass in grams."""
+    """A portion keyed by a verified food-database code and mass in grams."""
 
     model_config = ConfigDict(extra="forbid")
 
-    code: str = Field(min_length=1, description="Open Food Facts barcode from the product DB.")
+    code: str = Field(
+        min_length=1,
+        description=("Code copied verbatim from a lookup result: an Open Food Facts barcode or a `usda:<fdc_id>` id."),
+    )
+    name: str = Field(
+        min_length=1,
+        description="Product name copied from that same lookup result (grounding/readability only).",
+    )
     grams: float = Field(gt=0, description="Edible mass in grams.")
 
 
@@ -27,22 +37,28 @@ class AgentRecipe(BaseModel):
 
     name: str = Field(min_length=1)
     portions: list[PortionRef] = Field(min_length=1)
-    instructions: str = Field(min_length=1)
+    instructions: str = Field(
+        min_length=120,
+        description=(
+            "Full step-by-step preparation method (prep, cook method/temperature/"
+            "time, assembly) - detailed enough to cook from without any other reference."
+        ),
+    )
 
 
 class AgentMeal(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    kind: MealKind
+    kind: str
     recipe: AgentRecipe
 
 
 class AgentMealPlan(BaseModel):
-    """Structured plan for evaluation: ingredients by barcode ``code``, no aggregate macros."""
+    """Structured output the nutrition agent must produce: ingredients by database code, no embedded nutrients."""
 
     model_config = ConfigDict(extra="forbid")
 
     user_id: str
-    meals: list[AgentMeal] = Field(default_factory=list)
+    meals: list[AgentMeal] = Field(min_length=1)
     rationale: str = Field(default="")
     citations: list[Citation] = Field(default_factory=list)

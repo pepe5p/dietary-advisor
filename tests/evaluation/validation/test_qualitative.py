@@ -5,13 +5,14 @@ from __future__ import annotations
 import pytest
 from pydantic_ai.models.test import TestModel
 
+from dietary_advisor.config import get_settings
 from evaluation.scenarios import SoftCriterion
 from evaluation.validation.qualitative import CriterionScore, QualitativeResult, score_soft_preferences
 from tests.evaluation.conftest import agent_plan_rice_lunch
 
 
 @pytest.mark.asyncio()
-async def test_score_soft_preferences_with_test_model() -> None:
+async def test_score_soft_preferences_with_test_model(monkeypatch: pytest.MonkeyPatch) -> None:
     plan = agent_plan_rice_lunch()
     criteria = (SoftCriterion("recipe_simplicity", "Recipes should be quick and simple."),)
     expected = QualitativeResult(
@@ -24,11 +25,15 @@ async def test_score_soft_preferences_with_test_model() -> None:
         ],
         aggregate=0.85,
     )
+    monkeypatch.setitem(
+        get_settings().__dict__,
+        "resolved_judge_model",
+        TestModel(custom_output_args=expected.model_dump()),
+    )
     result = await score_soft_preferences(
         plan,
         "quick simple meals please",
         criteria,
-        model=TestModel(custom_output_args=expected.model_dump()),
     )
     assert result is not None
     assert result.aggregate == pytest.approx(0.85)

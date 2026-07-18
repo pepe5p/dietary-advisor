@@ -15,10 +15,10 @@ from dietary_advisor.agents.prompts import RAG_AGENT_SYSTEM
 from dietary_advisor.config import get_settings
 
 
-def build_rag_agent(model: str | None = None) -> Agent[AgentDeps, list[dict[str, Any]]]:
+def build_rag_agent() -> Agent[AgentDeps, list[dict[str, Any]]]:
     settings = get_settings()
     agent: Agent[AgentDeps, list[dict[str, Any]]] = Agent(
-        model or settings.llm_model,
+        settings.resolved_llm_model,
         deps_type=AgentDeps,
         output_type=list[dict[str, Any]],
         system_prompt=RAG_AGENT_SYSTEM,

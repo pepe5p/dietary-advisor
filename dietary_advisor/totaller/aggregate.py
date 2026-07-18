@@ -14,11 +14,8 @@ from __future__ import annotations
 import logging
 from fractions import Fraction
 
-from dietary_advisor.schemas.agent_output import AgentMealPlan
 from dietary_advisor.schemas.meal_plan import MealPlan, NutrientTotals, Portion
 from dietary_advisor.schemas.nutrition import NutrientName
-from dietary_advisor.tools.food_db import OffFoodDb
-from dietary_advisor.tools.plan_hydrate import hydrate_meal_plan
 
 log = logging.getLogger(__name__)
 
@@ -43,7 +40,7 @@ def total_meal_plan(plan: MealPlan) -> NutrientTotals:
     """Sum every portion in the plan into per-nutrient totals (canonical units)."""
     acc: dict[NutrientName, Fraction] = {}
     for meal in plan.meals:
-        for portion in meal.recipe.portions:
+        for portion in meal.portions:
             for nutrient, value in total_portion(portion).items():
                 acc[nutrient] = acc.get(nutrient, Fraction(0)) + value
 
@@ -59,11 +56,6 @@ def total_meal_plan(plan: MealPlan) -> NutrientTotals:
         rounded.get(NutrientName.FAT_G, 0.0),
     )
     return NutrientTotals(totals=rounded)
-
-
-def total_agent_meal_plan(plan: AgentMealPlan, lookup: OffFoodDb) -> NutrientTotals:
-    """Sum nutrients for an evaluation plan, resolving ``code`` via ``lookup``."""
-    return total_meal_plan(hydrate_meal_plan(plan, lookup))
 
 
 def total_meal_plan_dict(plan: MealPlan) -> dict[str, float]:

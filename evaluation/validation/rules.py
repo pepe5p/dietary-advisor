@@ -39,14 +39,12 @@ class AllergenExclusionRule(HardRule):
         out: list[Violation] = []
         target = self.constraint.target.lower()
         for meal in plan.meals:
-            for portion in meal.recipe.portions:
+            for portion in meal.portions:
                 if food_contains_allergen(portion.food, target):
                     out.append(
                         Violation(
                             constraint=self.constraint,
-                            detail=(
-                                f"{portion.food.name!r} in {meal.kind.value} contains the excluded allergen {target!r}."
-                            ),
+                            detail=(f"{portion.food.name!r} in {meal.kind} contains the excluded allergen {target!r}."),
                             offending_item=portion.food.name,
                         ),
                     )
@@ -61,7 +59,7 @@ class IngredientExclusionRule(HardRule):
         out: list[Violation] = []
         needle = self.constraint.target.lower()
         for meal in plan.meals:
-            for portion in meal.recipe.portions:
+            for portion in meal.portions:
                 if needle in portion.food.name.lower():
                     out.append(
                         Violation(
@@ -83,7 +81,7 @@ class DietPatternRule(HardRule):
         out: list[Violation] = []
         target = self.constraint.target.lower()
         for meal in plan.meals:
-            for portion in meal.recipe.portions:
+            for portion in meal.portions:
                 tags = {t.lower() for t in portion.food.tags}
                 if target not in tags:
                     out.append(

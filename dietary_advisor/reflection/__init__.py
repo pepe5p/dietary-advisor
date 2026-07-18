@@ -5,7 +5,7 @@ Hard-constraint validation is an evaluation-only concept and lives in
 and Validator.
 """
 
-from dietary_advisor.validation.reflection import reflect_and_refine, ReflectionResult
+from dietary_advisor.reflection.reflection import reflect_and_refine, ReflectionResult
 
 __all__ = [
     "ReflectionResult",

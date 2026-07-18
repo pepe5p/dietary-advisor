@@ -16,7 +16,7 @@ from typing import Any
 from rank_bm25 import BM25Okapi
 
 from dietary_advisor.config import get_settings
-from dietary_advisor.knowledge.store import VectorStore
+from dietary_advisor.dietary_rag.store import VectorStore
 from dietary_advisor.schemas.meal_plan import Citation
 
 log = logging.getLogger(__name__)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dietary_advisor.schemas.meal_plan import MealPlan
-from dietary_advisor.tools.totaller import total_meal_plan
+from dietary_advisor.totaller import total_meal_plan
 from evaluation.constraints import HardConstraint, ValidationReport
 from evaluation.validation.rules import rules_from_constraints
 

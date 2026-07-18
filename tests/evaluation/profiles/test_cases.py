@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from evaluation.profiles.cases import all_cases, EVAL_CASES, get_case
 from evaluation.profiles.derive import derive_hard_constraints
-from evaluation.profiles.eval_profile import case_complexity
 
 
 def test_eval_cases_count() -> None:
@@ -15,14 +14,7 @@ def test_eval_cases_count() -> None:
 def test_get_case_returns_same_profile() -> None:
     c = get_case("L1_01")
     assert c.case_id == "L1_01"
-    assert case_complexity(c.case_id) == 1
     assert c.profile.user_id == "L1_01"
-
-
-def test_case_macro_targets_match_profile_targets() -> None:
-    """Guard: EvalProfile.macro_targets must stay in sync with UserProfile.targets."""
-    for eval_profile in all_cases():
-        assert eval_profile.macro_targets == eval_profile.profile.targets
 
 
 def test_hard_constraints_match_derivation() -> None:

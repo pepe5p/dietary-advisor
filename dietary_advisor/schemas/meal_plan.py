@@ -7,18 +7,9 @@ Totaller and Validator can then operate on without ambiguity.
 
 from __future__ import annotations
 
-from enum import Enum
-
 from pydantic import BaseModel, ConfigDict, Field
 
 from dietary_advisor.schemas.nutrition import FoodItem, NutrientAmountMap, NutrientName
-
-
-class MealKind(str, Enum):
-    BREAKFAST = "breakfast"
-    LUNCH = "lunch"
-    DINNER = "dinner"
-    SNACK = "snack"
 
 
 class Portion(BaseModel):
@@ -30,29 +21,19 @@ class Portion(BaseModel):
     grams: float = Field(gt=0, description="Edible mass in grams.")
 
 
-class Recipe(BaseModel):
-    """A recipe = ordered list of weighted portions plus preparation steps."""
-
+class Meal(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    kind: str
     name: str = Field(min_length=1)
     portions: list[Portion] = Field(min_length=1)
-    instructions: str = Field(
+    recipe: str = Field(
         min_length=120,
         description=(
             "Full step-by-step preparation method (prep, cook method/temperature/"
             "time, assembly) - detailed enough to cook from without any other reference."
         ),
     )
-
-
-class Meal(BaseModel):
-    """A meal slot containing one recipe."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    kind: MealKind
-    recipe: Recipe
 
 
 class Citation(BaseModel):
@@ -101,10 +82,6 @@ class ShoppingListItem(BaseModel):
     name: str = Field(min_length=1)
     total_grams: float = Field(gt=0)
     code: str | None = None
-    from_open_food_facts: bool = Field(
-        default=False,
-        description="True when this ingredient is a verified Open Food Facts product rather than LLM-invented.",
-    )
     # Deterministically derived from `total_grams` and the ingredient's
     # per-100g nutrients (same Fraction-based math as the Totaller), so the
     # shopping list can be read as a standalone macro summary per ingredient.

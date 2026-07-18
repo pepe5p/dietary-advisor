@@ -10,7 +10,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator, WithJsonSchema
+from pydantic import BaseModel, ConfigDict, Field, field_validator, WithJsonSchema
 
 
 class NutrientName(str, Enum):
@@ -98,22 +98,11 @@ class Nutrient(BaseModel):
 
 
 class FoodItem(BaseModel):
-    """A food/recipe ingredient with normalized per-100g nutrients.
-
-    Either a real Open Food Facts product (keyed by its barcode `code`) or a
-    food invented by the LLM, distinguished by `from_open_food_facts`.
-    """
+    """A food/recipe ingredient with normalized per-100g nutrients."""
 
     model_config = ConfigDict(extra="forbid")
 
-    from_open_food_facts: bool = Field(
-        default=False,
-        description=(
-            "True only for a real product fetched from the Open Food Facts database. "
-            "Leave false for a food you invent/estimate yourself; such foods must omit `code`."
-        ),
-    )
-    code: str | None = Field(default=None, description="Open Food Facts barcode. Required when from_open_food_facts.")
+    code: str | None = Field(default=None, description="Open Food Facts or USDA identifier.")
     name: str = Field(min_length=1)
     description: str | None = None
 
@@ -133,14 +122,6 @@ class FoodItem(BaseModel):
             if amount < 0:
                 raise ValueError(f"Negative amount for {n.value}: {amount}")
         return v
-
-    @model_validator(mode="after")
-    def _check_code_provenance(self) -> FoodItem:
-        if self.from_open_food_facts and self.code is None:
-            raise ValueError(
-                "Open Food Facts records must have a `code` (barcode); only LLM-created foods may omit it.",
-            )
-        return self
 
 
 class MacroTargets(BaseModel):

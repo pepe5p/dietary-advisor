@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from dietary_advisor.schemas.meal_plan import (
     Meal,
-    MealKind,
     MealPlan,
     Portion,
-    Recipe,
 )
 from dietary_advisor.schemas.nutrition import FoodItem, NutrientName
 from evaluation.constraints import HardConstraint
@@ -15,10 +13,10 @@ from evaluation.validation.validator import validate_meal_plan
 from tests.conftest import LONG_INSTRUCTIONS
 
 
-def _plan_with(*portions: Portion, kind: MealKind = MealKind.LUNCH) -> MealPlan:
+def _plan_with(*portions: Portion, kind: str = "lunch") -> MealPlan:
     return MealPlan(
         user_id="x",
-        meals=[Meal(kind=kind, recipe=Recipe(name="r", portions=list(portions), instructions=LONG_INSTRUCTIONS))],
+        meals=[Meal(kind=kind, name="r", portions=list(portions), recipe=LONG_INSTRUCTIONS)],
     )
 
 

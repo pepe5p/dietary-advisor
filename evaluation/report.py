@@ -17,19 +17,12 @@ _METRIC_ORDER = ["CSR", "MAE_pct", "MSE_pct", "SoftScore", "iterations", "elapse
 
 
 def write_markdown_summary(df: pd.DataFrame, dest: Path) -> None:
-    """Write a Markdown summary with one table per metric (variant x level)."""
+    """Write a Markdown summary with the aggregated per-variant means."""
     summary = variant_summary(df)
-    metrics = [m for m in _METRIC_ORDER if m in summary.columns]
     out_lines: list[str] = ["# Ablation study results\n"]
 
-    out_lines.append("## Aggregated mean per (variant, level)\n")
+    out_lines.append("## Aggregated mean per variant\n")
     out_lines.append(summary.to_markdown(index=False))
-    out_lines.append("")
-
-    for metric in metrics:
-        pivot = summary.pivot(index="variant", columns="level", values=metric)
-        out_lines.append(f"\n## {metric} (mean across profiles)\n")
-        out_lines.append(pivot.round(3).to_markdown())
     dest.write_text("\n".join(out_lines), encoding="utf-8")
 
 
@@ -55,12 +48,12 @@ def write_plots(df: pd.DataFrame, dest: Path) -> None:
         if metric not in summary.columns:
             ax.set_visible(False)
             continue
-        pivot = summary.pivot(index="variant", columns="level", values=metric)
-        pivot.plot(kind="bar", ax=ax, rot=0)
+        ax.bar(summary["variant"], summary[metric])
         ax.set_title(title + (" (lower is better)" if lower_is_better else ""))
         ax.set_ylabel(metric)
         ax.grid(axis="y", alpha=0.3)
-    fig.suptitle("Leave-one-out ablation across patient complexity levels", fontsize=14)
+        ax.tick_params(axis="x", rotation=30)
+    fig.suptitle("Leave-one-out ablation", fontsize=14)
     fig.tight_layout()
     dest.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(dest, dpi=150)

@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from evaluation.profiles.eval_profile import case_complexity
-
 
 @dataclass(frozen=True)
 class SoftCriterion:
@@ -56,7 +54,3 @@ SCENARIOS: list[Scenario] = [
     Scenario("L3_04", "I have type 2 diabetes and celiac disease - plan one gluten-free day."),
     Scenario("L3_05", "I have hypertension and lactose intolerance - plan a DASH-style day."),
 ]
-
-
-def filter_scenarios(levels: list[int]) -> list[Scenario]:
-    return [s for s in SCENARIOS if case_complexity(s.case_id) in levels]

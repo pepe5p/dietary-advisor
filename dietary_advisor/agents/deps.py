@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from dietary_advisor.knowledge.retriever import HybridRetriever
+from dietary_advisor.dietary_rag.retriever import HybridRetriever
+from dietary_advisor.food_db import FoodDb
 from dietary_advisor.schemas.nutrition import MacroTargets
 from dietary_advisor.schemas.profile import UserProfile
-from dietary_advisor.tools.food_db import OffFoodDb
 
 
 @dataclass
@@ -25,5 +25,7 @@ class AgentDeps:
 
     profile: UserProfile
     targets: MacroTargets
-    food_db: OffFoodDb | None = None
+    # A single facade over both food databases. Required: the agent cannot
+    # invent a food, so there is no variant without it (see AGENTS.md).
+    food_db: FoodDb
     retriever: HybridRetriever | None = None

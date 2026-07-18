@@ -33,6 +33,13 @@ re-run; it skips anything already present:
 just setup
 ```
 
+Building the Open Food Facts DB also embeds every product (name, brands,
+categories, ingredients, ...) with a local `fastembed` model
+(`intfloat/multilingual-e5-small`) into a DuckDB VSS index, so product lookup is
+hybrid BM25 + semantic search. The ~0.5 GB model is downloaded once on the first
+`setup` run (cached under `.data/fastembed`); everything after that is
+offline.
+
 ## Run the tool
 
 `recommend` generates one plan; `chat` refines a plan over multiple turns. Both take
@@ -66,7 +73,7 @@ scored against ground-truth hard constraints frozen in
 CLI profiles above).
 
 ```bash
-just evaluate --levels 1,2,3 --repeats 3
+just evaluate --repeats 3
 ```
 
 This writes three artefacts to `evaluation/reports/` (visible on the host via the bind
@@ -78,7 +85,7 @@ G-Eval soft-preference scoring.
 Full reproduction from a clean host:
 
 ```bash
-just build && just dc setup && just dc evaluate --levels 1,2,3 --repeats 3
+just build && just dc setup && just dc evaluate --repeats 3
 ```
 
 ## Configuration

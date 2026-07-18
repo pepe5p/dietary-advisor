@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from dietary_advisor.food_db import FoodDb
 from dietary_advisor.schemas.agent_output import AgentMealPlan
-from dietary_advisor.tools.food_db import OffFoodDb
-from dietary_advisor.tools.plan_hydrate import hydrate_meal_plan
 from evaluation.profiles.eval_profile import EvalProfile
+from evaluation.validation.hydrate import hydrate_meal_plan
 from evaluation.validation.validator import validate_meal_plan
 
 
@@ -17,24 +17,20 @@ def check_integrity(plan: AgentMealPlan) -> list[str]:
         return errors
     for meal in plan.meals:
         if not meal.recipe.portions:
-            errors.append(f"{meal.kind.value}: recipe {meal.recipe.name!r} has no portions")
+            errors.append(f"{meal.kind}: recipe {meal.recipe.name!r} has no portions")
         for ref in meal.recipe.portions:
             if ref.grams <= 0:
-                errors.append(f"{meal.kind.value}: non-positive grams for code={ref.code}")
+                errors.append(f"{meal.kind}: non-positive grams for code={ref.code}")
         if not meal.recipe.instructions.strip():
-            errors.append(f"{meal.kind.value}: recipe {meal.recipe.name!r} has blank instructions")
+            errors.append(f"{meal.kind}: recipe {meal.recipe.name!r} has blank instructions")
     return errors
 
 
-def structural_csr(plan: AgentMealPlan, eval_profile: EvalProfile, lookup: OffFoodDb) -> float:
-    """Constraint Satisfaction Rate from integrity + hard rules + session meal-kind bans."""
+def structural_csr(plan: AgentMealPlan, eval_profile: EvalProfile, lookup: FoodDb) -> float:
+    """Constraint Satisfaction Rate from integrity + hard rules."""
     integrity = check_integrity(plan)
     if integrity:
         return 0.0
-
-    for kind in eval_profile.forbidden_meal_kinds:
-        if any(m.kind == kind for m in plan.meals):
-            return 0.0
 
     try:
         hydrated = hydrate_meal_plan(plan, lookup)

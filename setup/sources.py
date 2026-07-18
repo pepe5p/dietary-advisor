@@ -27,21 +27,6 @@ SOURCES: list[CorpusSource] = [
         url="https://cdn.who.int/media/docs/default-source/healthy-diet/healthy-diet-fact-sheet-394.pdf",
     ),
     CorpusSource(
-        doc_id="WHO_SODIUM_2023",
-        title="WHO global report on sodium intake reduction (2023)",
-        url="https://iris.who.int/bitstream/handle/10665/366393/9789240069985-eng.pdf",
-    ),
-    CorpusSource(
-        doc_id="USDA_DGA_2020_2025",
-        title="Dietary Guidelines for Americans 2020-2025",
-        url="https://www.dietaryguidelines.gov/sites/default/files/2021-03/Dietary_Guidelines_for_Americans-2020-2025.pdf",
-    ),
-    CorpusSource(
-        doc_id="ADA_NUTRITION_2019",
-        title="ADA: Nutrition Therapy for Adults With Diabetes or Prediabetes (2019)",
-        url="https://diabetesjournals.org/care/article-pdf/42/5/731/553088/dci190014.pdf",
-    ),
-    CorpusSource(
         doc_id="NICE_NG28",
         title="NICE NG28: Type 2 diabetes in adults: management",
         url="https://www.nice.org.uk/guidance/ng28/resources/type-2-diabetes-in-adults-management-pdf-1837338615493",

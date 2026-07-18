@@ -6,9 +6,8 @@ that enforces them lives in the evaluation package, not in production.
 """
 
 from evaluation.validation.hydrate import (
-    EvalPlanConversion,
     hydrate_meal_plan,
-    meal_plan_to_eval_plan,
+    total_agent_meal_plan,
 )
 from evaluation.validation.qualitative import (
     CriterionScore,
@@ -31,7 +30,6 @@ __all__ = [
     "AllergenExclusionRule",
     "CriterionScore",
     "DietPatternRule",
-    "EvalPlanConversion",
     "HardRule",
     "MaxNutrientRule",
     "MinNutrientRule",
@@ -40,9 +38,9 @@ __all__ = [
     "check_integrity",
     "hydrate_meal_plan",
     "macro_errors",
-    "meal_plan_to_eval_plan",
     "rules_from_constraints",
     "score_soft_preferences",
     "structural_csr",
+    "total_agent_meal_plan",
     "validate_meal_plan",
 ]

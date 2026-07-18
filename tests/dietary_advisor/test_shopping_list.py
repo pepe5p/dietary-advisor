@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from dietary_advisor.schemas.meal_plan import Meal, MealKind, MealPlan, Portion, Recipe
+from dietary_advisor.schemas.meal_plan import Meal, MealPlan, Portion
 from dietary_advisor.schemas.nutrition import FoodItem, NutrientName
-from dietary_advisor.tools.shopping_list import build_shopping_list
+from dietary_advisor.shopping_list import build_shopping_list
 from tests.conftest import LONG_INSTRUCTIONS
 
 
@@ -20,20 +20,16 @@ def test_shopping_list_aggregates_same_food_across_meals(
 ) -> None:
     plan = _plan(
         Meal(
-            kind=MealKind.LUNCH,
-            recipe=Recipe(
-                name="lunch",
-                portions=[Portion(food=chicken_food, grams=150), Portion(food=rice_food, grams=200)],
-                instructions=LONG_INSTRUCTIONS,
-            ),
+            kind="lunch",
+            name="lunch",
+            portions=[Portion(food=chicken_food, grams=150), Portion(food=rice_food, grams=200)],
+            recipe=LONG_INSTRUCTIONS,
         ),
         Meal(
-            kind=MealKind.DINNER,
-            recipe=Recipe(
-                name="dinner",
-                portions=[Portion(food=chicken_food, grams=100)],
-                instructions=LONG_INSTRUCTIONS,
-            ),
+            kind="dinner",
+            name="dinner",
+            portions=[Portion(food=chicken_food, grams=100)],
+            recipe=LONG_INSTRUCTIONS,
         ),
     )
     items = {it.name: it for it in build_shopping_list(plan).items}
@@ -55,12 +51,10 @@ def test_shopping_list_aggregates_same_food_across_meals(
 def test_shopping_list_is_sorted_by_name(chicken_food: FoodItem, rice_food: FoodItem) -> None:
     plan = _plan(
         Meal(
-            kind=MealKind.LUNCH,
-            recipe=Recipe(
-                name="lunch",
-                portions=[Portion(food=rice_food, grams=200), Portion(food=chicken_food, grams=150)],
-                instructions=LONG_INSTRUCTIONS,
-            ),
+            kind="lunch",
+            name="lunch",
+            portions=[Portion(food=rice_food, grams=200), Portion(food=chicken_food, grams=150)],
+            recipe=LONG_INSTRUCTIONS,
         ),
     )
     names = [it.name for it in build_shopping_list(plan).items]
@@ -72,12 +66,10 @@ def test_shopping_list_keeps_distinct_codes() -> None:
     b = FoodItem(code="2", name="Rice", nutrients_per_100g={NutrientName.ENERGY_KCAL: 360.0})
     plan = _plan(
         Meal(
-            kind=MealKind.LUNCH,
-            recipe=Recipe(
-                name="lunch",
-                portions=[Portion(food=a, grams=100), Portion(food=b, grams=50)],
-                instructions=LONG_INSTRUCTIONS,
-            ),
+            kind="lunch",
+            name="lunch",
+            portions=[Portion(food=a, grams=100), Portion(food=b, grams=50)],
+            recipe=LONG_INSTRUCTIONS,
         ),
     )
     items = build_shopping_list(plan).items
@@ -86,26 +78,3 @@ def test_shopping_list_keeps_distinct_codes() -> None:
     by_code = {it.code: it for it in items}
     assert by_code["1"].energy_kcal == pytest.approx(100 * 130 / 100)
     assert by_code["2"].energy_kcal == pytest.approx(50 * 360 / 100)
-
-
-def test_shopping_list_marks_off_provenance() -> None:
-    off_item = FoodItem(
-        code="1",
-        name="Rice",
-        from_open_food_facts=True,
-        nutrients_per_100g={NutrientName.ENERGY_KCAL: 130.0},
-    )
-    llm_item = FoodItem(name="Homemade stew", nutrients_per_100g={NutrientName.ENERGY_KCAL: 200.0})
-    plan = _plan(
-        Meal(
-            kind=MealKind.LUNCH,
-            recipe=Recipe(
-                name="lunch",
-                portions=[Portion(food=off_item, grams=100), Portion(food=llm_item, grams=100)],
-                instructions=LONG_INSTRUCTIONS,
-            ),
-        ),
-    )
-    by_name = {it.name: it for it in build_shopping_list(plan).items}
-    assert by_name["Rice"].from_open_food_facts is True
-    assert by_name["Homemade stew"].from_open_food_facts is False

@@ -19,7 +19,7 @@ import httpx
 import pypdf
 
 from dietary_advisor.config import Settings
-from dietary_advisor.knowledge.store import VectorStore
+from dietary_advisor.dietary_rag.store import VectorStore
 from setup.sources import CorpusSource, SOURCES
 
 log = logging.getLogger(__name__)
@@ -123,7 +123,7 @@ def _build_chunks_for(source: CorpusSource, raw_text: str, settings: Settings) -
     return out
 
 
-def build_rag_corpus(settings: Settings, *, force: bool = False) -> IngestStats:
+def build_rag_corpus(settings: Settings) -> IngestStats:
     """Ensure the RAG corpus is downloaded, chunked, embedded, and indexed."""
     corpus_dir = settings.corpus_dir
     corpus_dir.mkdir(parents=True, exist_ok=True)
@@ -135,7 +135,7 @@ def build_rag_corpus(settings: Settings, *, force: bool = False) -> IngestStats:
 
     for source in SOURCES:
         pdf_path = corpus_dir / f"{source.doc_id}.pdf"
-        if force or not pdf_path.exists():
+        if not pdf_path.exists():
             ok = _download(source.url, pdf_path, timeout_s=settings.request_timeout_s)
             if ok:
                 fetched.append(source.doc_id)

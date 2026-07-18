@@ -10,16 +10,15 @@ from collections.abc import Awaitable, Callable
 
 import pandas as pd
 
+from dietary_advisor.food_db import FoodDb
 from dietary_advisor.pipeline import Pipeline, PipelineResult, VariantConfig
 from dietary_advisor.schemas.agent_output import AgentMealPlan
 from dietary_advisor.schemas.nutrition import NutrientName
 from dietary_advisor.schemas.profile import UserProfile
-from dietary_advisor.tools.food_db import OffFoodDb
-from dietary_advisor.tools.totaller import total_agent_meal_plan
 from evaluation.profiles.cases import get_case
-from evaluation.profiles.eval_profile import case_complexity, EvalProfile
-from evaluation.scenarios import filter_scenarios, Scenario
-from evaluation.validation.hydrate import hydrate_meal_plan, meal_plan_to_eval_plan
+from evaluation.profiles.eval_profile import EvalProfile
+from evaluation.scenarios import Scenario, SCENARIOS
+from evaluation.validation.hydrate import hydrate_meal_plan, total_agent_meal_plan
 from evaluation.validation.qualitative import score_soft_preferences
 from evaluation.validation.quantitative import macro_errors
 from evaluation.validation.structural import structural_csr
@@ -33,7 +32,7 @@ RunFn = Callable[[UserProfile, str], Awaitable[PipelineResult]]
 def _hard_constraint_result(
     eval_plan: AgentMealPlan,
     eval_profile: EvalProfile,
-    lookup: OffFoodDb,
+    lookup: FoodDb,
 ) -> tuple[int, bool]:
     """Hydrate + run the ground-truth Validator, returning (n_violations, hard_satisfied)."""
     try:
@@ -49,19 +48,15 @@ async def _score_row(
     result: PipelineResult,
     scenario: Scenario,
     eval_profile: EvalProfile,
-    lookup: OffFoodDb,
+    lookup: FoodDb,
     *,
     run_judge: bool,
     variant_name: str,
     elapsed_s: float,
 ) -> dict[str, object]:
-    conversion = meal_plan_to_eval_plan(result.plan)
-    eval_plan = conversion.plan
-    for w in conversion.warnings:
-        log.warning("Eval conversion %s: %s", scenario.case_id, w)
-
+    eval_plan = result.agent_plan
     csr = structural_csr(eval_plan, eval_profile, lookup)
-    err = macro_errors(eval_plan, eval_profile.macro_targets, lookup)
+    err = macro_errors(eval_plan, eval_profile.profile.targets, lookup)
     nutrient_totals = total_agent_meal_plan(eval_plan, lookup).totals
     n_violations, hard_satisfied = _hard_constraint_result(eval_plan, eval_profile, lookup)
 
@@ -80,7 +75,6 @@ async def _score_row(
     return {
         "variant": variant_name,
         "case_id": scenario.case_id,
-        "level": case_complexity(scenario.case_id),
         "query": scenario.query,
         "iterations": result.iterations,
         "n_meals": len(eval_plan.meals),
@@ -93,9 +87,8 @@ async def _score_row(
         **{f"err_{k}_pct": v for k, v in err.per_nutrient.items()},
         "SoftScore": soft_score,
         "SoftDetail": soft_detail,
-        "kcal_target": eval_profile.macro_targets.energy_kcal,
+        "kcal_target": eval_profile.profile.targets.energy_kcal,
         "kcal_actual": float(nutrient_totals.get(NutrientName.ENERGY_KCAL, 0.0)),
-        "conversion_warnings": len(conversion.warnings),
         "elapsed_s": round(elapsed_s, 2),
         "error": None,
     }
@@ -105,7 +98,7 @@ async def _run_one(
     *,
     scenario: Scenario,
     eval_profile: EvalProfile,
-    lookup: OffFoodDb,
+    lookup: FoodDb,
     run_judge: bool,
     variant_name: str,
     run: RunFn,
@@ -118,7 +111,6 @@ async def _run_one(
         return {
             "variant": variant_name,
             "case_id": scenario.case_id,
-            "level": case_complexity(scenario.case_id),
             "query": scenario.query,
             "error": str(exc),
             "traceback": traceback.format_exc(limit=4),
@@ -137,7 +129,7 @@ async def _run_one(
 
 
 async def _run_ablation_grid_with_lookup(
-    lookup: OffFoodDb,
+    lookup: FoodDb,
     *,
     variants: list[VariantConfig],
     scenarios: list[Scenario],
@@ -183,31 +175,28 @@ async def _run_ablation_grid_with_lookup(
 async def run_ablation_grid(
     *,
     variants: list[VariantConfig],
-    levels: list[int],
     repeats: int = 1,
     run_judge: bool = True,
     run_fn: RunFn | None = None,
-    lookup: OffFoodDb | None = None,
+    lookup: FoodDb | None = None,
 ) -> pd.DataFrame:
     """Run every (variant, scenario, repeat) combination and return a DataFrame."""
-    scenarios = filter_scenarios(levels)
-
     if lookup is not None:
         rows = await _run_ablation_grid_with_lookup(
             lookup,
             variants=variants,
-            scenarios=scenarios,
+            scenarios=SCENARIOS,
             repeats=repeats,
             run_judge=run_judge,
             run_fn=run_fn,
         )
         return pd.DataFrame(rows)
 
-    with OffFoodDb() as client:
+    with FoodDb.open() as client:
         rows = await _run_ablation_grid_with_lookup(
             client,
             variants=variants,
-            scenarios=scenarios,
+            scenarios=SCENARIOS,
             repeats=repeats,
             run_judge=run_judge,
             run_fn=run_fn,
@@ -216,10 +205,10 @@ async def run_ablation_grid(
 
 
 def variant_summary(df: pd.DataFrame) -> pd.DataFrame:
-    """Aggregate a tidy DataFrame to (variant x level) means."""
+    """Aggregate a tidy DataFrame to per-variant means."""
     metric_cols = ["CSR", "MAE_pct", "MSE_pct", "SoftScore", "iterations", "elapsed_s"]
     cols = [c for c in metric_cols if c in df.columns]
-    grouped = df.groupby(["variant", "level"])[cols].mean(numeric_only=True).reset_index()
+    grouped = df.groupby(["variant"])[cols].mean(numeric_only=True).reset_index()
     return grouped.round(3)
 
 
@@ -227,7 +216,7 @@ def cli_main() -> None:  # pragma: no cover
     from evaluation.ablation import leave_one_out_variants
 
     df = asyncio.run(
-        run_ablation_grid(variants=leave_one_out_variants(), levels=[1, 2, 3], repeats=1),
+        run_ablation_grid(variants=leave_one_out_variants(), repeats=1),
     )
     print(variant_summary(df).to_string(index=False))  # noqa: T201
 

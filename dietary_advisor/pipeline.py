@@ -30,15 +30,16 @@ from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.nutrition_agent import build_nutrition_agent
 from dietary_advisor.agents.runner import run_agent_logged
 from dietary_advisor.config import get_settings
-from dietary_advisor.knowledge.retriever import HybridRetriever
-from dietary_advisor.llm import resolve_llm_model
+from dietary_advisor.dietary_rag.retriever import HybridRetriever
+from dietary_advisor.food_db import FoodDb
+from dietary_advisor.hydration import hydrate_meal_plan
+from dietary_advisor.reflection import reflect_and_refine, ReflectionResult
+from dietary_advisor.schemas.agent_output import AgentMealPlan
 from dietary_advisor.schemas.meal_plan import Citation, MealPlan, ShoppingList
 from dietary_advisor.schemas.nutrition import MacroTargets
 from dietary_advisor.schemas.profile import UserProfile
+from dietary_advisor.shopping_list import build_shopping_list
 from dietary_advisor.telemetry import collect_from_result, RunTelemetry
-from dietary_advisor.tools.food_db import OffFoodDb
-from dietary_advisor.tools.shopping_list import build_shopping_list
-from dietary_advisor.validation.reflection import reflect_and_refine, ReflectionResult
 
 log = logging.getLogger(__name__)
 
@@ -52,14 +53,15 @@ class VariantConfig:
     considered (it is part of the baseline task), so it is not a flag.
     """
 
+    # Kept for the leave-one-out label/description below and for backwards
+    # compatibility with the CLI's `--no-off` flag; it no longer disables the
+    # food DB itself. The agent has no ability to invent a food (every
+    # `PortionRef.code` is checked against the real database), so the food DB
+    # is always opened and passed to the agent - see AGENTS.md.
     food_enabled: bool = True
     totaller_enabled: bool = True
     rag_enabled: bool = True
     reflection_enabled: bool = True
-
-    @property
-    def needs_food_db(self) -> bool:
-        return self.food_enabled
 
     @property
     def label(self) -> str:
@@ -99,6 +101,9 @@ class PipelineResult:
     """Bundle returned by `Pipeline.run`."""
 
     plan: MealPlan
+    # The agent's raw reference-only output (post reflection), before
+    # hydration; this is what the evaluation harness scores.
+    agent_plan: AgentMealPlan
     targets: MacroTargets
     citations: list[Citation] = field(default_factory=list)
     iterations: int = 0
@@ -124,21 +129,20 @@ class Pipeline:
         self,
         variant: VariantConfig | None = None,
         *,
-        model: str | None = None,
-        food_db: OffFoodDb | None = None,
+        food_db: FoodDb | None = None,
         retriever: HybridRetriever | None = None,
     ) -> None:
         self.variant = variant if variant is not None else VariantConfig()
         self._settings = get_settings()
-        self._model = resolve_llm_model(model or self._settings.llm_model)
         # Lazy-init heavy collaborators; only create them when the variant needs them.
         self._food_db = food_db
-        self._owns_food_db = False  # Only close the food DB we created ourselves.
+        self._owns_food_db = False  # Only close DBs we created ourselves.
         self._retriever = retriever
 
-    def _ensure_food_db(self) -> OffFoodDb:
+    def _ensure_food_db(self) -> FoodDb:
+        """Open the food DB facade (both sources, per their usage settings)."""
         if self._food_db is None:
-            self._food_db = OffFoodDb()
+            self._food_db = FoodDb.open(self._settings)
             self._owns_food_db = True
         return self._food_db
 
@@ -198,14 +202,22 @@ class Pipeline:
         )
         rag_citations = await self._retrieve_context(profile, user_query)
 
+        if not self.variant.food_enabled:
+            log.warning(
+                "VariantConfig.food_enabled=False is unsupported (the agent cannot invent a food); "
+                "opening the food DB anyway.",
+            )
         deps = AgentDeps(
             profile=profile,
             targets=targets,
-            food_db=self._ensure_food_db() if self.variant.needs_food_db else None,
+            food_db=self._ensure_food_db(),
             retriever=self._ensure_retriever() if self.variant.rag_enabled else None,
         )
 
-        agent = build_nutrition_agent(model=self._model, totaller_enabled=self.variant.totaller_enabled)
+        agent = build_nutrition_agent(
+            totaller_enabled=self.variant.totaller_enabled,
+            rag_enabled=self.variant.rag_enabled,
+        )
         # A follow-up turn (message_history present) already carries the profile,
         # targets and previous plan in context, so we send a lean revision prompt
         # instead of re-stating everything.
@@ -219,34 +231,46 @@ class Pipeline:
                 rag_citations,
                 available_ingredients=available_ingredients,
             )
-        log.info("Invoking nutrition agent (model=%s, totaller=%s)...", self._model, self.variant.totaller_enabled)
+        log.info(
+            "Invoking nutrition agent (model=%s, totaller=%s)...",
+            self._settings.resolved_llm_model,
+            self.variant.totaller_enabled,
+        )
         result = await run_agent_logged(agent, prompt, deps=deps, label="nutrition", message_history=message_history)
-        plan = result.output
+        agent_plan: AgentMealPlan = result.output
         messages = list(result.all_messages())
         telemetry = collect_from_result(result)
-        log.info("Agent returned plan with %d meal(s), %d citation(s).", len(plan.meals), len(plan.citations))
+        log.info(
+            "Agent returned plan with %d meal(s), %d citation(s).",
+            len(agent_plan.meals),
+            len(agent_plan.citations),
+        )
 
         # Always merge in the RAG citations so grounding can be evaluated even
         # when the LLM forgot to copy them through.
         if rag_citations:
-            existing = {(c.source, c.snippet) for c in plan.citations}
+            existing = {(c.source, c.snippet) for c in agent_plan.citations}
             for c in rag_citations:
                 if (c.source, c.snippet) not in existing:
-                    plan.citations.append(c)
+                    agent_plan.citations.append(c)
 
         iterations = 0
         if self.variant.reflection_enabled:
             log.info("Starting reflection loop...")
             refl: ReflectionResult = await reflect_and_refine(
-                plan,
+                agent_plan,
                 deps,
-                model=self._model,
                 totaller_enabled=self.variant.totaller_enabled,
             )
-            plan = refl.plan
+            agent_plan = refl.plan
             iterations = refl.iterations
             telemetry = telemetry.merge(refl.telemetry)
             log.info("Reflection loop finished after %d iteration(s).", iterations)
+
+        # Hydration is the one place the agent's references become real,
+        # DB-verified FoodItems - everything downstream (shopping list, CLI
+        # display, totals) operates on the hydrated MealPlan.
+        plan = hydrate_meal_plan(agent_plan, deps.food_db)
 
         log.info(
             "Pipeline complete: variant=%s meals=%d citations=%d iterations=%d requests=%d tool_calls=%d",
@@ -259,6 +283,7 @@ class Pipeline:
         )
         return PipelineResult(
             plan=plan,
+            agent_plan=agent_plan,
             targets=targets,
             citations=rag_citations,
             iterations=iterations,
@@ -293,7 +318,7 @@ class Pipeline:
                 sections.append(
                     f"[{c.source}{f' p.{c.page}' if c.page else ''}] {c.snippet}",
                 )
-        sections.append("Return ONLY a valid MealPlan object.")
+        sections.append("Return ONLY a valid AgentMealPlan object.")
         return "\n\n".join(sections)
 
     def _compose_followup_prompt(
@@ -310,5 +335,5 @@ class Pipeline:
         if available_ingredients:
             sections.append("Available ingredients to use first:")
             sections.append("\n".join(f"- {name}" for name in available_ingredients))
-        sections.append("Return ONLY the full, updated MealPlan object.")
+        sections.append("Return ONLY the full, updated AgentMealPlan object.")
         return "\n\n".join(sections)

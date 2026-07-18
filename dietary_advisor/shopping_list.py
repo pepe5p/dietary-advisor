@@ -37,17 +37,15 @@ def build_shopping_list(plan: MealPlan) -> ShoppingList:
     # Keyed the same way as `totals`; each ingredient is assumed to carry the
     # same per-100g nutrients everywhere it's used (same key = same product).
     nutrients_per_100g: dict[tuple[str | None, str], dict[NutrientName, float]] = {}
-    from_off: dict[tuple[str | None, str], bool] = {}
     order: list[tuple[str | None, str]] = []
     for meal in plan.meals:
-        for portion in meal.recipe.portions:
+        for portion in meal.portions:
             food = portion.food
             key = (food.code, food.name.lower())
             if key not in totals:
                 totals[key] = Fraction(0)
                 names[key] = food.name
                 nutrients_per_100g[key] = food.nutrients_per_100g
-                from_off[key] = food.from_open_food_facts
                 order.append(key)
             totals[key] += Fraction(portion.grams).limit_denominator(10_000_000)
 
@@ -68,7 +66,6 @@ def build_shopping_list(plan: MealPlan) -> ShoppingList:
                 name=names[key],
                 total_grams=round(float(grams), _PRECISION_DIGITS),
                 code=key[0],
-                from_open_food_facts=from_off[key],
                 **macros,
             ),
         )

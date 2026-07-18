@@ -9,11 +9,9 @@ from dietary_advisor.schemas.agent_output import (
 from dietary_advisor.schemas.meal_plan import (
     Citation,
     Meal,
-    MealKind,
     MealPlan,
     NutrientTotals,
     Portion,
-    Recipe,
 )
 from dietary_advisor.schemas.nutrition import (
     FoodItem,
@@ -32,13 +30,11 @@ __all__ = [
     "FoodItem",
     "MacroTargets",
     "Meal",
-    "MealKind",
     "MealPlan",
     "Nutrient",
     "NutrientName",
     "NutrientTotals",
     "Portion",
     "PortionRef",
-    "Recipe",
     "UserProfile",
 ]

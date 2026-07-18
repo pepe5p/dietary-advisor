@@ -1,7 +1,7 @@
 set dotenv-load
 set positional-arguments
 
-PATHS_TO_LINT := "dietary_advisor evaluation setup tests"
+PATHS_TO_LINT := "dietary_advisor evaluation setup repl tests ipython_startup.py"
 TEST_PATH := "tests"
 ANSWERS_FILE := ".copier/.copier-answers.copier-python-project.yml"
 CONTAINER_NAME := "dietary_advisor"
@@ -21,8 +21,8 @@ default: help
 
 [group("cli")]
 [doc("Run the leave-one-out ablation evaluation grid")]
-evaluate *args:
-	uv run python -m dietary_advisor evaluate "$@"
+@evaluate *args:
+	uv run python -m evaluation "$@"
 
 [group("cli")]
 [doc("Run local data setup (Open Food Facts product DB, RAG corpus ingest)")]

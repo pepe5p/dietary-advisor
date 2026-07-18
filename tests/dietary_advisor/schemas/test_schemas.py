@@ -9,10 +9,8 @@ from pydantic import ValidationError
 
 from dietary_advisor.schemas.meal_plan import (
     Meal,
-    MealKind,
     MealPlan,
     Portion,
-    Recipe,
 )
 from dietary_advisor.schemas.nutrition import FoodItem, MacroTargets, NutrientName
 from dietary_advisor.schemas.profile import UserProfile
@@ -47,18 +45,13 @@ def test_food_item_rejects_negative_nutrients() -> None:
         FoodItem(name="Bad", nutrients_per_100g={NutrientName.PROTEIN_G: -1.0})
 
 
-def test_food_item_off_record_requires_code() -> None:
-    with pytest.raises(ValidationError):
-        FoodItem(name="Bad", from_open_food_facts=True)
-
-
-def test_food_item_off_record_with_code_is_valid() -> None:
-    item = FoodItem(code="123", name="Rice", from_open_food_facts=True)
+def test_food_item_with_code_is_valid() -> None:
+    item = FoodItem(code="123", name="Rice")
     assert item.code == "123"
 
 
-def test_food_item_llm_generated_may_omit_code() -> None:
-    item = FoodItem(name="Homemade stew", from_open_food_facts=False)
+def test_food_item_may_omit_code() -> None:
+    item = FoodItem(name="Homemade stew")
     assert item.code is None
 
 
@@ -79,22 +72,20 @@ def test_meal_plan_construction(chicken_food: FoodItem, rice_food: FoodItem) -> 
         user_id="x",
         meals=[
             Meal(
-                kind=MealKind.LUNCH,
-                recipe=Recipe(
-                    name="Chicken bowl",
-                    portions=[
-                        Portion(food=chicken_food, grams=150),
-                        Portion(food=rice_food, grams=200),
-                    ],
-                    instructions=LONG_INSTRUCTIONS,
-                ),
+                kind="lunch",
+                name="Chicken bowl",
+                portions=[
+                    Portion(food=chicken_food, grams=150),
+                    Portion(food=rice_food, grams=200),
+                ],
+                recipe=LONG_INSTRUCTIONS,
             ),
         ],
     )
-    assert plan.meals[0].recipe.portions[0].grams == 150
+    assert plan.meals[0].portions[0].grams == 150
 
 
-def test_recipe_rejects_short_instructions(chicken_food: FoodItem) -> None:
+def test_meal_rejects_short_recipe(chicken_food: FoodItem) -> None:
     """A one-liner like "Cook." should not pass as a real recipe."""
     with pytest.raises(ValidationError):
-        Recipe(name="r", portions=[Portion(food=chicken_food, grams=100)], instructions="Cook.")
+        Meal(kind="lunch", name="r", portions=[Portion(food=chicken_food, grams=100)], recipe="Cook.")

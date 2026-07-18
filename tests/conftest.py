@@ -11,8 +11,8 @@ from dietary_advisor.config import get_api_keys, get_settings
 from dietary_advisor.schemas.nutrition import FoodItem, MacroTargets, NutrientName
 from dietary_advisor.schemas.profile import UserProfile
 
-# Realistic placeholder `Recipe.instructions` text for tests that don't care
-# about the specific recipe content.
+# Realistic placeholder meal `recipe` text for tests that don't care about the
+# specific recipe content.
 LONG_INSTRUCTIONS = (
     "1. Prep all ingredients: wash, chop and measure them out. "
     "2. Cook each component using the appropriate method and time. "

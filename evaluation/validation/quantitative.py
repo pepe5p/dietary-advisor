@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from dietary_advisor.food_db import FoodDb
 from dietary_advisor.schemas.agent_output import AgentMealPlan
 from dietary_advisor.schemas.nutrition import MacroTargets, NutrientName
-from dietary_advisor.tools.food_db import OffFoodDb
-from dietary_advisor.tools.totaller import total_agent_meal_plan
+from evaluation.validation.hydrate import total_agent_meal_plan
 
 _MACRO_NUTRIENTS = (
     NutrientName.ENERGY_KCAL,
@@ -28,7 +28,7 @@ class NutrientErrors:
 def macro_errors(
     plan: AgentMealPlan,
     targets: MacroTargets,
-    lookup: OffFoodDb,
+    lookup: FoodDb,
 ) -> NutrientErrors:
     """Compute MAE/MSE between Totaller totals and target macros, as % error per nutrient."""
     totals = total_agent_meal_plan(plan, lookup).totals

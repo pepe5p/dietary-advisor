@@ -4,37 +4,39 @@ from __future__ import annotations
 
 import pytest
 
+from dietary_advisor.food_db import FoodDb
+from dietary_advisor.hydration import to_food_item
 from dietary_advisor.pipeline import PipelineResult, VariantConfig
-from dietary_advisor.schemas.meal_plan import Meal, MealKind, MealPlan, Portion, Recipe
-from dietary_advisor.tools.food_db import OffFoodDb
+from dietary_advisor.schemas.meal_plan import Meal, MealPlan, Portion
 from evaluation.profiles.cases import get_case
 from evaluation.runner import run_ablation_grid
 from tests.conftest import LONG_INSTRUCTIONS
+from tests.evaluation.conftest import agent_plan_single
 
 
 @pytest.mark.asyncio()
-async def test_run_ablation_grid_with_mock_run_fn(off_db: OffFoodDb, any_code: str) -> None:
+async def test_run_ablation_grid_with_mock_run_fn(food_db: FoodDb, any_code: str) -> None:
     eval_profile = get_case("L1_01")
     targets = eval_profile.profile.targets
-    food = off_db.get_food(any_code)
+    food = to_food_item(food_db.get_food(any_code))
 
     meal_plan = MealPlan(
         user_id="L1_01",
         meals=[
             Meal(
-                kind=MealKind.LUNCH,
-                recipe=Recipe(
-                    name="Real food",
-                    portions=[Portion(food=food, grams=200.0)],
-                    instructions=LONG_INSTRUCTIONS,
-                ),
+                kind="lunch",
+                name="Real food",
+                portions=[Portion(food=food, grams=200.0)],
+                recipe=LONG_INSTRUCTIONS,
             ),
         ],
     )
+    agent_plan = agent_plan_single(any_code, grams=200.0, user_id="L1_01", food_name=food.name)
 
     async def fake_run(profile: object, query: str) -> PipelineResult:  # noqa: ARG001
         return PipelineResult(
             plan=meal_plan,
+            agent_plan=agent_plan,
             targets=targets,
             iterations=1,
             variant="baseline",
@@ -43,11 +45,10 @@ async def test_run_ablation_grid_with_mock_run_fn(off_db: OffFoodDb, any_code: s
     baseline = VariantConfig(food_enabled=False, totaller_enabled=False, rag_enabled=False, reflection_enabled=False)
     df = await run_ablation_grid(
         variants=[baseline],
-        levels=[1],
         repeats=1,
         run_judge=False,
         run_fn=fake_run,
-        lookup=off_db,
+        lookup=food_db,
     )
     l1 = df[df["case_id"] == "L1_01"]
     assert len(l1) == 1

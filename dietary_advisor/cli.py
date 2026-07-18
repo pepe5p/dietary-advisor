@@ -1,4 +1,4 @@
-"""`dietary-advisor` Typer CLI: recommend / evaluate."""
+"""`dietary-advisor` Typer CLI: recommend / chat / info."""
 
 from __future__ import annotations
 
@@ -13,11 +13,12 @@ from rich.console import Console
 from rich.table import Table
 
 from dietary_advisor.config import get_settings
+from dietary_advisor.food_db.usda_food_db import is_usda_code
 from dietary_advisor.pipeline import Pipeline, VariantConfig
 from dietary_advisor.profiles import get_profile
 from dietary_advisor.schemas.nutrition import NutrientName
 from dietary_advisor.schemas.profile import UserProfile
-from dietary_advisor.tools.totaller import total_meal_plan
+from dietary_advisor.totaller import total_meal_plan
 
 app = typer.Typer(help="Neuro-symbolic dietary advisor (master's thesis CLI).")
 
@@ -241,8 +242,8 @@ def _render_result(result: object) -> None:
     plan_tbl.add_column("Products")
     plan_tbl.add_column("Recipe")
     for meal in result.plan.meals:
-        portions = ", ".join(f"{p.food.name}: {p.grams:.0f}" for p in meal.recipe.portions)
-        plan_tbl.add_row(meal.kind.value, meal.recipe.name, portions, meal.recipe.instructions)
+        portions = ", ".join(f"{p.food.name}: {p.grams:.0f}" for p in meal.portions)
+        plan_tbl.add_row(meal.kind, meal.name, portions, meal.recipe)
     console.print(plan_tbl)
 
     if result.plan.rationale:
@@ -252,16 +253,18 @@ def _render_result(result: object) -> None:
         shop_tbl = Table(title="Shopping list")
         shop_tbl.add_column("Ingredient")
         shop_tbl.add_column("Source")
+        shop_tbl.add_column("DB ID")
         shop_tbl.add_column("Total (g)", justify="right")
         shop_tbl.add_column("kcal", justify="right")
         shop_tbl.add_column("Protein g", justify="right")
         shop_tbl.add_column("Carbs g", justify="right")
         shop_tbl.add_column("Fat g", justify="right")
         for item in result.shopping_list.items:
-            source = "[green]OFF DB[/green]" if item.from_open_food_facts else "[yellow]LLM est.[/yellow]"
+            source = "[cyan]USDA[/cyan]" if item.code and is_usda_code(item.code) else "[green]OFF[/green]"
             shop_tbl.add_row(
                 item.name,
                 source,
+                item.code or "-",
                 f"{item.total_grams:.0f}",
                 f"{item.energy_kcal:.0f}",
                 f"{item.protein_g:.1f}",
@@ -309,45 +312,6 @@ def _render_telemetry(telemetry: object) -> None:
         f"output tokens: {telemetry.output_tokens} | "
         f"total tokens: {telemetry.total_tokens}[/dim]",
     )
-
-
-# ---------- evaluate ----------------------------------------------------------------------------
-
-
-@app.command()
-def evaluate(
-    levels: str = typer.Option("1,2,3", "--levels", help="Comma-separated complexity levels."),
-    output: Path = typer.Option(Path("evaluation/reports/ablation.csv"), "--output"),
-    repeats: int = typer.Option(1, "--repeats", help="Repeat each (variant,profile,query) N times."),
-    no_judge: bool = typer.Option(False, "--no-judge", help="Skip G-Eval soft-preference scoring."),
-) -> None:
-    """Run the leave-one-out ablation grid (full system + one config per disabled module)."""
-    # Local imports keep `cli --help` fast even when matplotlib isn't built.
-    from evaluation.ablation import leave_one_out_variants
-    from evaluation.report import write_markdown_summary, write_plots
-    from evaluation.runner import run_ablation_grid
-
-    level_ids = [int(s) for s in levels.split(",") if s.strip()]
-
-    df = asyncio.run(
-        run_ablation_grid(
-            variants=leave_one_out_variants(),
-            levels=level_ids,
-            repeats=repeats,
-            run_judge=not no_judge,
-        ),
-    )
-    output.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(output, index=False)
-    console.print(f"[green]Saved CSV[/green] {output} ({len(df)} rows)")
-
-    summary_md = output.with_suffix(".md")
-    write_markdown_summary(df, summary_md)
-    console.print(f"[green]Saved summary[/green] {summary_md}")
-
-    plot_path = output.with_suffix(".png")
-    write_plots(df, plot_path)
-    console.print(f"[green]Saved plots[/green] {plot_path}")
 
 
 # ---------- info -------------------------------------------------------------------------------
