@@ -17,7 +17,7 @@ import logging
 from typing import Any
 
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent, ModelRetry, RunContext
+from pydantic_ai import Agent, ModelRetry, ModelSettings, RunContext
 
 from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.prompts import nutrition_agent_system, reflection_refiner_system
@@ -123,6 +123,7 @@ def _build_agent(system_prompt: str, *, totaller_enabled: bool) -> Agent[AgentDe
         deps_type=AgentDeps,
         output_type=AgentMealPlan,
         system_prompt=system_prompt,
+        model_settings=ModelSettings(temperature=settings.llm_temperature),
         retries=2,
     )
     agent.output_validator(_validate_codes)

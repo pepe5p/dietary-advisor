@@ -6,6 +6,7 @@ from dietary_advisor.schemas.agent_output import (
     AgentRecipe,
     PortionRef,
 )
+from dietary_advisor.schemas.blueprint import MealConcept
 from dietary_advisor.schemas.meal_plan import (
     Citation,
     Meal,
@@ -30,6 +31,7 @@ __all__ = [
     "FoodItem",
     "MacroTargets",
     "Meal",
+    "MealConcept",
     "MealPlan",
     "Nutrient",
     "NutrientName",

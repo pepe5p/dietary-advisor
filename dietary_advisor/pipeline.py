@@ -17,15 +17,22 @@ The four toggleable modules (desc.md):
     Totaller   - deterministic nutrient summation, exposed to the agent as a tool
     RAG        - clinical-guideline retrieval
     Reflection - Generate-Review-Refine self-correction loop (plain self-review)
+
+A fifth, always-on step (not a toggleable module - see AGENTS.md/the blueprint
+agent) runs a lightweight brainstorming agent ahead of the nutrition agent on
+fresh (non-follow-up) requests, so the nutrition agent's ingredient choices
+start from a concrete, varied dish concept instead of an abstract macro gap.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 
 from pydantic_ai.messages import ModelMessage
 
+from dietary_advisor.agents.blueprint_agent import build_blueprint_agent
 from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.nutrition_agent import build_nutrition_agent
 from dietary_advisor.agents.runner import run_agent_logged
@@ -35,6 +42,7 @@ from dietary_advisor.food_db import FoodDb
 from dietary_advisor.hydration import hydrate_meal_plan
 from dietary_advisor.reflection import reflect_and_refine, ReflectionResult
 from dietary_advisor.schemas.agent_output import AgentMealPlan
+from dietary_advisor.schemas.blueprint import MealConcept
 from dietary_advisor.schemas.meal_plan import Citation, MealPlan, ShoppingList
 from dietary_advisor.schemas.nutrition import MacroTargets
 from dietary_advisor.schemas.profile import UserProfile
@@ -183,6 +191,28 @@ class Pipeline:
         log.info("RAG retrieved %d citation(s).", len(citations))
         return citations
 
+    async def _generate_blueprint(
+        self,
+        deps: AgentDeps,
+        user_query: str,
+    ) -> tuple[list[MealConcept], RunTelemetry]:
+        """Brainstorm dish concepts for the day, degrading to an empty list on failure.
+
+        A creative aid, not a correctness-critical step: if the call fails
+        (rate limit, malformed output after exhausting retries), the nutrition
+        agent simply falls back to choosing its own ingredients, so a broken
+        brainstorm never sinks the whole request.
+        """
+        prompt = self._compose_blueprint_prompt(deps.profile, deps.targets, user_query)
+        try:
+            agent = build_blueprint_agent()
+            result = await run_agent_logged(agent, prompt, deps=deps, label="blueprint")
+        except Exception as exc:  # noqa: BLE001 - LLMs raise many things; never sink the request for this
+            log.warning("Blueprint agent failed, continuing without meal concepts: %s", exc)
+            return [], RunTelemetry()
+        log.info("Blueprint agent produced %d meal concept(s).", len(result.output))
+        return result.output, collect_from_result(result)
+
     async def run(
         self,
         profile: UserProfile,
@@ -200,8 +230,6 @@ class Pipeline:
             is_followup,
             user_query,
         )
-        rag_citations = await self._retrieve_context(profile, user_query)
-
         if not self.variant.food_enabled:
             log.warning(
                 "VariantConfig.food_enabled=False is unsupported (the agent cannot invent a food); "
@@ -213,6 +241,19 @@ class Pipeline:
             food_db=self._ensure_food_db(),
             retriever=self._ensure_retriever() if self.variant.rag_enabled else None,
         )
+
+        # The blueprint brainstorm only makes sense for a fresh plan - a
+        # follow-up already has an established plan and asks for minimal
+        # targeted changes, so regenerating concepts would work against that.
+        if is_followup:
+            rag_citations = await self._retrieve_context(profile, user_query)
+            meal_concepts: list[MealConcept] = []
+            blueprint_telemetry = RunTelemetry()
+        else:
+            rag_citations, (meal_concepts, blueprint_telemetry) = await asyncio.gather(
+                self._retrieve_context(profile, user_query),
+                self._generate_blueprint(deps, user_query),
+            )
 
         agent = build_nutrition_agent(
             totaller_enabled=self.variant.totaller_enabled,
@@ -229,6 +270,7 @@ class Pipeline:
                 user_query,
                 targets,
                 rag_citations,
+                meal_concepts,
                 available_ingredients=available_ingredients,
             )
         log.info(
@@ -239,7 +281,7 @@ class Pipeline:
         result = await run_agent_logged(agent, prompt, deps=deps, label="nutrition", message_history=message_history)
         agent_plan: AgentMealPlan = result.output
         messages = list(result.all_messages())
-        telemetry = collect_from_result(result)
+        telemetry = collect_from_result(result).merge(blueprint_telemetry)
         log.info(
             "Agent returned plan with %d meal(s), %d citation(s).",
             len(agent_plan.meals),
@@ -299,6 +341,7 @@ class Pipeline:
         user_query: str,
         targets: MacroTargets,
         rag_citations: list[Citation],
+        meal_concepts: list[MealConcept],
         *,
         available_ingredients: list[str] | None = None,
     ) -> str:
@@ -309,6 +352,9 @@ class Pipeline:
             "Macro targets (single day):",
             targets.model_dump_json(indent=2),
         ]
+        if meal_concepts:
+            sections.append("Meal concepts (creative starting points):")
+            sections.append("\n".join(f"- {c.kind}: {c.dish_name}" for c in meal_concepts))
         if available_ingredients:
             sections.append("Available ingredients to use first (the user has these on hand):")
             sections.append("\n".join(f"- {name}" for name in available_ingredients))
@@ -320,6 +366,18 @@ class Pipeline:
                 )
         sections.append("Return ONLY a valid AgentMealPlan object.")
         return "\n\n".join(sections)
+
+    def _compose_blueprint_prompt(self, profile: UserProfile, targets: MacroTargets, user_query: str) -> str:
+        return "\n\n".join(
+            [
+                f"User query: {user_query}",
+                "Profile:",
+                profile.model_dump_json(indent=2),
+                "Macro targets (single day):",
+                targets.model_dump_json(indent=2),
+                "Propose three dishes concepts per meal slot.",
+            ],
+        )
 
     def _compose_followup_prompt(
         self,

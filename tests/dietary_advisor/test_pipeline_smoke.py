@@ -30,6 +30,7 @@ from dietary_advisor.food_db import OFFItem
 from dietary_advisor.food_db.facade import LookupQuery
 from dietary_advisor.pipeline import Pipeline, VariantConfig
 from dietary_advisor.profiles import PROFILES
+from dietary_advisor.schemas.blueprint import MealConcept
 from dietary_advisor.schemas.meal_plan import MealPlan
 from dietary_advisor.schemas.nutrition import NutrientName
 from dietary_advisor.schemas.profile import UserProfile
@@ -140,6 +141,38 @@ async def test_pipeline_chat_threads_message_history(
     assert isinstance(second.plan, MealPlan)
     # History accumulates across turns, proving conversation memory is threaded.
     assert len(second.messages) > len(first.messages)
+
+
+def test_compose_prompt_includes_meal_concepts_section(healthy_profile: UserProfile) -> None:
+    with Pipeline(VariantConfig(rag_enabled=False), food_db=_FakeFoodDb()) as pipeline:  # type: ignore[arg-type]
+        prompt = pipeline._compose_prompt(
+            healthy_profile,
+            "Plan a day.",
+            healthy_profile.targets,
+            [],
+            [MealConcept(kind="breakfast", dish_name="Shakshuka with feta and crusty bread")],
+        )
+    assert "Meal concepts" in prompt
+    assert "breakfast: Shakshuka with feta and crusty bread" in prompt
+
+
+@pytest.mark.asyncio()
+async def test_pipeline_survives_blueprint_agent_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    healthy_profile: UserProfile,
+) -> None:
+    """A broken brainstorming pass degrades to no concepts rather than failing the request."""
+    _use_test_model(monkeypatch)
+
+    def _boom() -> None:
+        raise RuntimeError("blueprint agent unavailable")
+
+    monkeypatch.setattr(pipeline_module, "build_blueprint_agent", _boom)
+
+    baseline = VariantConfig(food_enabled=False, totaller_enabled=False, rag_enabled=False, reflection_enabled=False)
+    with Pipeline(baseline, food_db=_FakeFoodDb()) as pipeline:  # type: ignore[arg-type]
+        result = await pipeline.run(healthy_profile, "Plan one balanced day.")
+    assert isinstance(result.plan, MealPlan)
 
 
 def test_cli_chat_session_runs(monkeypatch: pytest.MonkeyPatch) -> None:

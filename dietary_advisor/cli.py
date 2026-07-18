@@ -16,9 +16,10 @@ from dietary_advisor.config import get_settings
 from dietary_advisor.food_db.usda_food_db import is_usda_code
 from dietary_advisor.pipeline import Pipeline, VariantConfig
 from dietary_advisor.profiles import get_profile
+from dietary_advisor.schemas.meal_plan import Portion
 from dietary_advisor.schemas.nutrition import NutrientName
 from dietary_advisor.schemas.profile import UserProfile
-from dietary_advisor.totaller import total_meal_plan
+from dietary_advisor.totaller import total_meal_plan, total_portion
 
 app = typer.Typer(help="Neuro-symbolic dietary advisor (master's thesis CLI).")
 
@@ -214,6 +215,17 @@ def chat(
         console.print(f"[green]Wrote[/green] {json_out}")
 
 
+def _portion_macros(portion: Portion) -> tuple[float, float, float, float]:
+    """Return (kcal, protein g, carbs g, fat g) for a single portion."""
+    amounts = total_portion(portion)
+    return (
+        float(amounts.get(NutrientName.ENERGY_KCAL, 0)),
+        float(amounts.get(NutrientName.PROTEIN_G, 0)),
+        float(amounts.get(NutrientName.CARBS_G, 0)),
+        float(amounts.get(NutrientName.FAT_G, 0)),
+    )
+
+
 def _render_result(result: object) -> None:
     """Pretty-print a `PipelineResult` to the console."""
     from dietary_advisor.pipeline import PipelineResult  # local import to avoid cycles
@@ -221,33 +233,43 @@ def _render_result(result: object) -> None:
     assert isinstance(result, PipelineResult)
     console.rule(f"Variant {result.variant} - reflection iterations: {result.iterations}")
 
-    targets_tbl = Table(title="Macro targets", show_header=True)
-    targets_tbl.add_column("kcal")
-    targets_tbl.add_column("protein g")
-    targets_tbl.add_column("carbs g")
-    targets_tbl.add_column("fat g")
-    targets_tbl.add_column("fiber g")
-    targets_tbl.add_row(
-        f"{result.targets.energy_kcal:.0f}",
-        f"{result.targets.protein_g:.0f}",
-        f"{result.targets.carbs_g:.0f}",
-        f"{result.targets.fat_g:.0f}",
-        f"{result.targets.fiber_g:.0f}",
-    )
-    console.print(targets_tbl)
+    totals = total_meal_plan(result.plan)
+    macro_tbl = Table(title="Macro totals (actual vs target)")
+    macro_tbl.add_column("Nutrient")
+    macro_tbl.add_column("Actual", justify="right")
+    macro_tbl.add_column("Target", justify="right")
+    for label, nutrient, target in (
+        ("kcal", NutrientName.ENERGY_KCAL, result.targets.energy_kcal),
+        ("protein g", NutrientName.PROTEIN_G, result.targets.protein_g),
+        ("carbs g", NutrientName.CARBS_G, result.targets.carbs_g),
+        ("fat g", NutrientName.FAT_G, result.targets.fat_g),
+    ):
+        macro_tbl.add_row(label, f"{totals.get(nutrient):.0f}", f"{target:.0f}")
+    console.print(macro_tbl)
+
+    if result.plan.rationale:
+        console.print(f"\n[bold]Rationale[/bold]: {result.plan.rationale}")
 
     plan_tbl = Table(title=f"MealPlan ({len(result.plan.meals)} meals)", show_lines=True)
     plan_tbl.add_column("Meal")
     plan_tbl.add_column("Meal Name")
     plan_tbl.add_column("Products")
+    plan_tbl.add_column("Meal totals")
     plan_tbl.add_column("Recipe")
     for meal in result.plan.meals:
-        portions = ", ".join(f"{p.food.name}: {p.grams:.0f}" for p in meal.portions)
-        plan_tbl.add_row(meal.kind, meal.name, portions, meal.recipe)
+        lines = []
+        meal_kcal = meal_protein = meal_carbs = meal_fat = 0.0
+        for p in meal.portions:
+            kcal, protein, carbs, fat = _portion_macros(p)
+            lines.append(f"{p.food.name}: {p.grams:.0f}g — {kcal:.0f} kcal, P{protein:.1f} C{carbs:.1f} F{fat:.1f}")
+            meal_kcal += kcal
+            meal_protein += protein
+            meal_carbs += carbs
+            meal_fat += fat
+        products = "\n".join(lines)
+        meal_totals = f"{meal_kcal:.0f} kcal\nP{meal_protein:.1f} C{meal_carbs:.1f} F{meal_fat:.1f}"
+        plan_tbl.add_row(meal.kind, meal.name, products, meal_totals, meal.recipe)
     console.print(plan_tbl)
-
-    if result.plan.rationale:
-        console.print(f"\n[bold]Rationale[/bold]: {result.plan.rationale}")
 
     if result.shopping_list.items:
         shop_tbl = Table(title="Shopping list")
@@ -272,20 +294,6 @@ def _render_result(result: object) -> None:
                 f"{item.fat_g:.1f}",
             )
         console.print(shop_tbl)
-
-    totals = total_meal_plan(result.plan)
-    macro_tbl = Table(title="Macro totals (actual vs target)")
-    macro_tbl.add_column("Nutrient")
-    macro_tbl.add_column("Actual", justify="right")
-    macro_tbl.add_column("Target", justify="right")
-    for label, nutrient, target in (
-        ("kcal", NutrientName.ENERGY_KCAL, result.targets.energy_kcal),
-        ("protein g", NutrientName.PROTEIN_G, result.targets.protein_g),
-        ("carbs g", NutrientName.CARBS_G, result.targets.carbs_g),
-        ("fat g", NutrientName.FAT_G, result.targets.fat_g),
-    ):
-        macro_tbl.add_row(label, f"{totals.get(nutrient):.0f}", f"{target:.0f}")
-    console.print(macro_tbl)
 
     if result.citations:
         console.print(f"\n[bold]Citations[/bold]: {len(result.citations)} chunks retrieved.")

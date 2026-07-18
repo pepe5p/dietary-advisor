@@ -85,6 +85,89 @@ def _trash_predicate() -> str:
     return "(" + " AND ".join(text + lists) + ")"
 
 
+# Atwater estimate of kcal/100g from the macronutrients, used to detect energy
+# values that can't be reconciled with the product's own macros. Label kcal may
+# legitimately include fiber at 2 kcal/g, so the mismatch check accepts anything
+# between the pure 9/4/4 estimate and the fiber-credited one. Rounding on
+# low-energy labels (teas, waters: 0.1 kcal vs 0.2 expected) makes a purely
+# relative margin delete half of all sub-50-kcal products, hence the absolute
+# floor below.
+_ATWATER_KCAL = "(fat_100g * 9 + proteins_100g * 4 + carbohydrates_100g * 4)"
+_ATWATER_KCAL_WITH_FIBER = f"({_ATWATER_KCAL} + coalesce(fiber_100g, 0) * 2)"
+_ENERGY_MARGIN = 0.05
+_ENERGY_MARGIN_FLOOR_KCAL = 20
+
+# Decimal-shift factors tried (in order, first match wins) when repairing an
+# energy value: a mis-placed decimal point or a per-serving/per-100g mix-up
+# shows up as kcal off by a power of ten from the Atwater estimate.
+_ENERGY_TYPO_FACTORS: tuple[float, ...] = (10, 100, 1000, 0.1, 0.01)
+
+# Pure fat is 9 kcal/g, so no real food exceeds 900 kcal/100g; anything above is
+# a data error (kJ mislabelled as kcal, per-serving values, etc.).
+_MAX_KCAL_100G = 900
+
+
+def _energy_checkable() -> str:
+    """SQL boolean: the four columns the energy checks need are all present."""
+    cols = ("energy_kcal_100g", "fat_100g", "proteins_100g", "carbohydrates_100g")
+    return "(" + " AND ".join(f"{c} IS NOT NULL" for c in cols) + ")"
+
+
+def _energy_typo_predicate(factor: float) -> str:
+    """SQL boolean: dividing kcal by `factor` reconciles it with the Atwater estimate."""
+    return (
+        f"{_energy_checkable()} AND {_ATWATER_KCAL} > 0 "
+        f"AND abs(energy_kcal_100g / {factor} - {_ATWATER_KCAL}) <= {_ENERGY_MARGIN} * {_ATWATER_KCAL}"
+    )
+
+
+def _energy_mismatch_predicate() -> str:
+    """SQL boolean: kcal falls outside the plausible band derived from the macros.
+
+    The band spans the pure Atwater estimate to the fiber-credited one, widened
+    on each side by the 5% margin with a `_ENERGY_MARGIN_FLOOR_KCAL` floor.
+    """
+    margin_low = f"greatest({_ENERGY_MARGIN} * {_ATWATER_KCAL}, {_ENERGY_MARGIN_FLOOR_KCAL})"
+    margin_high = f"greatest({_ENERGY_MARGIN} * {_ATWATER_KCAL_WITH_FIBER}, {_ENERGY_MARGIN_FLOOR_KCAL})"
+    return (
+        f"{_energy_checkable()} AND ("
+        f"energy_kcal_100g < {_ATWATER_KCAL} - {margin_low}"
+        f" OR energy_kcal_100g > {_ATWATER_KCAL_WITH_FIBER} + {margin_high})"
+    )
+
+
+def _clean_energy(con: duckdb.DuckDBPyConnection) -> int:
+    """Repair or drop products whose energy disagrees with their macros.
+
+    Ordered so repairs run before deletions: (1) rescale kcal off by a power of
+    ten from the Atwater estimate, (2) delete impossible values above
+    `_MAX_KCAL_100G`, (3) delete whatever still can't be reconciled. Returns the
+    number of rows deleted (steps 2+3), which the caller uses to decide whether
+    the FTS corpus needs rebuilding.
+    """
+    for factor in _ENERGY_TYPO_FACTORS:
+        pred = _energy_typo_predicate(factor)
+        fixed = con.execute(f"SELECT count(*) FROM products WHERE {pred}").fetchone()[0]  # type: ignore[index]  # noqa: S608
+        if fixed:
+            con.execute(f"UPDATE products SET energy_kcal_100g = energy_kcal_100g / {factor} WHERE {pred}")  # noqa: S608
+            log.info("Rescaled energy_kcal_100g by 1/%s for %d product(s).", factor, fixed)
+
+    over = con.execute(
+        f"SELECT count(*) FROM products WHERE energy_kcal_100g > {_MAX_KCAL_100G}"  # noqa: S608
+    ).fetchone()[0]  # type: ignore[index]
+    if over:
+        con.execute(f"DELETE FROM products WHERE energy_kcal_100g > {_MAX_KCAL_100G}")  # noqa: S608
+        log.info("Removed %d product(s) with energy_kcal_100g > %d.", over, _MAX_KCAL_100G)
+
+    mismatch = _energy_mismatch_predicate()
+    bad = con.execute(f"SELECT count(*) FROM products WHERE {mismatch}").fetchone()[0]  # type: ignore[index]  # noqa: S608
+    if bad:
+        con.execute(f"DELETE FROM products WHERE {mismatch}")  # noqa: S608
+        log.info("Removed %d product(s) whose energy disagrees with their macros.", bad)
+
+    return over + bad
+
+
 def _embed_documents(texts: list[str], batch_size: int = 256) -> list[list[float]]:
     """Embed product documents (build-time only) with the E5 `passage:` prefix."""
     prefixed = [_PASSAGE_PREFIX + t for t in texts]
@@ -445,6 +528,7 @@ def _materialize_off_db(settings: Settings, parquet_path: Path) -> Path:
 
             log.info("Filtering Open Food Facts products (source: %s)...", parquet_path)
             con.execute(f"CREATE TABLE products AS {_build_select_sql(source_sql)}")
+            _clean_energy(con)
             row_count = con.execute("SELECT count(*) FROM products").fetchone()[0]  # type: ignore[index]
 
             for stmt in _column_comment_sql("products"):
@@ -486,9 +570,10 @@ def build_off_db(settings: Settings) -> Path:
     when missing), then filtered to Polish products with a complete macro profile
     and materialized atomically. When the columns are already current the DB is
     instead upgraded in place, without the embedding pass: unidentifiable rows are
-    deleted (see `_trash_predicate`) and the FTS index is rebuilt when rows went
-    away or its field set is stale. So changing `_FTS_FIELDS` or the trash rules
-    never forces a full re-embed; only a column change does.
+    deleted (see `_trash_predicate`), energy values are repaired/pruned (see
+    `_clean_energy`), and the FTS index is rebuilt when rows went away or its
+    field set is stale. So changing `_FTS_FIELDS`, the trash rules or the energy
+    rules never forces a full re-embed; only a column change does.
     """
     target = settings.off_db
     missing = _stale_products_columns(target)
@@ -501,6 +586,7 @@ def build_off_db(settings: Settings) -> Path:
             if deleted:
                 con.execute(f"DELETE FROM products WHERE {_trash_predicate()}")  # noqa: S608
                 log.info("Removed %d unidentifiable OFF product(s) from %s.", deleted, target)
+            deleted += _clean_energy(con)
             # Deleting rows shifts the BM25 corpus statistics, so the FTS index
             # is rebuilt whenever rows went away (as well as when its field set
             # is stale); surviving embeddings and the HNSW index stay valid.

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent, ModelSettings, RunContext
 
 from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.prompts import RAG_AGENT_SYSTEM
@@ -22,6 +22,7 @@ def build_rag_agent() -> Agent[AgentDeps, list[dict[str, Any]]]:
         deps_type=AgentDeps,
         output_type=list[dict[str, Any]],
         system_prompt=RAG_AGENT_SYSTEM,
+        model_settings=ModelSettings(temperature=settings.llm_temperature),
         retries=1,
     )
 

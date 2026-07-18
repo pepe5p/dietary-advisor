@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     llm_model: str = Field(...)
     # "judge" model used for the G-Eval soft-preference judge
     judge_model: str = Field(...)
+    # Sampling temperature for the nutrition/refiner/RAG agents. Provider defaults
+    # tend to be conservative for tool-calling flows, which combined with fully
+    # deterministic retrieval (BM25 + cosine similarity, no randomness) makes the
+    # same "safe" ingredient choice recur across runs; raising this pushes back
+    # without needing per-provider tuning in code.
+    llm_temperature: float = Field(default=1.0, ge=0.0, le=2.0)
 
     # --- Storage ---
     data_dir: Path = Field(default=Path(".data"))

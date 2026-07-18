@@ -67,8 +67,24 @@ _RULE_ALLERGENS = """Never include a food whose tags contain `contains:<allergen
 
 _RULE_DIET_PATTERN = "Respect the profile's diet pattern (e.g. vegan, vegetarian)"
 
-_RULE_TOTALLER = """After drafting the plan, ALWAYS call `total_meal_plan` and adjust portions
-   so that energy_kcal is nearly equal to the macro target."""
+_RULE_BLUEPRINT = """When a "Meal concepts" section is supplied below, build one meal per
+   concept, using it as your creative starting point and swapping in whatever
+   real product/ingredient your search actually finds - do not invent your
+   own concept for a slot that already has one. If no concepts are supplied
+   (e.g. on a follow-up turn), choose your own varied ingredients instead."""
+
+_RULE_TOTALLER = """After drafting the plan, ALWAYS call `total_meal_plan` and compare
+   energy_kcal against the macro target:
+   - Within ±5% of the target kcal is good enough - STOP adjusting and return
+     the plan.
+   - If the total is off by 25% or less, adjust ONLY by changing the `grams`
+     of existing portions - do NOT add, remove, or swap products. Scale the
+     grams proportionally to the kcal gap in one pass, then re-total.
+   - Only when the total is off by more than 25% may you change the meal
+     composition itself.
+   Call `total_meal_plan` at most 5 times in a run. If you are still outside
+   ±5% after the fifth call, stop and return the plan whose total came
+   closest to the target - do not keep iterating."""
 
 _RULE_CITATIONS = """Cite every clinical claim in the rationale using a `Citation` from the
    RAG retriever output supplied to you."""
@@ -88,7 +104,9 @@ _PROCESS_SEARCH = """- Search first for every ingredient you need, strongly pref
   broader query if nothing suitable comes back."""
 _PROCESS_ALLOCATE = """- Allocate portions across meals so the plan uses familiar, realistic meals
   (not obscure local specialties) and the macros land near target."""
-_PROCESS_VERIFY = "- Verify with `total_meal_plan` and adjust portions until energy_kcal nearly equals target."
+_PROCESS_VERIFY = """- Verify with `total_meal_plan` (at most 5 calls): ±5% of target kcal is good
+  enough; when off by 25% or less, fix it by scaling portion grams only; after
+  the fifth call keep the closest plan you produced."""
 _PROCESS_RECIPE = """- Write out the full step-by-step `recipe.instructions` for every meal before
   returning the plan."""
 
@@ -102,7 +120,7 @@ def nutrition_agent_system(*, totaller_enabled: bool = True, rag_enabled: bool =
     their capability is ablated off, so the model is never told to call a tool
     that was not registered or to cite excerpts it never received.
     """
-    rules = [_RULE_PORTION_REF, _RULE_SEARCH_FIRST, _RULE_ALLERGENS, _RULE_DIET_PATTERN]
+    rules = [_RULE_PORTION_REF, _RULE_SEARCH_FIRST, _RULE_ALLERGENS, _RULE_DIET_PATTERN, _RULE_BLUEPRINT]
     if totaller_enabled:
         rules.append(_RULE_TOTALLER)
     if rag_enabled:
@@ -123,6 +141,16 @@ profile, formulate 1-3 focused search queries against the guideline corpus
 (WHO / NICE / ADA / USDA / EFSA) and return the most relevant chunks.
 Prefer specificity over breadth: a query like "type 2 diabetes fiber target"
 beats "diet for diabetes". Return the chunks verbatim with metadata.
+"""
+
+
+BLUEPRINT_AGENT_SYSTEM = """You are a meal-idea generator. Suggest one concrete dish name for each meal
+slot of the day (breakfast, lunch, dinner, and a snack or two).
+
+Name specific dishes, not nutrient-role placeholders - "Turkish menemen with
+feta", not "a high-protein breakfast". Favour varied, non-obvious ideas
+across cuisines rather than the first predictable option. That is your whole
+job: another agent turns these names into an actual plan.
 """
 
 
