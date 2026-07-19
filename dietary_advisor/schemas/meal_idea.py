@@ -1,7 +1,7 @@
-"""Meal blueprint schema: creative dish concepts, not DB-verified facts.
+"""Meal-idea schema: creative dish concepts, not DB-verified facts.
 
-`MealConcept` is the output of the blueprint agent (see
-`dietary_advisor.agents.blueprint_agent`), a brainstorming pass that runs
+`MealConcept` is the output of the meal-idea agent (see
+`dietary_advisor.agents.meal_idea_agent`), a brainstorming pass that runs
 before the nutrition agent ever touches the food DB. It intentionally carries
 no nutrients or product codes - it exists purely to give the nutrition agent
 a concrete, varied creative starting point instead of an abstract macro gap

@@ -1,6 +1,6 @@
 """Hardcoded example user profiles for the CLI.
 
-There is no profile store: the CLI (`recommend`/`chat`) resolves a profile
+There is no profile store: the CLI (`recommend`) resolves a profile
 from this fixed list by `user_id` when invoked with `--profile-id` (the
 `--profile` option instead accepts a full `UserProfile` as inline JSON).
 This module is CLI-only - the evaluation harness owns its own, independent

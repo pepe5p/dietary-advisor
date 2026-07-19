@@ -9,12 +9,16 @@ from __future__ import annotations
 from enum import Enum
 from functools import cached_property, lru_cache
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import Field
 from pydantic_ai.models import Model
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from dietary_advisor.llm import resolve_llm_model
+from dietary_advisor.config.llm import resolve_llm_model
+
+# Shared constraint for the per-agent sampling temperature fields below.
+Temperature = Annotated[float, Field(default=1.0, ge=0.0, le=2.0)]
 
 
 class FoodDbUsage(str, Enum):
@@ -51,7 +55,10 @@ class Settings(BaseSettings):
     # deterministic retrieval (BM25 + cosine similarity, no randomness) makes the
     # same "safe" ingredient choice recur across runs; raising this pushes back
     # without needing per-provider tuning in code.
-    llm_temperature: float = Field(default=1.0, ge=0.0, le=2.0)
+    llm_temperature: Temperature
+    # Separate knob for the meal-idea agent, so its dish-idea variety can be
+    # tuned independently of the grounded nutrition/refiner/RAG agents above.
+    meal_idea_llm_temperature: Temperature
 
     # --- Storage ---
     data_dir: Path = Field(default=Path(".data"))
@@ -103,7 +110,7 @@ class Settings(BaseSettings):
     # Which retrieval channel(s) the USDA reader uses (or `disabled` to skip it).
     usda_usage: FoodDbUsage = Field(default=FoodDbUsage.FULL)
 
-    # --- Reflection loop (Generate-Score-Refine) ---
+    # --- Reflection loop (critique-then-refine) ---
     reflection_max_loops: int = Field(default=3, ge=0, le=10)
 
     # --- RAG ---

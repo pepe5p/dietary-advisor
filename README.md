@@ -1,10 +1,11 @@
 # Dietary Advisor
 
 Neuro-symbolic agentic architecture for dietary recommendations (master's thesis).
-An LLM is combined with deterministic symbolic components (local Open Food Facts
-lookup, `Fraction`-based nutrient totaller, hybrid RAG over clinical guidelines,
-a self-review reflection loop) and evaluated with a leave-one-out ablation across
-three patient complexity levels (L1-L3).
+An LLM is combined with deterministic symbolic components: a local Open Food Facts
+lookup (always on - part of the baseline, since the agent cannot invent a food),
+plus a `Fraction`-based nutrient totaller, hybrid RAG over clinical guidelines, and
+a self-review reflection loop, each ablatable. Evaluated with a leave-one-out
+ablation across three patient complexity levels (L1-L3).
 
 ## Requirements
 
@@ -42,17 +43,15 @@ offline.
 
 ## Run the tool
 
-`recommend` generates one plan; `chat` refines a plan over multiple turns. Both take
-exactly one of `--profile-id <id>` (a built-in profile from
+`recommend` generates one plan. It takes exactly one of `--profile-id <id>`
+(a built-in profile from
 [`dietary_advisor/profiles.py`](dietary_advisor/profiles.py), `L1_01`…`L3_05`) or
 `--profile '{...}'` (a full `UserProfile` JSON string).
 
 ```bash
 just run recommend --profile-id L2_01 \
-    --query "Plan a 1-day, ~1700 kcal vegetarian menu I can cook in 30 min."
-
-# refine interactively; --json-out saves the final plan on exit
-just run chat --profile-id L2_01 --query "Plan a balanced day." --json-out out/plan.json
+    --query "Plan a 1-day, ~1700 kcal vegetarian menu I can cook in 30 min." \
+    --json-out out/plan.json
 
 just run info                 # sanity-check resolved settings (model, data dir, .env)
 just run recommend --help     # every command and option is self-documented
@@ -62,8 +61,8 @@ Results (macro targets, meal plan, shopping list, actual-vs-target macros, citat
 count) print to the terminal; add `--json-out <path>` to also persist the full result.
 Build a plan around what you have with `--available "salmon, spinach, lemon"`.
 
-Each symbolic module can be toggled off to feel its effect:
-`--no-off`, `--no-totaller`, `--no-rag`, `--no-reflective-loop`.
+Each ablatable module can be toggled off to feel its effect:
+`--no-totaller`, `--no-rag`, `--no-reflective-loop`.
 
 ## Run the evaluation
 
@@ -79,7 +78,7 @@ just evaluate --repeats 3
 This writes three artefacts to `evaluation/reports/` (visible on the host via the bind
 mount): `ablation.csv` (per-run rows), `ablation.md` (aggregated summary), and
 `ablation.png` (CSR / SoftScore / MAE / MSE charts). With `--repeats 3`, 15 profiles ×
-5 configs = 225 runs; expect 30-90 min with `gpt-4o-mini`. Add `--no-judge` to skip the
+4 configs = 180 runs; expect 30-90 min with `gpt-4o-mini`. Add `--no-judge` to skip the
 G-Eval soft-preference scoring.
 
 Full reproduction from a clean host:

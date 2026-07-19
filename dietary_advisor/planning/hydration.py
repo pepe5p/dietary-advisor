@@ -47,7 +47,7 @@ def hydrate_meal_plan(plan: AgentMealPlan, food_db: FoodDb) -> MealPlan:
                 recipe=agent_meal.recipe.instructions,
             ),
         )
-    log.info("hydration.hydrate_meal_plan(%d meal(s))", len(meals))
+    log.debug("hydration.hydrate_meal_plan(%d meal(s))", len(meals))
     return MealPlan(
         user_id=plan.user_id,
         meals=meals,

@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 from fractions import Fraction
 
-from dietary_advisor.schemas.meal_plan import MealPlan, NutrientTotals, Portion
+from dietary_advisor.schemas.meal_plan import MealNutrientTotals, MealPlan, NutrientTotals, Portion
 from dietary_advisor.schemas.nutrition import NutrientName
 
 log = logging.getLogger(__name__)
@@ -36,17 +36,29 @@ def total_portion(portion: Portion) -> dict[NutrientName, Fraction]:
     return out
 
 
+def _round(acc: dict[NutrientName, Fraction]) -> dict[NutrientName, float]:
+    return {nutrient: round(float(value), _PRECISION_DIGITS) for nutrient, value in acc.items()}
+
+
 def total_meal_plan(plan: MealPlan) -> NutrientTotals:
-    """Sum every portion in the plan into per-nutrient totals (canonical units)."""
-    acc: dict[NutrientName, Fraction] = {}
+    """Sum every portion in the plan into per-nutrient totals, overall and per meal.
+
+    Per-meal sums are accumulated in exact `Fraction`s and folded into the
+    overall total before either is rounded, so the overall total is the exact
+    sum rather than a sum of already-rounded meal totals.
+    """
+    overall: dict[NutrientName, Fraction] = {}
+    per_meal: list[MealNutrientTotals] = []
     for meal in plan.meals:
+        meal_acc: dict[NutrientName, Fraction] = {}
         for portion in meal.portions:
             for nutrient, value in total_portion(portion).items():
-                acc[nutrient] = acc.get(nutrient, Fraction(0)) + value
+                meal_acc[nutrient] = meal_acc.get(nutrient, Fraction(0)) + value
+        for nutrient, value in meal_acc.items():
+            overall[nutrient] = overall.get(nutrient, Fraction(0)) + value
+        per_meal.append(MealNutrientTotals(kind=meal.kind, name=meal.name, totals=_round(meal_acc)))
 
-    rounded: dict[NutrientName, float] = {
-        nutrient: round(float(value), _PRECISION_DIGITS) for nutrient, value in acc.items()
-    }
+    rounded = _round(overall)
     log.info(
         "totaller.total_meal_plan(%d meal(s)) -> kcal=%.0f protein=%.1fg carbs=%.1fg fat=%.1fg",
         len(plan.meals),
@@ -55,12 +67,4 @@ def total_meal_plan(plan: MealPlan) -> NutrientTotals:
         rounded.get(NutrientName.CARBS_G, 0.0),
         rounded.get(NutrientName.FAT_G, 0.0),
     )
-    return NutrientTotals(totals=rounded)
-
-
-def total_meal_plan_dict(plan: MealPlan) -> dict[str, float]:
-    """Convenience wrapper returning a plain `{nutrient_name: amount}` dict.
-
-    This is the shape exposed to the LLM through the agent tool layer.
-    """
-    return {n.value: v for n, v in total_meal_plan(plan).totals.items()}
+    return NutrientTotals(totals=rounded, per_meal=per_meal)

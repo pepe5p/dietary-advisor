@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
-from typing import Any
+from collections.abc import Callable, Hashable, Sequence
 
 # Reciprocal-rank-fusion damping constant. 60 is the value from the original
 # RRF paper and is the de-facto default; it keeps any single top rank from
@@ -11,19 +10,19 @@ from typing import Any
 _RRF_K = 60
 
 
-def reciprocal_rank_fusion(
-    ranked_lists: Sequence[list[dict[str, Any]]],
-    key: Callable[[dict[str, Any]], Any],
+def reciprocal_rank_fusion[RowT](
+    ranked_lists: Sequence[list[RowT]],
+    key: Callable[[RowT], Hashable],
     k: int = _RRF_K,
-) -> list[dict[str, Any]]:
+) -> list[RowT]:
     """Fuse several ranked result lists into one via reciprocal rank fusion.
 
     Each row contributes `1 / (k + rank)` to its key's score, so a record
     surfaced by both channels outranks one that scores highly in only one.
     Preserves the first row seen per key (column sets are identical here).
     """
-    scores: dict[Any, float] = {}
-    rows: dict[Any, dict[str, Any]] = {}
+    scores: dict[Hashable, float] = {}
+    rows: dict[Hashable, RowT] = {}
     for ranked in ranked_lists:
         for rank, row in enumerate(ranked, start=1):
             identity = key(row)

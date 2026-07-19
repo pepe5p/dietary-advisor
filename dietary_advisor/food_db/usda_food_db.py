@@ -20,8 +20,9 @@ import duckdb
 
 from dietary_advisor.config import FoodDbUsage, get_settings
 from dietary_advisor.food_db.embeddings import embed_query
+from dietary_advisor.food_db.errors import USDAUnknownFoodCodeError
 from dietary_advisor.food_db.fusion import reciprocal_rank_fusion
-from dietary_advisor.food_db.models import USDAItem
+from dietary_advisor.food_db.models import Row, USDAItem
 from dietary_advisor.schemas.nutrition import NutrientName
 
 log = logging.getLogger(__name__)
@@ -66,7 +67,7 @@ def _fdc_id(code: str) -> int:
     try:
         return int(raw)
     except ValueError as exc:
-        raise KeyError(f"not a USDA code: {code!r}") from exc
+        raise USDAUnknownFoodCodeError(f"not a USDA code: {code!r}") from exc
 
 
 def _row_to_usda_item(row: Mapping[str, Any]) -> USDAItem:
@@ -123,12 +124,12 @@ class UsdaFoodDb:
     def __exit__(self, *exc: object) -> None:
         self.close()
 
-    def _rows(self, sql: str, params: list[Any]) -> list[dict[str, Any]]:
+    def _rows(self, sql: str, params: list[Any]) -> list[Row]:
         cur = self._con.execute(sql, params)
         columns = [d[0] for d in cur.description]
         return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
 
-    def _bm25_rows(self, query: str, limit: int) -> list[dict[str, Any]]:
+    def _bm25_rows(self, query: str, limit: int) -> list[Row]:
         """Lexical (BM25) candidates from the full-text index built by `setup`."""
         return self._rows(
             f"SELECT * FROM ("  # noqa: S608 (static column list; params are bound)
@@ -137,7 +138,7 @@ class UsdaFoodDb:
             [query, limit],
         )
 
-    def _semantic_rows(self, query: str, limit: int) -> list[dict[str, Any]]:
+    def _semantic_rows(self, query: str, limit: int) -> list[Row]:
         """Nearest foods to `query` by embedding cosine distance.
 
         Degrades to an empty list (rather than raising) when the DB predates the
@@ -179,11 +180,11 @@ class UsdaFoodDb:
         return [_row_to_usda_item(r) for r in rows]
 
     def get_food(self, code: str) -> USDAItem:
-        """Return the food with `usda:<fdc_id>` `code`, or raise `KeyError` if absent."""
+        """Return the food with `usda:<fdc_id>` `code`, or raise `USDAUnknownFoodCodeError` if absent."""
         rows = self._rows(
             f"SELECT {_SELECT_COLUMNS} FROM foods WHERE fdc_id = ? LIMIT 1",  # noqa: S608 (static columns)
             [_fdc_id(code)],
         )
         if not rows:
-            raise KeyError(f"unknown USDA food code: {code!r}")
+            raise USDAUnknownFoodCodeError(f"unknown USDA food code: {code!r}")
         return _row_to_usda_item(rows[0])

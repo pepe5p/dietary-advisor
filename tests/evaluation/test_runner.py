@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 
 from dietary_advisor.food_db import FoodDb
-from dietary_advisor.hydration import to_food_item
-from dietary_advisor.pipeline import PipelineResult, VariantConfig
+from dietary_advisor.planning.hydration import to_food_item
+from dietary_advisor.planning.pipeline import PipelineResult, VariantConfig
 from dietary_advisor.schemas.meal_plan import Meal, MealPlan, Portion
 from evaluation.profiles.cases import get_case
 from evaluation.runner import run_ablation_grid
@@ -42,7 +42,7 @@ async def test_run_ablation_grid_with_mock_run_fn(food_db: FoodDb, any_code: str
             variant="baseline",
         )
 
-    baseline = VariantConfig(food_enabled=False, totaller_enabled=False, rag_enabled=False, reflection_enabled=False)
+    baseline = VariantConfig(totaller_enabled=False, rag_enabled=False, reflection_enabled=False)
     df = await run_ablation_grid(
         variants=[baseline],
         repeats=1,

@@ -15,7 +15,7 @@ from dietary_advisor.agents.nutrition_agent import (
     total_meal_plan,
 )
 from dietary_advisor.config import get_settings
-from dietary_advisor.food_db import OFFItem
+from dietary_advisor.food_db import OFFItem, OFFUnknownFoodCodeError
 from dietary_advisor.schemas.agent_output import AgentMeal, AgentMealPlan, AgentRecipe, PortionRef
 from dietary_advisor.schemas.nutrition import MacroTargets, NutrientName
 from dietary_advisor.schemas.profile import UserProfile
@@ -49,14 +49,14 @@ def test_totaller_tool_omitted_when_disabled(monkeypatch: pytest.MonkeyPatch) ->
 
 
 class _FakeFoodDb:
-    """Knows exactly one code; everything else raises `KeyError` like the real facade."""
+    """Knows exactly one code; everything else raises `UnknownFoodCodeError` like the real facade."""
 
     def __init__(self, known_code: str = "known") -> None:
         self._known_code = known_code
 
     def get_food(self, code: str) -> OFFItem:
         if code != self._known_code:
-            raise KeyError(f"unknown code: {code!r}")
+            raise OFFUnknownFoodCodeError(f"unknown code: {code!r}")
         return OFFItem(code=code, name="Known food", nutrients_per_100g={NutrientName.ENERGY_KCAL: 100.0})
 
 
@@ -106,7 +106,9 @@ async def test_total_meal_plan_tool_hydrates_and_sums() -> None:
     ctx = _fake_ctx(_FakeFoodDb("known"))
     plan = _plan_with_code("known")
     totals = await total_meal_plan(ctx, plan)
-    assert totals["energy_kcal"] == pytest.approx(100.0)  # 100g @ 100 kcal/100g
+    assert totals.totals[NutrientName.ENERGY_KCAL] == pytest.approx(100.0)  # 100g @ 100 kcal/100g
+    assert len(totals.per_meal) == 1
+    assert totals.per_meal[0].totals[NutrientName.ENERGY_KCAL] == pytest.approx(100.0)
 
 
 @pytest.mark.asyncio()

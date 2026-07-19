@@ -46,12 +46,27 @@ class Citation(BaseModel):
     snippet: str = Field(min_length=1, description="Verbatim quote (<=300 chars).")
 
 
+class MealNutrientTotals(BaseModel):
+    """Per-nutrient totals for a single meal within a `NutrientTotals` breakdown."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str
+    name: str
+    totals: NutrientAmountMap = Field(default_factory=dict)
+
+    def get(self, name: NutrientName, default: float = 0.0) -> float:
+        return self.totals.get(name, default)
+
+
 class NutrientTotals(BaseModel):
     """Result of the Totaller run over a `MealPlan`. All values in canonical units."""
 
     model_config = ConfigDict(extra="forbid")
 
     totals: NutrientAmountMap = Field(default_factory=dict)
+    # Ordered like MealPlan.meals; a list (not a dict) because meal names can collide.
+    per_meal: list[MealNutrientTotals] = Field(default_factory=list)
 
     def get(self, name: NutrientName, default: float = 0.0) -> float:
         return self.totals.get(name, default)

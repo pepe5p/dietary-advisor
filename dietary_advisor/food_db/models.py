@@ -5,15 +5,21 @@ domain `dietary_advisor.schemas.nutrition.FoodItem`, they are read-only,
 never emitted by the LLM, and deliberately do not share a base class - each
 DB has different provenance/context fields, and forcing a common shape would
 either lose information or fabricate fields the source doesn't have.
-`dietary_advisor.hydration.to_food_item` is the only place either becomes a
+`dietary_advisor.planning.hydration.to_food_item` is the only place either becomes a
 `FoodItem`.
 """
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from dietary_advisor.schemas.nutrition import NutrientAmountMap
+
+# A raw DuckDB row keyed by column name. The column set varies per query (and is
+# open-ended under `SELECT *`), so it is deliberately not a fixed model.
+type Row = dict[str, Any]
 
 
 class OFFItem(BaseModel):

@@ -34,11 +34,12 @@ nutrient values and cannot invent a food. Its structured output
 only by `PortionRef(code, name, grams)`, where `code` must come from a
 `lookup_food`/`lookup_foods` hit. An output validator (`_validate_codes`)
 resolves every code against the real `FoodDb` before accepting the run,
-raising `ModelRetry` on anything that doesn't exist. `dietary_advisor.hydration`
+raising `ModelRetry` on anything that doesn't exist. `dietary_advisor.planning.hydration`
 is the only place a reference resolves into a real, DB-verified `FoodItem`
 (`to_food_item`/`hydrate_meal_plan`), used identically by the production
-pipeline and the evaluation harness. Because of this, `VariantConfig.food_enabled`
-no longer disables the food DB (see its docstring in `pipeline.py`).
+pipeline and the evaluation harness. Because of this, the food DB and its
+lookup tools are always on and are not part of `VariantConfig`/the ablation
+grid (see the docstring in `dietary_advisor/planning/pipeline.py`).
 
 When a piece of logic is shared between runtime and a build/eval step, keep the
 shared primitive in `dietary_advisor` and call it from the outer package — do

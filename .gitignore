@@ -176,3 +176,5 @@ notes/
 .devcontainer/
 
 .cursor/
+
+.DS_Store

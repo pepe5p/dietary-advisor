@@ -70,5 +70,5 @@ def build_shopping_list(plan: MealPlan) -> ShoppingList:
             ),
         )
     items.sort(key=lambda it: (it.name.lower(), it.code or ""))
-    log.info("shopping_list.build_shopping_list(%d meal(s)) -> %d item(s)", len(plan.meals), len(items))
+    log.debug("shopping_list.build_shopping_list(%d meal(s)) -> %d item(s)", len(plan.meals), len(items))
     return ShoppingList(items=items)

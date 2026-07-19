@@ -3,7 +3,7 @@
 `PortionRef` deliberately carries no nutrients - the agent has no ability to
 invent or estimate them. It can only reference a `code` (and matching `name`)
 copied verbatim from a `lookup_food`/`lookup_foods` result; an output
-validator on the agent rejects any other code. `dietary_advisor.hydration`
+validator on the agent rejects any other code. `dietary_advisor.planning.hydration`
 is the one place a reference resolves back to a real, DB-verified
 `FoodItem`, both in production (`Pipeline.run`) and in the evaluation
 harness.

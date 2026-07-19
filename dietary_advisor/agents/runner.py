@@ -17,7 +17,7 @@ from typing import TypeVar
 
 from pydantic_ai import Agent
 from pydantic_ai.agent import AgentRunResult
-from pydantic_ai.messages import ModelMessage, ToolCallPart
+from pydantic_ai.messages import ToolCallPart
 
 log = logging.getLogger(__name__)
 
@@ -31,16 +31,14 @@ async def run_agent_logged(
     *,
     deps: DepsT,
     label: str,
-    message_history: list[ModelMessage] | None = None,
 ) -> AgentRunResult[OutputT]:
     """Run `agent` via `Agent.iter`, logging each node at INFO level.
 
-    Equivalent to `await agent.run(prompt, deps=deps, message_history=...)`
-    but narrates, per node, whether the model is being called or which tool
-    it asked for - so each `httpx` request line in the logs can be
-    attributed to a cause.
+    Equivalent to `await agent.run(prompt, deps=deps)` but narrates, per
+    node, whether the model is being called or which tool it asked for - so
+    each `httpx` request line in the logs can be attributed to a cause.
     """
-    async with agent.iter(prompt, deps=deps, message_history=message_history) as run:
+    async with agent.iter(prompt, deps=deps) as run:
         async for node in run:
             if Agent.is_model_request_node(node):
                 log.info("[%s] -> model request", label)

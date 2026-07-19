@@ -14,7 +14,6 @@ from dietary_advisor.schemas.meal_plan import (
 from dietary_advisor.schemas.nutrition import FoodItem, NutrientName
 from dietary_advisor.totaller import (
     total_meal_plan,
-    total_meal_plan_dict,
     total_portion,
 )
 from tests.conftest import LONG_INSTRUCTIONS
@@ -50,12 +49,21 @@ def test_totaller_aggregates_multiple_meals(chicken_food: FoodItem, rice_food: F
             ),
         ],
     )
-    totals = total_meal_plan(plan).totals
+    result = total_meal_plan(plan)
+    totals = result.totals
     # 250g chicken at 165 kcal/100g + 200g rice at 130 kcal/100g
     expected_kcal = 250 * 165 / 100 + 200 * 130 / 100
     assert totals[NutrientName.ENERGY_KCAL] == pytest.approx(expected_kcal, abs=0.05)
     expected_protein = 250 * 31 / 100 + 200 * 2.7 / 100
     assert totals[NutrientName.PROTEIN_G] == pytest.approx(expected_protein, abs=0.05)
+
+    # Per-meal breakdown, ordered like plan.meals: lunch (chicken+rice), dinner (chicken only).
+    assert [m.kind for m in result.per_meal] == ["lunch", "dinner"]
+    lunch, dinner = result.per_meal
+    lunch_kcal = 150 * 165 / 100 + 200 * 130 / 100
+    assert lunch.totals[NutrientName.ENERGY_KCAL] == pytest.approx(lunch_kcal, abs=0.05)
+    dinner_kcal = 100 * 165 / 100
+    assert dinner.totals[NutrientName.ENERGY_KCAL] == pytest.approx(dinner_kcal, abs=0.05)
 
 
 def test_totaller_handles_many_small_portions() -> None:
@@ -68,21 +76,3 @@ def test_totaller_handles_many_small_portions() -> None:
     )
     totals = total_meal_plan(plan).totals
     assert totals[NutrientName.PROTEIN_G] == pytest.approx(100.0)
-
-
-def test_totaller_dict_keys_use_nutrient_value() -> None:
-    food = FoodItem(name="a", nutrients_per_100g={NutrientName.SODIUM_MG: 500.0})
-    plan = MealPlan(
-        user_id="x",
-        meals=[
-            Meal(
-                kind="lunch",
-                name="r",
-                portions=[Portion(food=food, grams=100)],
-                recipe=LONG_INSTRUCTIONS,
-            )
-        ],
-    )
-    d = total_meal_plan_dict(plan)
-    assert "sodium_mg" in d
-    assert d["sodium_mg"] == pytest.approx(500.0)

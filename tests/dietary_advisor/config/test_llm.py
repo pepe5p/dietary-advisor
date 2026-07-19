@@ -7,7 +7,7 @@ from pydantic_ai.models import Model
 from pydantic_ai.models.groq import GroqModel
 from pydantic_ai.models.openai import OpenAIChatModel
 
-from dietary_advisor.llm import resolve_llm_model
+from dietary_advisor.config.llm import resolve_llm_model
 
 
 def test_resolve_groq_model_uses_extended_timeout() -> None:

@@ -19,7 +19,7 @@ import httpx
 import pypdf
 
 from dietary_advisor.config import Settings
-from dietary_advisor.dietary_rag.store import VectorStore
+from dietary_advisor.dietary_rag.store import Chunk, ChunkMeta, VectorStore
 from setup.sources import CorpusSource, SOURCES
 
 log = logging.getLogger(__name__)
@@ -101,32 +101,61 @@ def _detect_page(chunk: str) -> int | None:
     return int(m.group(1)) if m else None
 
 
-def _build_chunks_for(source: CorpusSource, raw_text: str, settings: Settings) -> list[dict[str, str | int | None]]:
+def _build_chunks_for(source: CorpusSource, raw_text: str, settings: Settings) -> list[Chunk]:
     chunks = _chunk(
         raw_text,
         chunk_size=settings.rag_chunk_size,
         overlap=settings.rag_chunk_overlap,
     )
-    out: list[dict[str, str | int | None]] = []
+    out: list[Chunk] = []
     for i, c in enumerate(chunks):
         chunk_hash = hashlib.sha1(c.encode("utf-8"), usedforsecurity=False).hexdigest()[:10]
         chunk_id = f"{source.doc_id}::{i:04d}::{chunk_hash}"
         out.append(
-            {
-                "id": chunk_id,
-                "text": c,
-                "doc_id": source.doc_id,
-                "title": source.title,
-                "page": _detect_page(c),
-            },
+            Chunk(
+                id=chunk_id,
+                text=c,
+                meta=ChunkMeta(doc_id=source.doc_id, title=source.title, page=_detect_page(c)),
+            ),
         )
     return out
+
+
+def _check_manual_sources(corpus_dir: Path) -> None:
+    """Abort the build if any manual-download source PDF is missing.
+
+    Manual sources sit behind WAFs that reject the ingest client, so they must
+    be fetched by hand first. Failing up front (rather than silently indexing a
+    partial corpus) is what keeps the RAG build honest.
+    """
+    missing = [
+        (s, corpus_dir / f"{s.doc_id}.pdf")
+        for s in SOURCES
+        if s.manual and not (corpus_dir / f"{s.doc_id}.pdf").exists()
+    ]
+    if not missing:
+        return
+    lines = ["Manual-download source PDF(s) missing. Fetch each in a browser, then re-run:"]
+    for source, dest in missing:
+        lines.append(f"  - You need to manually download {source.title} from {source.url}\n      and save it to {dest}")
+    raise FileNotFoundError("\n".join(lines))
+
+
+def _purge_stale_chunks(store: VectorStore) -> None:
+    """Drop indexed chunks whose source is no longer in the curated list."""
+    valid = {s.doc_id for s in SOURCES}
+    indexed = {chunk.meta.doc_id for chunk in store.all_documents()}
+    stale = sorted(indexed - valid)
+    if stale:
+        log.info("Purging %d stale doc(s) from the index: %s", len(stale), stale)
+        store.delete_docs(stale)
 
 
 def build_rag_corpus(settings: Settings) -> IngestStats:
     """Ensure the RAG corpus is downloaded, chunked, embedded, and indexed."""
     corpus_dir = settings.corpus_dir
     corpus_dir.mkdir(parents=True, exist_ok=True)
+    _check_manual_sources(corpus_dir)
     store = VectorStore()
 
     fetched: list[str] = []
@@ -135,7 +164,7 @@ def build_rag_corpus(settings: Settings) -> IngestStats:
 
     for source in SOURCES:
         pdf_path = corpus_dir / f"{source.doc_id}.pdf"
-        if not pdf_path.exists():
+        if not pdf_path.exists() and not source.manual:
             ok = _download(source.url, pdf_path, timeout_s=settings.request_timeout_s)
             if ok:
                 fetched.append(source.doc_id)
@@ -157,5 +186,7 @@ def build_rag_corpus(settings: Settings) -> IngestStats:
             continue
         store.upsert_chunks(chunks)
         total_chunks += len(chunks)
+
+    _purge_stale_chunks(store)
 
     return IngestStats(fetched=fetched, failed=failed, chunks_indexed=total_chunks)

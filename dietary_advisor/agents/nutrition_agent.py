@@ -14,32 +14,19 @@ retry rather than letting a fabricated code reach hydration.
 from __future__ import annotations
 
 import logging
-from typing import Any
 
-from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelRetry, ModelSettings, RunContext
 
 from dietary_advisor.agents.deps import AgentDeps
-from dietary_advisor.agents.prompts import nutrition_agent_system, reflection_refiner_system
+from dietary_advisor.agents.prompts import nutrition_agent_system, REFLECTION_REFINER_AGENT_SYSTEM
 from dietary_advisor.config import get_settings
-from dietary_advisor.food_db.facade import LookupQuery
-from dietary_advisor.hydration import total_agent_meal_plan
+from dietary_advisor.food_db.errors import UnknownFoodCodeError
+from dietary_advisor.food_db.facade import LookupQuery, LookupResult
+from dietary_advisor.planning.hydration import total_agent_meal_plan
 from dietary_advisor.schemas.agent_output import AgentMealPlan
+from dietary_advisor.schemas.meal_plan import NutrientTotals
 
 log = logging.getLogger(__name__)
-
-
-class FoodQuery(BaseModel):
-    """One ingredient search in a batch, with independent per-source result caps.
-
-    `max_results_usda`/`max_results_off` let the agent weight a query towards
-    the source that actually has it (generic staples in USDA, branded
-    products in OFF) instead of searching both identically; 0 skips a source.
-    """
-
-    query: str
-    max_results_usda: int = Field(default=2, ge=0, le=10)
-    max_results_off: int = Field(default=2, ge=0, le=10)
 
 
 async def _validate_codes(ctx: RunContext[AgentDeps], output: AgentMealPlan) -> AgentMealPlan:
@@ -54,7 +41,7 @@ async def _validate_codes(ctx: RunContext[AgentDeps], output: AgentMealPlan) -> 
         for ref in meal.recipe.portions:
             try:
                 ctx.deps.food_db.get_food(ref.code)
-            except KeyError:
+            except UnknownFoodCodeError:
                 unknown.append(ref.code)
     if unknown:
         raise ModelRetry(
@@ -70,7 +57,7 @@ async def lookup_food(
     query: str,
     max_results_usda: int = 2,
     max_results_off: int = 2,
-) -> dict[str, list[dict[str, Any]]]:
+) -> LookupResult:
     """Search both food databases by name for the best-matching foods.
 
     Results come back grouped by source: `open_food_facts` (branded/packaged
@@ -85,35 +72,35 @@ async def lookup_food(
     this ingredient.
     """
     log.info("lookup_food(%r, max_results_usda=%d, max_results_off=%d)", query, max_results_usda, max_results_off)
-    return await ctx.deps.food_db.lookup([LookupQuery(query, max_results_off, max_results_usda)])
+    lookup_query = LookupQuery(query=query, max_results_off=max_results_off, max_results_usda=max_results_usda)
+    return await ctx.deps.food_db.lookup([lookup_query])
 
 
 async def lookup_foods(
     ctx: RunContext[AgentDeps],
-    queries: list[FoodQuery],
-) -> dict[str, list[dict[str, Any]]]:
+    queries: list[LookupQuery],
+) -> LookupResult:
     """Batch search of both food databases: one tool call for several ingredient queries.
 
-    Each `FoodQuery` sets its own `max_results_usda`/`max_results_off`, so you
-    can weight some ingredients towards USDA, others towards OFF, or skip a
+    Each query sets its own `max_results_usda`/`max_results_off`, so you can
+    weight some ingredients towards USDA, others towards OFF, or skip a
     source entirely. Returns hits grouped by source (`open_food_facts`,
     `usda`) exactly like `lookup_food`, pooling matches across every query.
     """
     log.info("lookup_foods(%d query/queries)", len(queries))
     if not queries:
-        return {"open_food_facts": [], "usda": []}
-    return await ctx.deps.food_db.lookup([LookupQuery(q.query, q.max_results_off, q.max_results_usda) for q in queries])
+        return LookupResult()
+    return await ctx.deps.food_db.lookup(queries)
 
 
-async def total_meal_plan(ctx: RunContext[AgentDeps], plan: AgentMealPlan) -> dict[str, float]:
-    """Deterministically hydrate `plan`'s codes and sum the per-nutrient totals."""
+async def total_meal_plan(ctx: RunContext[AgentDeps], plan: AgentMealPlan) -> NutrientTotals:
+    """Deterministically hydrate `plan`'s codes and total nutrients, overall and per meal."""
     try:
-        totals = total_agent_meal_plan(plan, ctx.deps.food_db)
-    except KeyError as exc:
+        return total_agent_meal_plan(plan, ctx.deps.food_db)
+    except UnknownFoodCodeError as exc:
         raise ModelRetry(
             f"Cannot total the plan: {exc}. Every `code` must be copied verbatim from a lookup result.",
         ) from exc
-    return {n.value: v for n, v in totals.totals.items()}
 
 
 def _build_agent(system_prompt: str, *, totaller_enabled: bool) -> Agent[AgentDeps, AgentMealPlan]:
@@ -149,24 +136,11 @@ def build_nutrition_agent(
 
 
 def build_refiner_agent(*, totaller_enabled: bool = True) -> Agent[AgentDeps, AgentMealPlan]:
-    """Self-review agent for the Reflection Loop.
+    """Refinement agent for the Reflection Loop.
 
     Same toolset as the main nutrition agent (including the lookup tools, so
     it can swap out an ingredient rather than inventing a replacement), but a
-    prompt focused on critiquing and improving the previous plan (no
-    deterministic feedback - the loop is a plain review/correction pass).
+    prompt focused on fixing exactly the issues the critic agent reported
+    (see `dietary_advisor.reflection`), not a blind self-review pass.
     """
-    prompt = reflection_refiner_system(totaller_enabled=totaller_enabled)
-    return _build_agent(prompt, totaller_enabled=totaller_enabled)
-
-
-def format_self_review_prompt(plan: AgentMealPlan, *, totaller_enabled: bool = True) -> str:
-    """Render a plain self-review prompt for the refiner agent (no deterministic feedback)."""
-    verify = "verify the macro totals with `total_meal_plan`, and " if totaller_enabled else ""
-    return (
-        "Review the following AgentMealPlan critically: check it against the user's profile "
-        f"(allergens, diet pattern, disliked foods), {verify}fix any issues you find.\n\n"
-        "Previous AgentMealPlan (JSON):\n"
-        f"{plan.model_dump_json(indent=2)}\n\n"
-        "Produce an improved AgentMealPlan."
-    )
+    return _build_agent(REFLECTION_REFINER_AGENT_SYSTEM, totaller_enabled=totaller_enabled)

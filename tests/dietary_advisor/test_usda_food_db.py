@@ -14,6 +14,7 @@ import pytest
 
 from dietary_advisor.config import FoodDbUsage, get_settings
 from dietary_advisor.food_db import usda_food_db as usda_mod
+from dietary_advisor.food_db.errors import USDAUnknownFoodCodeError
 from dietary_advisor.food_db.usda_food_db import UsdaFoodDb
 from dietary_advisor.schemas.nutrition import NutrientName
 
@@ -128,5 +129,5 @@ def test_get_food_by_usda_code(usda_db_path: Path) -> None:
 
 
 def test_get_food_unknown_code_raises(usda_db_path: Path) -> None:
-    with UsdaFoodDb(usda_db_path) as db, pytest.raises(KeyError):
+    with UsdaFoodDb(usda_db_path) as db, pytest.raises(USDAUnknownFoodCodeError):
         db.get_food("usda:999999")

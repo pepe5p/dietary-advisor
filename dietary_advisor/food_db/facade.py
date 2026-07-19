@@ -15,9 +15,12 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Sequence
-from typing import Any, NamedTuple
+from typing import Protocol
+
+from pydantic import BaseModel, Field
 
 from dietary_advisor.config import FoodDbUsage, get_settings, Settings
+from dietary_advisor.food_db.errors import OFFUnknownFoodCodeError, USDAUnknownFoodCodeError
 from dietary_advisor.food_db.models import OFFItem, USDAItem
 from dietary_advisor.food_db.off_food_db import OffFoodDb
 from dietary_advisor.food_db.usda_food_db import is_usda_code, UsdaFoodDb
@@ -45,17 +48,51 @@ _MACRO_KEYS: tuple[tuple[str, NutrientName], ...] = (
 _INGREDIENTS_SUMMARY_MAX_CHARS = 200
 
 
-class LookupQuery(NamedTuple):
-    """One ingredient search with its own per-source result cap.
-
-    A limit of 0 skips that source entirely for this query, letting the
-    caller weight a generic staple towards USDA or a branded product towards
-    OFF instead of searching both sources identically.
-    """
+class LookupQuery(BaseModel):
+    """One ingredient search with its own per-source result cap."""
 
     query: str
-    off_limit: int
-    usda_limit: int
+    max_results_off: int = Field(default=2, ge=0, le=15)
+    max_results_usda: int = Field(default=2, ge=0, le=10)
+
+
+class _MacroHit(BaseModel):
+    """The four per-100g macros every hit carries, shared by both sources."""
+
+    kcal_per_100g: float = 0.0
+    protein_g_per_100g: float = 0.0
+    carbs_g_per_100g: float = 0.0
+    fat_g_per_100g: float = 0.0
+
+
+class OFFHit(_MacroHit):
+    """A single Open Food Facts search hit as surfaced to the agent."""
+
+    code: str
+    name: str
+    brands: str | None = None
+    categories: str | None = None
+    ingredients_text: str | None = None
+    tags: list[str] = Field(default_factory=list)
+
+
+class USDAHit(_MacroHit):
+    """A single USDA search hit as surfaced to the agent."""
+
+    code: str
+    name: str
+    category: str | None = None
+
+
+class LookupResult(BaseModel):
+    """Search hits grouped by source, the return shape of the agent lookup tools."""
+
+    open_food_facts: list[OFFHit] = Field(default_factory=list)
+    usda: list[USDAHit] = Field(default_factory=list)
+
+
+class _Searchable[ItemT](Protocol):
+    def search(self, query: str, limit: int = ...) -> list[ItemT]: ...
 
 
 def _macro_fields(item: OFFItem | USDAItem) -> dict[str, float]:
@@ -68,34 +105,34 @@ def _truncate(text: str | None) -> str | None:
     return text[:_INGREDIENTS_SUMMARY_MAX_CHARS].rstrip() + "..."
 
 
-def _off_hits_summary(items: list[OFFItem]) -> list[dict[str, Any]]:
+def _off_hits_summary(items: list[OFFItem]) -> list[OFFHit]:
     return [
-        {
-            "code": it.code,
-            "name": it.name,
-            "brands": it.brands,
-            "categories": it.categories,
-            "ingredients_text": _truncate(it.ingredients_text),
-            "tags": it.tags,
+        OFFHit(
+            code=it.code,
+            name=it.name,
+            brands=it.brands,
+            categories=it.categories,
+            ingredients_text=_truncate(it.ingredients_text),
+            tags=it.tags,
             **_macro_fields(it),
-        }
+        )
         for it in items
     ]
 
 
-def _usda_hits_summary(items: list[USDAItem]) -> list[dict[str, Any]]:
+def _usda_hits_summary(items: list[USDAItem]) -> list[USDAHit]:
     return [
-        {
-            "code": it.code,
-            "name": it.name,
-            "category": it.category,
+        USDAHit(
+            code=it.code,
+            name=it.name,
+            category=it.category,
             **_macro_fields(it),
-        }
+        )
         for it in items
     ]
 
 
-def _safe_search(db: OffFoodDb | UsdaFoodDb, query: str, limit: int) -> list[Any]:
+def _safe_search[ItemT](db: _Searchable[ItemT], query: str, limit: int) -> list[ItemT]:
     try:
         return list(db.search(query, limit=limit))
     except Exception as exc:  # noqa: BLE001 (each source is best-effort)
@@ -103,7 +140,10 @@ def _safe_search(db: OffFoodDb | UsdaFoodDb, query: str, limit: int) -> list[Any
         return []
 
 
-async def _search_source(db: OffFoodDb | UsdaFoodDb | None, queries: Sequence[tuple[str, int]]) -> list[list[Any]]:
+async def _search_source[ItemT](
+    db: _Searchable[ItemT] | None,
+    queries: Sequence[tuple[str, int]],
+) -> list[list[ItemT]]:
     """Run each query against one DB off the event loop, one hit list per query.
 
     Each query carries its own limit; a limit of 0 (or a disabled source)
@@ -111,7 +151,7 @@ async def _search_source(db: OffFoodDb | UsdaFoodDb | None, queries: Sequence[tu
     grouped per query (index-aligned with `queries`) so the caller can report
     per-query hit counts.
     """
-    hits_per_query: list[list[Any]] = []
+    hits_per_query: list[list[ItemT]] = []
     for query, limit in queries:
         if db is None or limit <= 0:
             hits_per_query.append([])
@@ -124,7 +164,7 @@ class FoodDb:
     """Facade over the OFF and USDA readers behind one food-lookup surface.
 
     Either source may be `None` (its `usage` is `disabled`); in that case it
-    contributes no search hits and lookups of its codes raise `KeyError`.
+    contributes no search hits and lookups of its codes raise `UnknownFoodCodeError`.
     """
 
     def __init__(self, off_db: OffFoodDb | None = None, usda_db: UsdaFoodDb | None = None) -> None:
@@ -145,7 +185,7 @@ class FoodDb:
         usda = UsdaFoodDb(settings.usda_db) if settings.usda_usage is not FoodDbUsage.DISABLED else None
         return cls(off, usda)
 
-    async def lookup(self, queries: Sequence[LookupQuery]) -> dict[str, list[dict[str, Any]]]:
+    async def lookup(self, queries: Sequence[LookupQuery]) -> LookupResult:
         """Search both sources concurrently, returning hits grouped by source.
 
         Each `LookupQuery` caps hits per source independently, so the caller
@@ -159,34 +199,34 @@ class FoodDb:
         """
         queries = list(queries)[:_MAX_BATCH_QUERIES]
         off_per_query, usda_per_query = await asyncio.gather(
-            _search_source(self._off, [(q.query, q.off_limit) for q in queries]),
-            _search_source(self._usda, [(q.query, q.usda_limit) for q in queries]),
+            _search_source(self._off, [(q.query, q.max_results_off) for q in queries]),
+            _search_source(self._usda, [(q.query, q.max_results_usda) for q in queries]),
         )
         for q, off_hits, usda_hits in zip(queries, off_per_query, usda_per_query, strict=True):
-            log.info(
+            log.debug(
                 "lookup query %r (off_limit=%d, usda_limit=%d): %d combined hit(s), %d from USDA, %d from OFF",
                 q.query,
-                q.off_limit,
-                q.usda_limit,
+                q.max_results_off,
+                q.max_results_usda,
                 len(off_hits) + len(usda_hits),
                 len(usda_hits),
                 len(off_hits),
             )
         off_flat = [hit for query_hits in off_per_query for hit in query_hits]
         usda_flat = [hit for query_hits in usda_per_query for hit in query_hits]
-        return {
-            "open_food_facts": _off_hits_summary(off_flat),
-            "usda": _usda_hits_summary(usda_flat),
-        }
+        return LookupResult(
+            open_food_facts=_off_hits_summary(off_flat),
+            usda=_usda_hits_summary(usda_flat),
+        )
 
     def get_food(self, code: str) -> OFFItem | USDAItem:
         """Resolve `code` to its read model, routing by prefix to the owning source."""
         if is_usda_code(code):
             if self._usda is None:
-                raise KeyError(f"USDA food DB unavailable for code: {code!r}")
+                raise USDAUnknownFoodCodeError(f"USDA food DB unavailable for code: {code!r}")
             return self._usda.get_food(code)
         if self._off is None:
-            raise KeyError(f"OFF food DB unavailable for code: {code!r}")
+            raise OFFUnknownFoodCodeError(f"OFF food DB unavailable for code: {code!r}")
         return self._off.get_food(code)
 
     def close(self) -> None:

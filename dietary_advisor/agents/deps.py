@@ -16,16 +16,9 @@ from dietary_advisor.schemas.profile import UserProfile
 
 @dataclass
 class AgentDeps:
-    """Bundle of services consumed by all specialised agents.
-
-    Deliberately carries no constraints: production never validates against
-    hard constraints (that is an evaluation-only concept) - the agent must
-    infer restrictions from `profile` itself.
-    """
+    """Bundle of services consumed by all specialised agents."""
 
     profile: UserProfile
     targets: MacroTargets
-    # A single facade over both food databases. Required: the agent cannot
-    # invent a food, so there is no variant without it (see AGENTS.md).
     food_db: FoodDb
     retriever: HybridRetriever | None = None

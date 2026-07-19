@@ -1,4 +1,4 @@
-"""Blueprint agent: brainstorms dish concepts ahead of the nutrition agent.
+"""Meal-idea agent: brainstorms dish concepts ahead of the nutrition agent.
 
 Runs before `nutrition_agent` so ingredient variety follows from a concrete,
 varied dish concept chosen up front, rather than from an instruction asking
@@ -14,18 +14,18 @@ from __future__ import annotations
 from pydantic_ai import Agent, ModelSettings
 
 from dietary_advisor.agents.deps import AgentDeps
-from dietary_advisor.agents.prompts import BLUEPRINT_AGENT_SYSTEM
+from dietary_advisor.agents.prompts import MEAL_IDEA_AGENT_SYSTEM
 from dietary_advisor.config import get_settings
-from dietary_advisor.schemas.blueprint import MealConcept
+from dietary_advisor.schemas.meal_idea import MealConcept
 
 
-def build_blueprint_agent() -> Agent[AgentDeps, list[MealConcept]]:
+def build_meal_idea_agent() -> Agent[AgentDeps, list[MealConcept]]:
     settings = get_settings()
     return Agent(
         settings.resolved_llm_model,
         deps_type=AgentDeps,
         output_type=list[MealConcept],
-        system_prompt=BLUEPRINT_AGENT_SYSTEM,
-        model_settings=ModelSettings(temperature=settings.llm_temperature),
+        system_prompt=MEAL_IDEA_AGENT_SYSTEM,
+        model_settings=ModelSettings(temperature=settings.meal_idea_llm_temperature),
         retries=1,
     )

@@ -9,15 +9,15 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any
 
 import duckdb
 from rich.pretty import pprint
 from rich.table import Table
 
 from dietary_advisor.config import get_settings
-from dietary_advisor.food_db import FoodDb, OffFoodDb, OFFItem, UsdaFoodDb, USDAItem
-from dietary_advisor.food_db.facade import LookupQuery
+from dietary_advisor.food_db import FoodDb, LookupQuery, LookupResult, OffFoodDb, OFFItem, UsdaFoodDb, USDAItem
+from dietary_advisor.food_db.models import Row
 from dietary_advisor.food_db.off_food_db import _row_to_off_item
 from dietary_advisor.food_db.usda_food_db import _fdc_id, _row_to_usda_item
 from dietary_advisor.schemas.nutrition import canonical_unit, NutrientName
@@ -41,8 +41,7 @@ __all__ = [
 ]
 
 # The two food_db read models don't share a base class (see food_db/models.py).
-ReadModel = OFFItem | USDAItem
-_ReadModelT = TypeVar("_ReadModelT", bound=ReadModel)
+type ReadModel = OFFItem | USDAItem
 
 # Nutrients shown as their own columns; the rest are folded into a summary line.
 _MACRO_COLUMNS: tuple[NutrientName, ...] = (
@@ -53,7 +52,7 @@ _MACRO_COLUMNS: tuple[NutrientName, ...] = (
 )
 
 
-def _fetch_record(con: duckdb.DuckDBPyConnection, sql: str, params: list[Any], code: str) -> dict[str, Any]:
+def _fetch_record(con: duckdb.DuckDBPyConnection, sql: str, params: list[Any], code: str) -> Row:
     cur = con.execute(sql, params)
     columns = [d[0] for d in cur.description]
     row = cur.fetchone()
@@ -62,13 +61,13 @@ def _fetch_record(con: duckdb.DuckDBPyConnection, sql: str, params: list[Any], c
     return dict(zip(columns, row, strict=True))
 
 
-def _channel(
+def _channel[ReadModelT: ReadModel](
     db: OffFoodDb | UsdaFoodDb,
     method: str,
     query: str,
     limit: int,
-    mapper: Callable[[dict[str, Any]], _ReadModelT],
-) -> list[_ReadModelT]:
+    mapper: Callable[[Row], ReadModelT],
+) -> list[ReadModelT]:
     """Run one retrieval channel (`_bm25_rows` / `_semantic_rows`) in isolation.
 
     Bypasses the reader's hybrid `search()` (which fuses both channels via
@@ -101,7 +100,7 @@ def get_off_item(code: str) -> OFFItem:
         return off_food_db.get_food(code=code)
 
 
-def get_off_record(code: str) -> dict[str, Any]:
+def get_off_record(code: str) -> Row:
     """Return the full, unprocessed OFF record for `code` from the slimmed `.duckdb`.
 
     Unlike `get_off_item` (which maps the row to an `OFFItem`), this returns every
@@ -132,7 +131,7 @@ def get_usda_item(code: str) -> USDAItem:
         return usda_food_db.get_food(code=code)
 
 
-def get_usda_record(code: str) -> dict[str, Any]:
+def get_usda_record(code: str) -> Row:
     """Return the full, unprocessed USDA record for `code` (bare fdc_id or `usda:<fdc_id>`).
 
     Unlike `get_usda_item` (which maps the row to a `USDAItem`), this returns
@@ -145,20 +144,21 @@ def get_usda_record(code: str) -> dict[str, Any]:
         con.close()
 
 
-def lookup(query: str, off_limit: int = 5, usda_limit: int = 5) -> dict[str, list[dict[str, Any]]]:
+def lookup(query: str, off_limit: int = 5, usda_limit: int = 5) -> LookupResult:
     """Run the whole `FoodDb.lookup` facade path for one query, grouped by source.
 
     Unlike the single-reader `search_off`/`search_usda`, this drives the exact
     dual-source lookup the nutrition agent's tools call: both sources searched
     with their own per-source cap (0 skips a source) and hits returned as the
-    prompt-shaped summary dicts (inspect with `pdict`). `FoodDb.open()` honours
-    the `off_usage`/`usda_usage` settings, so a disabled source stays empty.
+    prompt-shaped `LookupResult`. `FoodDb.open()` honours the
+    `off_usage`/`usda_usage` settings, so a disabled source stays empty.
     """
     with FoodDb.open() as food_db:
-        return asyncio.run(food_db.lookup([LookupQuery(query, off_limit=off_limit, usda_limit=usda_limit)]))
+        query_obj = LookupQuery(query=query, max_results_off=off_limit, max_results_usda=usda_limit)
+        return asyncio.run(food_db.lookup([query_obj]))
 
 
-def get_parquet_record(code: str) -> dict[str, Any]:
+def get_parquet_record(code: str) -> Row:
     """Return the full, unprocessed OFF record for `code` from the raw Parquet export.
 
     Unlike `get_off_record` (which reads the slimmed `.duckdb` built by `setup`),
@@ -196,7 +196,7 @@ def _shorten_long_sequences(value: Any) -> Any:
     return value
 
 
-def pdict(record: dict[str, Any]) -> None:
+def pdict(record: Row) -> None:
     pprint(_shorten_long_sequences(record))
 
 
@@ -263,7 +263,7 @@ _MANUAL: tuple[tuple[str, str], ...] = (
     ("search_usda_semantic(query, limit=5)", "Search USDA, embedding (semantic) channel only."),
     ("get_usda_item(code)", "Get one food as a USDAItem."),
     ("get_usda_record(code)", "Get the full raw row (dict) from the USDA duckdb."),
-    ("lookup(query, off_limit=5, usda_limit=5)", "Run the full dual-source FoodDb.lookup -> dict grouped by source."),
+    ("lookup(query, off_limit=5, usda_limit=5)", "Run the full dual-source FoodDb.lookup -> LookupResult."),
     ("pfi(items)", "Rich-print an OFFItem/USDAItem or a list of them."),
     ("pdict(record)", "Rich pretty-print a raw record dict."),
 )

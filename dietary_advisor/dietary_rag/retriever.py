@@ -11,12 +11,11 @@ import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any
 
 from rank_bm25 import BM25Okapi
 
 from dietary_advisor.config import get_settings
-from dietary_advisor.dietary_rag.store import VectorStore
+from dietary_advisor.dietary_rag.store import Chunk, ChunkMeta, QueryHit, VectorStore
 from dietary_advisor.schemas.meal_plan import Citation
 
 log = logging.getLogger(__name__)
@@ -32,17 +31,16 @@ def _tokenise(text: str) -> list[str]:
 class RetrievedChunk:
     id: str
     text: str
-    metadata: dict[str, Any]
+    meta: ChunkMeta
     score: float
 
     def to_citation(self, max_snippet_chars: int = 280) -> Citation:
         snippet = self.text.strip().replace("\n", " ")
         if len(snippet) > max_snippet_chars:
             snippet = snippet[:max_snippet_chars].rstrip() + "..."
-        page = self.metadata.get("page")
         return Citation(
-            source=str(self.metadata.get("doc_id") or self.metadata.get("title") or "unknown"),
-            page=int(page) if page is not None else None,
+            source=self.meta.doc_id or self.meta.title or "unknown",
+            page=self.meta.page,
             snippet=snippet,
         )
 
@@ -63,8 +61,8 @@ class HybridRetriever:
 
     def _refresh_bm25(self) -> None:
         docs = self._store.all_documents()
-        self._docs: list[dict[str, Any]] = docs
-        self._tokenised: list[list[str]] = [_tokenise(d["text"]) for d in docs]
+        self._docs: list[Chunk] = docs
+        self._tokenised: list[list[str]] = [_tokenise(d.text) for d in docs]
         self._bm25 = BM25Okapi(self._tokenised) if self._tokenised else None
 
     def _bm25_scores(self, query: str) -> dict[str, float]:
@@ -77,16 +75,10 @@ class HybridRetriever:
         max_score = max(scores) if len(scores) else 0.0
         if max_score <= 0:
             return {}
-        return {self._docs[i]["id"]: float(scores[i]) / max_score for i in range(len(self._docs))}
+        return {self._docs[i].id: float(scores[i]) / max_score for i in range(len(self._docs))}
 
-    def _dense_scores(self, query: str, top_k: int) -> dict[str, tuple[float, dict[str, Any], str]]:
-        results = self._store.query(query, top_k=top_k)
-        out: dict[str, tuple[float, dict[str, Any], str]] = {}
-        # Cosine distance -> similarity in [0, 1]; clamp negative to 0.
-        for r in results:
-            sim = max(0.0, 1.0 - (r.get("distance") or 0.0))
-            out[r["id"]] = (sim, r["metadata"], r["text"])
-        return out
+    def _dense_scores(self, query: str, top_k: int) -> dict[str, QueryHit]:
+        return {hit.id: hit for hit in self._store.query(query, top_k=top_k)}
 
     def retrieve(self, query: str, top_k: int | None = None) -> list[RetrievedChunk]:
         if not query.strip():
@@ -100,28 +92,31 @@ class HybridRetriever:
         all_ids = set(dense) | set(bm25)
         fused: dict[str, float] = defaultdict(float)
         for cid in all_ids:
-            d = dense.get(cid, (0.0, {}, ""))[0]
+            hit = dense.get(cid)
+            # Cosine distance -> similarity in [0, 1]; clamp negative to 0.
+            d = max(0.0, 1.0 - (hit.distance or 0.0)) if hit else 0.0
             b = bm25.get(cid, 0.0)
             fused[cid] = (1.0 - self._bm25_weight) * d + self._bm25_weight * b
 
         # Resolve text + metadata, falling back to BM25-only candidates.
-        text_meta: dict[str, tuple[str, dict[str, Any]]] = {}
-        for cid, (_, meta, text) in dense.items():
-            text_meta[cid] = (text, meta)
+        text_meta: dict[str, tuple[str, ChunkMeta]] = {}
+        for cid, hit in dense.items():
+            text_meta[cid] = (hit.text, hit.meta)
         for cid in all_ids - text_meta.keys():
             for doc in self._docs:
-                if doc["id"] == cid:
-                    text_meta[cid] = (doc["text"], doc["metadata"])
+                if doc.id == cid:
+                    text_meta[cid] = (doc.text, doc.meta)
                     break
 
         ranked = sorted(fused.items(), key=lambda kv: kv[1], reverse=True)[:top_k]
         out: list[RetrievedChunk] = []
         for cid, score in ranked:
-            text, meta = text_meta.get(cid, ("", {}))
-            if not text:
+            found = text_meta.get(cid)
+            if found is None or not found[0]:
                 continue
-            out.append(RetrievedChunk(id=cid, text=text, metadata=meta, score=round(score, 4)))
-        log.info("retriever.retrieve(%r) -> %d chunk(s)", query, len(out))
+            text, meta = found
+            out.append(RetrievedChunk(id=cid, text=text, meta=meta, score=round(score, 4)))
+        log.debug("retriever.retrieve(%r) -> %d chunk(s)", query, len(out))
         return out
 
     def retrieve_citations(self, query: str, top_k: int | None = None) -> list[Citation]:

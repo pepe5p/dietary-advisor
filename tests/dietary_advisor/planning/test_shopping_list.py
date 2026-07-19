@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
+from dietary_advisor.planning.shopping_list import build_shopping_list
 from dietary_advisor.schemas.meal_plan import Meal, MealPlan, Portion
 from dietary_advisor.schemas.nutrition import FoodItem, NutrientName
-from dietary_advisor.shopping_list import build_shopping_list
 from tests.conftest import LONG_INSTRUCTIONS
 
 

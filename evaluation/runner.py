@@ -11,7 +11,7 @@ from collections.abc import Awaitable, Callable
 import pandas as pd
 
 from dietary_advisor.food_db import FoodDb
-from dietary_advisor.pipeline import Pipeline, PipelineResult, VariantConfig
+from dietary_advisor.planning.pipeline import Pipeline, PipelineResult, VariantConfig
 from dietary_advisor.schemas.agent_output import AgentMealPlan
 from dietary_advisor.schemas.nutrition import NutrientName
 from dietary_advisor.schemas.profile import UserProfile

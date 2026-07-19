@@ -1,19 +1,19 @@
-"""Render a hardcoded `PipelineResult` through the CLI's own `_render_result`.
+"""Render a hardcoded `PipelineResult` through the CLI's own `render_result`.
 
-Lets display tweaks in `dietary_advisor/cli.py` be previewed from the REPL
-without running the LLM pipeline or opening the food DB.
+Lets display tweaks in `dietary_advisor/cli/rendering.py` be previewed from
+the REPL without running the LLM pipeline or opening the food DB.
 """
 
 from __future__ import annotations
 
 from collections import Counter
 
-import dietary_advisor.cli as cli
-from dietary_advisor.pipeline import PipelineResult
+from dietary_advisor.cli.rendering import render_result
+from dietary_advisor.planning.pipeline import PipelineResult
+from dietary_advisor.planning.shopping_list import build_shopping_list
 from dietary_advisor.schemas.agent_output import AgentMeal, AgentMealPlan, AgentRecipe, PortionRef
 from dietary_advisor.schemas.meal_plan import Citation, Meal, MealPlan, Portion
 from dietary_advisor.schemas.nutrition import FoodItem, MacroTargets, NutrientName
-from dietary_advisor.shopping_list import build_shopping_list
 from dietary_advisor.telemetry import RunTelemetry
 from repl.manual import print_manual
 
@@ -203,13 +203,13 @@ def sample_result() -> PipelineResult:
 
 
 def print_run_result(result: PipelineResult | None = None) -> None:
-    """Render `result` (defaults to `sample_result()`) via the CLI's own `_render_result`."""
-    cli._render_result(result if result is not None else sample_result())
+    """Render `result` (defaults to `sample_result()`) via the CLI's own `render_result`."""
+    render_result(result if result is not None else sample_result())
 
 
 _MANUAL: tuple[tuple[str, str], ...] = (
     ("sample_result()", "Build a hardcoded, DB-independent PipelineResult -> exercises every _render_result branch."),
-    ("print_run_result(result=None)", "Render a PipelineResult (defaults to sample_result()) via cli._render_result."),
+    ("print_run_result(result=None)", "Render a PipelineResult (defaults to sample_result()) via cli.render_result."),
 )
 
 print_manual("run result helpers", _MANUAL)

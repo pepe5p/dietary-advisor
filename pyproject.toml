@@ -75,7 +75,7 @@ ignore = ["S101", "A003", "B904", "N818", "COM812"]
 [tool.ruff.lint.per-file-ignores]
 # typer encourages using `typer.Option`/`typer.Argument` as default arguments,
 # which conflicts with B008 ("function call in default argument").
-"dietary_advisor/cli.py" = ["B008"]
+"dietary_advisor/cli/app.py" = ["B008"]
 "setup/cli.py" = ["B008"]
 "evaluation/cli.py" = ["B008"]
 

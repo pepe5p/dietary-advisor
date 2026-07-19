@@ -15,7 +15,7 @@ default: help
 	just --list
 
 [group("cli")]
-[doc("Run the dietary-advisor tool (recommend, chat, info)")]
+[doc("Run the dietary-advisor tool (recommend, info)")]
 @run *args:
 	uv run python -m dietary_advisor "$@"
 
