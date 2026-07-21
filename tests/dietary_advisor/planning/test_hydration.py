@@ -10,31 +10,27 @@ from dietary_advisor.totaller.nutrition import NutrientName
 def test_off_item_maps_to_food_item() -> None:
     off = OFFItem(
         code="123",
-        name="Mozzarella",
-        description="soft cheese",
-        nutrients_per_100g={NutrientName.ENERGY_KCAL: 250.0},
-        tags=["vegetarian"],
+        product_name="Mozzarella",
+        energy_kcal_in_100g=250.0,
         brands="Acme",
+        product_quantity=200.0,
     )
     food = to_food_item(off)
     assert food.code == "123"
     assert food.name == "Mozzarella"
-    assert food.description == "soft cheese"
     assert food.nutrients_per_100g == {NutrientName.ENERGY_KCAL: 250.0}
-    assert food.tags == ["vegetarian"]
+    assert food.quantity_g == 200.0
 
 
 def test_usda_item_maps_to_food_item() -> None:
     usda = USDAItem(
-        code="usda:456",
-        name="Cheddar cheese",
-        description="Cheddar cheese, USDA",
-        nutrients_per_100g={NutrientName.ENERGY_KCAL: 400.0},
+        fdc_id=456,
+        description="Cheddar cheese",
+        energy_kcal_in_100g=400.0,
         category="Dairy",
     )
     food = to_food_item(usda)
     assert food.code == "usda:456"
     assert food.name == "Cheddar cheese"
     assert food.nutrients_per_100g == {NutrientName.ENERGY_KCAL: 400.0}
-    # USDA items carry no tags (the source has none).
-    assert food.tags == []
+    assert food.quantity_g is None

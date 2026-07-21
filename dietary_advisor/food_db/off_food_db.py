@@ -7,7 +7,8 @@ source in the system.
 
 The agent searches by product name (`search`) and gets the best-matching
 records; evaluation resolves a plan's barcodes back to their canonical
-nutrients (`get_food`).
+nutrients (`get_food`). Rows are returned as 1:1 `OFFItem`s; nutrient units
+are already canonicalized at build time.
 """
 
 from __future__ import annotations
@@ -24,124 +25,32 @@ from dietary_advisor.food_db.embeddings import embed_query
 from dietary_advisor.food_db.errors import OFFUnknownFoodCodeError
 from dietary_advisor.food_db.fusion import reciprocal_rank_fusion as _reciprocal_rank_fusion
 from dietary_advisor.food_db.models import OFFItem, Row
-from dietary_advisor.totaller.nutrition import NutrientName
 
 log = logging.getLogger(__name__)
 
-# OFF per-100g column -> (canonical nutrient, factor to canonical unit).
-# OFF normalizes `*_100g` to grams (energy in kcal); the Totaller expects the
-# canonical units declared in totaller/nutrition.py, so minerals/vitamins in
-# grams are scaled to mg / ug here.
-_NUTRIENT_FACTORS: tuple[tuple[str, NutrientName, float], ...] = (
-    ("energy_kcal_100g", NutrientName.ENERGY_KCAL, 1.0),
-    ("proteins_100g", NutrientName.PROTEIN_G, 1.0),
-    ("carbohydrates_100g", NutrientName.CARBS_G, 1.0),
-    ("fat_100g", NutrientName.FAT_G, 1.0),
-    ("saturated_fat_100g", NutrientName.SATURATED_FAT_G, 1.0),
-    ("fiber_100g", NutrientName.FIBER_G, 1.0),
-    ("sugars_100g", NutrientName.SUGAR_G, 1.0),
-    ("sodium_100g", NutrientName.SODIUM_MG, 1000.0),
-    ("potassium_100g", NutrientName.POTASSIUM_MG, 1000.0),
-    ("calcium_100g", NutrientName.CALCIUM_MG, 1000.0),
-    ("iron_100g", NutrientName.IRON_MG, 1000.0),
-    ("vitamin_c_100g", NutrientName.VITAMIN_C_MG, 1000.0),
-    ("vitamin_d_100g", NutrientName.VITAMIN_D_UG, 1_000_000.0),
-    ("cholesterol_100g", NutrientName.CHOLESTEROL_MG, 1000.0),
-)
-
-# OFF allergen slug (without the `en:` language prefix) -> our Allergen value,
-# matching the `contains:<allergen>` tags the rule validator checks.
-_OFF_ALLERGEN_TO_TAG: dict[str, str] = {
-    "milk": "milk",
-    "gluten": "gluten",
-    "cereals-with-gluten": "gluten",
-    "soybeans": "soybeans",
-    "eggs": "eggs",
-    "mustard": "mustard",
-    "nuts": "tree nuts",
-    "celery": "celery",
-    "peanuts": "peanuts",
-    "fish": "fish",
-    "sesame-seeds": "sesame",
-    "sesame": "sesame",
-    "sulphur-dioxide-and-sulphites": "sulphites",
-    "crustaceans": "crustaceans",
-    "lupin": "lupin",
-    "molluscs": "molluscs",
-}
-
+# Every stored column except the embedding vector (never needed at read time).
 _SELECT_COLUMNS = (
-    "code, product_name, product_name_pl, generic_name, "
-    "labels_tags, allergens_tags, traces_tags, "
-    "brands, brands_tags, categories, categories_tags, compared_to_category, ingredients_text, "
-    + ", ".join(col for col, _, _ in _NUTRIENT_FACTORS)
+    "code, product_name, product_name_pl, ingredients_text, "
+    "brands, brands_tags, quantity, serving_size, serving_quantity, "
+    "product_quantity, product_quantity_unit, nutrition_data_per, "
+    "categories, categories_tags, compared_to_category, "
+    "labels_tags, allergens_tags, traces_tags, additives_tags, "
+    "nova_group, nutriscore_grade, nutriscore_score, "
+    "energy_kcal_in_100g, energy_kj_in_100g, proteins_g_in_100g, carbohydrates_g_in_100g, "
+    "sugars_g_in_100g, fat_g_in_100g, saturated_fat_g_in_100g, fiber_g_in_100g, salt_g_in_100g, "
+    "sodium_mg_in_100g, potassium_mg_in_100g, calcium_mg_in_100g, iron_mg_in_100g, "
+    "vitamin_c_mg_in_100g, vitamin_d_ug_in_100g, cholesterol_mg_in_100g"
 )
 
 
-def _diet_tags(labels: list[str]) -> list[str]:
-    tags: list[str] = []
-    low = [t.lower() for t in labels]
-    is_vegan = any("vegan" in t and "non-vegan" not in t and "no-vegan" not in t for t in low)
-    is_vegetarian = is_vegan or any("vegetarian" in t and "non-vegetarian" not in t for t in low)
-    if is_vegan:
-        tags.append("vegan")
-    if is_vegetarian:
-        tags.append("vegetarian")
-    return tags
-
-
-def _allergen_tags(*tag_lists: list[str] | None) -> list[str]:
-    out: list[str] = []
-    for tags in tag_lists:
-        for raw in tags or []:
-            slug = raw.split(":", 1)[-1].lower() if ":" in raw else raw.lower()
-            mapped = _OFF_ALLERGEN_TO_TAG.get(slug)
-            if mapped:
-                tag = f"contains:{mapped}"
-                if tag not in out:
-                    out.append(tag)
-    return out
-
-
-def get_off_item_name(row: Mapping[str, Any]) -> str:
-    return (
-        row.get("product_name")
-        or row.get("product_name_pl")
-        or row.get("generic_name")
-        or row.get("brands")
-        or "unknown"
-    )
+def get_off_item_name(item: OFFItem | Mapping[str, Any]) -> str:
+    """Display name fallback used by hits and hydration."""
+    get = item.get if isinstance(item, Mapping) else lambda k: getattr(item, k, None)
+    return get("product_name") or get("product_name_pl") or get("brands") or "unknown"
 
 
 def _row_to_off_item(row: Mapping[str, Any]) -> OFFItem:
-    """Map a `products` row to an `OFFItem` (pure; no DB access)."""
-    nutrients: dict[NutrientName, float] = {}
-    for col, nutrient, factor in _NUTRIENT_FACTORS:
-        value = row.get(col)
-        if value is None:
-            continue
-        scaled = float(value) * factor
-        if scaled >= 0:
-            nutrients[nutrient] = scaled
-
-    name = get_off_item_name(row)
-    tags = _diet_tags(row.get("labels_tags") or []) + _allergen_tags(
-        row.get("allergens_tags"),
-        row.get("traces_tags"),
-    )
-    return OFFItem(
-        code=row["code"],
-        name=str(name),
-        description=row.get("generic_name"),
-        nutrients_per_100g=nutrients,
-        tags=tags,
-        brands=row.get("brands"),
-        brands_tags=row.get("brands_tags") or [],
-        categories=row.get("categories"),
-        categories_tags=row.get("categories_tags") or [],
-        compared_to_category=row.get("compared_to_category"),
-        ingredients_text=row.get("ingredients_text"),
-    )
+    return OFFItem.model_validate(dict(row))
 
 
 class OffFoodDb:
@@ -246,5 +155,4 @@ class OffFoodDb:
         )
         if not rows:
             raise OFFUnknownFoodCodeError(f"unknown product code: {code!r}")
-        food = _row_to_off_item(rows[0])
-        return food
+        return _row_to_off_item(rows[0])

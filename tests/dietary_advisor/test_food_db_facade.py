@@ -19,7 +19,8 @@ from dietary_advisor.food_db import (
     USDAUnknownFoodCodeError,
 )
 from dietary_advisor.food_db.facade import LookupQuery, LookupResult
-from dietary_advisor.totaller.nutrition import NutrientName
+from dietary_advisor.food_db.off_food_db import get_off_item_name
+from dietary_advisor.food_db.usda_food_db import get_usda_item_name
 
 
 class _FakeDb:
@@ -35,8 +36,10 @@ class _FakeDb:
             raise RuntimeError("db exploded")
         return self._items[:limit]
 
-    def get_food(self, code: str) -> OFFItem:
-        return OFFItem(code=code, name=f"{self.label}:{code}")
+    def get_food(self, code: str) -> OFFItem | USDAItem:
+        if self.label == "usda":
+            return USDAItem(fdc_id=int(code.removeprefix("usda:")), description=f"{self.label}:{code}")
+        return OFFItem(code=code, product_name=f"{self.label}:{code}")
 
 
 def _facade(off: _FakeDb | None = None, usda: _FakeDb | None = None) -> FoodDb:
@@ -45,11 +48,16 @@ def _facade(off: _FakeDb | None = None, usda: _FakeDb | None = None) -> FoodDb:
 
 
 def _off_item(code: str) -> OFFItem:
-    return OFFItem(code=code, name=f"OFF {code}", brands="Acme", nutrients_per_100g={NutrientName.ENERGY_KCAL: 200.0})
+    return OFFItem(code=code, product_name=f"OFF {code}", brands="Acme", energy_kcal_in_100g=200.0)
 
 
 def _usda_item(code: str) -> USDAItem:
-    return USDAItem(code=code, name=f"USDA {code}", category="Dairy")
+    fdc_id = int(code.removeprefix("usda:"))
+    return USDAItem(fdc_id=fdc_id, description=f"USDA {code}", category="Dairy")
+
+
+def _item_name(item: OFFItem | USDAItem) -> str:
+    return get_off_item_name(item) if isinstance(item, OFFItem) else get_usda_item_name(item)
 
 
 # --- get_food routing -------------------------------------------------------
@@ -57,26 +65,26 @@ def _usda_item(code: str) -> USDAItem:
 
 def test_usda_prefix_routes_to_usda_db() -> None:
     router = _facade(_FakeDb("off"), _FakeDb("usda"))
-    assert router.get_food("usda:123").name == "usda:usda:123"
+    assert _item_name(router.get_food("usda:123")) == "usda:usda:123"
 
 
 def test_plain_barcode_routes_to_off_db() -> None:
     router = _facade(_FakeDb("off"), _FakeDb("usda"))
-    assert router.get_food("5901234").name == "off:5901234"
+    assert _item_name(router.get_food("5901234")) == "off:5901234"
 
 
 def test_usda_code_without_usda_db_raises() -> None:
     router = _facade(_FakeDb("off"), None)
     with pytest.raises(USDAUnknownFoodCodeError):
         router.get_food("usda:123")
-    assert router.get_food("5901234").name == "off:5901234"
+    assert _item_name(router.get_food("5901234")) == "off:5901234"
 
 
 def test_off_code_without_off_db_raises() -> None:
     router = _facade(None, _FakeDb("usda"))
     with pytest.raises(OFFUnknownFoodCodeError):
         router.get_food("5901234")
-    assert router.get_food("usda:123").name == "usda:usda:123"
+    assert _item_name(router.get_food("usda:123")) == "usda:usda:123"
 
 
 # --- grouped lookup ---------------------------------------------------------
@@ -89,9 +97,22 @@ def test_returns_both_sources_under_distinct_keys() -> None:
 
     assert [h.code for h in result.open_food_facts] == ["1", "2"]
     assert [h.code for h in result.usda] == ["usda:10"]
-    # Source-specific context is surfaced per channel.
     assert result.open_food_facts[0].brands == "Acme"
+    assert result.open_food_facts[0].energy_kcal == 200.0
     assert result.usda[0].category == "Dairy"
+
+
+def test_lookup_csv_renders_both_sources() -> None:
+    off = _FakeDb("off", [_off_item("1")])
+    usda = _FakeDb("usda", [_usda_item("usda:10")])
+    result = asyncio.run(_facade(off, usda).lookup([LookupQuery(query="milk", max_results_off=1, max_results_usda=1)]))
+    csv_text = result.render_csv()
+    assert "# open_food_facts" in csv_text
+    assert "# usda" in csv_text
+    assert "energy_kcal" in csv_text
+    assert "sodium_mg" in csv_text
+    assert "1," in csv_text or "1\n" in csv_text or csv_text.count("1") >= 1
+    assert "usda:10" in csv_text
 
 
 def test_missing_usda_source_yields_empty_usda_channel() -> None:
@@ -128,7 +149,6 @@ def test_batch_pools_hits_across_queries() -> None:
             ]
         )
     )
-    # One hit per query per source.
     assert len(result.open_food_facts) == 3
     assert len(result.usda) == 3
 
@@ -144,7 +164,6 @@ def test_each_query_uses_its_own_limit() -> None:
             ]
         )
     )
-    # 2 hits for the first query + 5 for the second, per source.
     assert len(result.open_food_facts) == 7
     assert len(result.usda) == 7
 

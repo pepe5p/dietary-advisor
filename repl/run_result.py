@@ -22,14 +22,18 @@ __all__ = ["print_run_result", "sample_result"]
 _OATS = FoodItem(
     code="3017620422003",
     name="Rolled oats",
+    quantity_g=500.0,
     nutrients_per_100g={
         NutrientName.ENERGY_KCAL: 380.0,
         NutrientName.PROTEIN_G: 13.0,
         NutrientName.CARBS_G: 62.0,
         NutrientName.FAT_G: 7.0,
+        NutrientName.SATURATED_FAT_G: 1.2,
         NutrientName.FIBER_G: 10.0,
+        NutrientName.SUGAR_G: 1.0,
+        NutrientName.SODIUM_MG: 2.0,
+        NutrientName.IRON_MG: 4.3,
     },
-    tags=["vegan"],
 )
 _BLUEBERRIES = FoodItem(
     code="usda:173946",
@@ -40,8 +44,10 @@ _BLUEBERRIES = FoodItem(
         NutrientName.CARBS_G: 14.5,
         NutrientName.FAT_G: 0.3,
         NutrientName.FIBER_G: 2.4,
+        NutrientName.SUGAR_G: 10.0,
+        NutrientName.VITAMIN_C_MG: 9.7,
+        NutrientName.POTASSIUM_MG: 77.0,
     },
-    tags=["vegan"],
 )
 _CHICKEN_BREAST = FoodItem(
     code="usda:171077",
@@ -51,31 +57,39 @@ _CHICKEN_BREAST = FoodItem(
         NutrientName.PROTEIN_G: 31.0,
         NutrientName.CARBS_G: 0.0,
         NutrientName.FAT_G: 3.6,
+        NutrientName.SATURATED_FAT_G: 1.0,
+        NutrientName.SODIUM_MG: 74.0,
+        NutrientName.CHOLESTEROL_MG: 85.0,
     },
-    tags=[],
 )
 _QUINOA = FoodItem(
     code="8712345678901",
     name="Cooked quinoa",
+    quantity_g=250.0,
     nutrients_per_100g={
         NutrientName.ENERGY_KCAL: 120.0,
         NutrientName.PROTEIN_G: 4.4,
         NutrientName.CARBS_G: 21.3,
         NutrientName.FAT_G: 1.9,
         NutrientName.FIBER_G: 2.8,
+        NutrientName.SODIUM_MG: 7.0,
+        NutrientName.IRON_MG: 1.5,
     },
-    tags=["vegan", "gluten-free"],
 )
 _SALMON = FoodItem(
     code="20123456",
     name="Baked salmon fillet",
+    quantity_g=400.0,
     nutrients_per_100g={
         NutrientName.ENERGY_KCAL: 208.0,
         NutrientName.PROTEIN_G: 20.4,
         NutrientName.CARBS_G: 0.0,
         NutrientName.FAT_G: 13.4,
+        NutrientName.SATURATED_FAT_G: 3.1,
+        NutrientName.SODIUM_MG: 59.0,
+        NutrientName.VITAMIN_D_UG: 11.0,
+        NutrientName.CHOLESTEROL_MG: 55.0,
     },
-    tags=["pescatarian"],
 )
 _BROCCOLI = FoodItem(
     code="usda:170379",
@@ -86,8 +100,10 @@ _BROCCOLI = FoodItem(
         NutrientName.CARBS_G: 7.2,
         NutrientName.FAT_G: 0.4,
         NutrientName.FIBER_G: 3.3,
+        NutrientName.VITAMIN_C_MG: 64.9,
+        NutrientName.CALCIUM_MG: 47.0,
+        NutrientName.POTASSIUM_MG: 293.0,
     },
-    tags=["vegan"],
 )
 
 _BREAKFAST_RECIPE = (

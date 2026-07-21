@@ -46,6 +46,11 @@ def test_shopping_list_aggregates_same_food_across_meals(
     assert rice.protein_g == pytest.approx(200 * 2.7 / 100)
     assert rice.carbs_g == pytest.approx(200 * 28.0 / 100)
     assert rice.fat_g == pytest.approx(200 * 0.3 / 100)
+    assert rice.other_nutrients[NutrientName.FIBER_G] == pytest.approx(0.8)
+    assert rice.other_nutrients[NutrientName.SODIUM_MG] == pytest.approx(2.0)
+    assert chicken.other_nutrients == {}
+    assert chicken.quantity_g is None
+    assert rice.quantity_g is None
 
 
 def test_shopping_list_is_sorted_by_name(chicken_food: FoodItem, rice_food: FoodItem) -> None:
@@ -78,3 +83,28 @@ def test_shopping_list_keeps_distinct_codes() -> None:
     by_code = {it.code: it for it in items}
     assert by_code["1"].energy_kcal == pytest.approx(100 * 130 / 100)
     assert by_code["2"].energy_kcal == pytest.approx(50 * 360 / 100)
+
+
+def test_shopping_list_carries_product_quantity() -> None:
+    off = FoodItem(
+        code="3017620422003",
+        name="Rolled oats",
+        quantity_g=500.0,
+        nutrients_per_100g={NutrientName.ENERGY_KCAL: 380.0},
+    )
+    usda = FoodItem(
+        code="usda:173946",
+        name="Blueberries",
+        nutrients_per_100g={NutrientName.ENERGY_KCAL: 57.0},
+    )
+    plan = _plan(
+        Meal(
+            kind="breakfast",
+            name="breakfast",
+            portions=[Portion(food=off, grams=60), Portion(food=usda, grams=80)],
+            recipe=LONG_INSTRUCTIONS,
+        ),
+    )
+    by_name = {it.name: it for it in build_shopping_list(plan).items}
+    assert by_name["Rolled oats"].quantity_g == 500.0
+    assert by_name["Blueberries"].quantity_g is None

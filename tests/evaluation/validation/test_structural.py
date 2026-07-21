@@ -20,7 +20,8 @@ def test_structural_csr_perfect_vegetarian_plan(food_db: FoodDb, vegetarian_code
     assert structural_csr(plan, eval_profile, food_db) == 1.0
 
 
-def test_structural_csr_fails_on_peanut_allergen(food_db: FoodDb, peanut_code: str) -> None:
-    plan = agent_plan_single(peanut_code, user_id="L2_01", name="PB dish", grams=50.0)
+def test_structural_csr_fails_on_disliked_ingredient(food_db: FoodDb, mushroom_code: str) -> None:
+    # L2_01 excludes mushrooms by hydrated food name.
+    plan = agent_plan_single(mushroom_code, user_id="L2_01", grams=50.0)
     eval_profile = get_case("L2_01")
     assert structural_csr(plan, eval_profile, food_db) < 1.0

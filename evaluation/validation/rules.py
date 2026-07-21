@@ -4,6 +4,10 @@ Each rule type knows how to inspect a `MealPlan` (and its `NutrientTotals`)
 and emit zero or more `Violation`s. This is intentionally *not* an LLM:
 relying on a probabilistic checker would defeat the whole purpose of the
 neuro-symbolic architecture.
+
+Allergen and diet-pattern adherence are judged by the LLM critic / qualitative
+G-Eval judge rather than deterministic tag matching — OFF/USDA tags are not
+reliable enough for safety-critical exclusion.
 """
 
 from __future__ import annotations
@@ -12,14 +16,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from dietary_advisor.planning.meal_plan import MealPlan, NutrientTotals
-from dietary_advisor.totaller.nutrition import FoodItem, NutrientName
+from dietary_advisor.totaller.nutrition import NutrientName
 from evaluation.constraints import HardConstraint, Violation
-
-
-def food_contains_allergen(food: FoodItem, allergen: str) -> bool:
-    """Cheap allergen check based on canonical `contains:<allergen>` tags."""
-    target = f"contains:{allergen.lower()}"
-    return any(t.lower() == target for t in food.tags)
 
 
 class HardRule(ABC):
@@ -29,26 +27,6 @@ class HardRule(ABC):
 
     @abstractmethod
     def check(self, plan: MealPlan, totals: NutrientTotals) -> list[Violation]: ...
-
-
-@dataclass
-class AllergenExclusionRule(HardRule):
-    constraint: HardConstraint
-
-    def check(self, plan: MealPlan, totals: NutrientTotals) -> list[Violation]:  # noqa: ARG002
-        out: list[Violation] = []
-        target = self.constraint.target.lower()
-        for meal in plan.meals:
-            for portion in meal.portions:
-                if food_contains_allergen(portion.food, target):
-                    out.append(
-                        Violation(
-                            constraint=self.constraint,
-                            detail=(f"{portion.food.name!r} in {meal.kind} contains the excluded allergen {target!r}."),
-                            offending_item=portion.food.name,
-                        ),
-                    )
-        return out
 
 
 @dataclass
@@ -65,31 +43,6 @@ class IngredientExclusionRule(HardRule):
                         Violation(
                             constraint=self.constraint,
                             detail=f"{portion.food.name!r} matches excluded ingredient {needle!r}.",
-                            offending_item=portion.food.name,
-                        ),
-                    )
-        return out
-
-
-@dataclass
-class DietPatternRule(HardRule):
-    """Every food must carry the diet-pattern tag (e.g. 'vegan')."""
-
-    constraint: HardConstraint
-
-    def check(self, plan: MealPlan, totals: NutrientTotals) -> list[Violation]:  # noqa: ARG002
-        out: list[Violation] = []
-        target = self.constraint.target.lower()
-        for meal in plan.meals:
-            for portion in meal.portions:
-                tags = {t.lower() for t in portion.food.tags}
-                if target not in tags:
-                    out.append(
-                        Violation(
-                            constraint=self.constraint,
-                            detail=(
-                                f"{portion.food.name!r} is not tagged {target!r} (tags: {sorted(tags) or 'none'})."
-                            ),
                             offending_item=portion.food.name,
                         ),
                     )
@@ -164,15 +117,14 @@ class MealCountRule(HardRule):
         return []
 
 
+_LLM_JUDGED_KINDS = frozenset({"allergen_exclusion", "diet_pattern"})
+
+
 def rule_from_constraint(constraint: HardConstraint) -> HardRule:
     """Factory dispatch from constraint kind to rule implementation."""
     match constraint.kind:
-        case "allergen_exclusion":
-            return AllergenExclusionRule(constraint)
         case "ingredient_exclusion":
             return IngredientExclusionRule(constraint)
-        case "diet_pattern":
-            return DietPatternRule(constraint)
         case "max_nutrient":
             return MaxNutrientRule(constraint)
         case "min_nutrient":
@@ -183,4 +135,5 @@ def rule_from_constraint(constraint: HardConstraint) -> HardRule:
 
 
 def rules_from_constraints(constraints: list[HardConstraint]) -> list[HardRule]:
-    return [rule_from_constraint(c) for c in constraints]
+    """Build executable rules, skipping kinds owned by the LLM judge."""
+    return [rule_from_constraint(c) for c in constraints if c.kind not in _LLM_JUDGED_KINDS]

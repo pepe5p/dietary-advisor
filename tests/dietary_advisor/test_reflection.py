@@ -24,7 +24,6 @@ from dietary_advisor.config import get_settings
 from dietary_advisor.food_db import OFFItem
 from dietary_advisor.profile import UserProfile
 from dietary_advisor.reflection import reflect_and_refine
-from dietary_advisor.totaller.nutrition import NutrientName
 from tests.conftest import LONG_INSTRUCTIONS
 
 _KNOWN_CODE = "known"
@@ -37,13 +36,11 @@ class _FakeFoodDb:
         assert code == _KNOWN_CODE
         return OFFItem(
             code=code,
-            name="Test food",
-            nutrients_per_100g={
-                NutrientName.ENERGY_KCAL: 200.0,
-                NutrientName.PROTEIN_G: 10.0,
-                NutrientName.CARBS_G: 20.0,
-                NutrientName.FAT_G: 5.0,
-            },
+            product_name="Test food",
+            energy_kcal_in_100g=200.0,
+            proteins_g_in_100g=10.0,
+            carbohydrates_g_in_100g=20.0,
+            fat_g_in_100g=5.0,
         )
 
 

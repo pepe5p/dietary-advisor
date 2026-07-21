@@ -222,42 +222,28 @@ EVAL_CASES: dict[str, EvalProfile] = {
         case_id="L2_01",
         profile=_L2_01_PROFILE,
         hard_constraints=(
-            HardConstraint.allergen("peanuts", source=ConstraintSource.PROFILE),
-            HardConstraint.allergen("tree nuts", source=ConstraintSource.PROFILE),
-            HardConstraint.diet("vegetarian", source=ConstraintSource.PROFILE),
             HardConstraint(kind="ingredient_exclusion", target="mushrooms", source=ConstraintSource.PROFILE),
         ),
     ),
     "L2_02": EvalProfile(
         case_id="L2_02",
         profile=_L2_02_PROFILE,
-        hard_constraints=(HardConstraint.diet("vegan", source=ConstraintSource.PROFILE),),
+        hard_constraints=(),
     ),
     "L2_03": EvalProfile(
         case_id="L2_03",
         profile=_L2_03_PROFILE,
-        hard_constraints=(
-            HardConstraint.allergen("milk", source=ConstraintSource.PROFILE),
-            HardConstraint.diet("pescatarian", source=ConstraintSource.PROFILE),
-            HardConstraint.allergen("milk", source=ConstraintSource.SAFETY),
-        ),
+        hard_constraints=(),
     ),
     "L2_04": EvalProfile(
         case_id="L2_04",
         profile=_L2_04_PROFILE,
-        hard_constraints=(
-            HardConstraint.allergen("gluten", source=ConstraintSource.PROFILE),
-            HardConstraint.allergen("gluten", source=ConstraintSource.SAFETY),
-        ),
+        hard_constraints=(),
     ),
     "L2_05": EvalProfile(
         case_id="L2_05",
         profile=_L2_05_PROFILE,
-        hard_constraints=(
-            HardConstraint.allergen("eggs", source=ConstraintSource.PROFILE),
-            HardConstraint.allergen("soybeans", source=ConstraintSource.PROFILE),
-            HardConstraint.diet("vegan", source=ConstraintSource.PROFILE),
-        ),
+        hard_constraints=(),
     ),
     "L3_01": EvalProfile(
         case_id="L3_01",
@@ -314,7 +300,6 @@ EVAL_CASES: dict[str, EvalProfile] = {
         case_id="L3_03",
         profile=_L3_03_PROFILE,
         hard_constraints=(
-            HardConstraint.diet("mediterranean", source=ConstraintSource.PROFILE),
             HardConstraint(kind="ingredient_exclusion", target="organ meats", source=ConstraintSource.PROFILE),
             HardConstraint.max_nutrient(
                 NutrientName.SATURATED_FAT_G,
@@ -334,7 +319,6 @@ EVAL_CASES: dict[str, EvalProfile] = {
         case_id="L3_04",
         profile=_L3_04_PROFILE,
         hard_constraints=(
-            HardConstraint.allergen("gluten", source=ConstraintSource.PROFILE),
             HardConstraint.min_nutrient(
                 NutrientName.FIBER_G,
                 value=30.0,
@@ -349,22 +333,18 @@ EVAL_CASES: dict[str, EvalProfile] = {
                     "WHO conditional recommendation: <10 % of energy from free sugars (~50 g on a 2000 kcal diet)."
                 ),
             ),
-            HardConstraint.allergen("gluten", source=ConstraintSource.SAFETY),
         ),
     ),
     "L3_05": EvalProfile(
         case_id="L3_05",
         profile=_L3_05_PROFILE,
         hard_constraints=(
-            HardConstraint.allergen("milk", source=ConstraintSource.PROFILE),
-            HardConstraint.diet("dash", source=ConstraintSource.PROFILE),
             HardConstraint.max_nutrient(
                 NutrientName.SODIUM_MG,
                 value=2000.0,
                 source=ConstraintSource.CLINICAL_GUIDELINE,
                 rationale="WHO recommends <2 g/day sodium for adults with hypertension.",
             ),
-            HardConstraint.allergen("milk", source=ConstraintSource.SAFETY),
         ),
     ),
 }

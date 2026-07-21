@@ -15,11 +15,13 @@ import duckdb
 from rich.pretty import pprint
 from rich.table import Table
 
+from dietary_advisor.cli.rendering import format_extra_nutrients
 from dietary_advisor.config import get_settings
 from dietary_advisor.food_db import FoodDb, LookupQuery, LookupResult, OffFoodDb, OFFItem, UsdaFoodDb, USDAItem
 from dietary_advisor.food_db.models import Row
-from dietary_advisor.food_db.off_food_db import _row_to_off_item
-from dietary_advisor.food_db.usda_food_db import _fdc_id, _row_to_usda_item
+from dietary_advisor.food_db.nutrients import nutrients_from_row
+from dietary_advisor.food_db.off_food_db import _row_to_off_item, get_off_item_name
+from dietary_advisor.food_db.usda_food_db import _fdc_id, _row_to_usda_item, get_usda_item_name, to_code
 from dietary_advisor.totaller.nutrition import canonical_unit, NutrientName
 from repl.manual import console, print_manual
 from setup.settings import get_setup_settings
@@ -31,6 +33,7 @@ __all__ = [
     "get_usda_item",
     "get_usda_record",
     "lookup",
+    "lookup_csv",
     "pdict",
     "pfi",
     "search_off",
@@ -46,7 +49,6 @@ __all__ = [
 # The two food_db read models don't share a base class (see food_db/models.py).
 type ReadModel = OFFItem | USDAItem
 
-# Nutrients shown as their own columns; the rest are folded into a summary line.
 _MACRO_COLUMNS: tuple[NutrientName, ...] = (
     NutrientName.ENERGY_KCAL,
     NutrientName.PROTEIN_G,
@@ -112,11 +114,7 @@ def get_off_item(code: str) -> OFFItem:
 
 
 def get_off_record(code: str) -> Row:
-    """Return the full, unprocessed OFF record for `code` from the slimmed `.duckdb`.
-
-    Unlike `get_off_item` (which maps the row to an `OFFItem`), this returns every
-    column stored by `setup`, including ones not surfaced on `OFFItem`.
-    """
+    """Return the full, unprocessed OFF record for `code` from the slimmed `.duckdb`."""
     con = duckdb.connect(str(get_settings().off_db), read_only=True)
     try:
         return _fetch_record(con, "SELECT * FROM products WHERE code = ? LIMIT 1", [code], code)
@@ -151,11 +149,7 @@ def get_usda_item(code: str) -> USDAItem:
 
 
 def get_usda_record(code: str) -> Row:
-    """Return the full, unprocessed USDA record for `code` (bare fdc_id or `usda:<fdc_id>`).
-
-    Unlike `get_usda_item` (which maps the row to a `USDAItem`), this returns
-    every column stored by `setup`, including ones not surfaced on `USDAItem`.
-    """
+    """Return the full, unprocessed USDA record for `code` (bare fdc_id or `usda:<fdc_id>`)."""
     con = duckdb.connect(str(get_settings().usda_db), read_only=True)
     try:
         return _fetch_record(con, "SELECT * FROM foods WHERE fdc_id = ? LIMIT 1", [_fdc_id(code)], code)
@@ -172,27 +166,19 @@ def sql_usda(sql: str) -> list[Row]:
 
 
 def lookup(query: str, off_limit: int = 5, usda_limit: int = 5) -> LookupResult:
-    """Run the whole `FoodDb.lookup` facade path for one query, grouped by source.
-
-    Unlike the single-reader `search_off`/`search_usda`, this drives the exact
-    dual-source lookup the nutrition agent's tools call: both sources searched
-    with their own per-source cap (0 skips a source) and hits returned as the
-    prompt-shaped `LookupResult`. `FoodDb.open()` honours the
-    `off_usage`/`usda_usage` settings, so a disabled source stays empty.
-    """
+    """Run the whole `FoodDb.lookup` facade path for one query, grouped by source."""
     with FoodDb.open() as food_db:
         query_obj = LookupQuery(query=query, max_results_off=off_limit, max_results_usda=usda_limit)
         return asyncio.run(food_db.lookup([query_obj]))
 
 
-def get_parquet_record(code: str) -> Row:
-    """Return the full, unprocessed OFF record for `code` from the raw Parquet export.
+def lookup_csv(query: str, off_limit: int = 5, usda_limit: int = 5) -> str:
+    """Same as `lookup`, but return the CSV text the nutrition agent tools see."""
+    return lookup(query, off_limit=off_limit, usda_limit=usda_limit).render_csv()
 
-    Unlike `get_off_record` (which reads the slimmed `.duckdb` built by `setup`),
-    this scans the ~7.6 GB `food.parquet` cache directly, so every original OFF
-    column is available for exploration. Each lookup is a full file scan (a few
-    seconds); it is a debugging aid, not a hot path.
-    """
+
+def get_parquet_record(code: str) -> Row:
+    """Return the full, unprocessed OFF record for `code` from the raw Parquet export."""
     parquet = get_setup_settings().off_raw_parquet
     con = duckdb.connect()
     try:
@@ -206,8 +192,6 @@ def get_parquet_record(code: str) -> Row:
         con.close()
 
 
-# Records read with `SELECT *` carry the 384-dim `embedding` vector; dumping it
-# in full drowns every other field, so collapse any long sequence to a marker.
 _MAX_INLINE_SEQ = 16
 
 
@@ -227,42 +211,52 @@ def pdict(record: Row) -> None:
     pprint(_shorten_long_sequences(record))
 
 
+def _item_name(item: ReadModel) -> str:
+    return get_off_item_name(item) if isinstance(item, OFFItem) else get_usda_item_name(item)
+
+
+def _item_code(item: ReadModel) -> str:
+    return item.code if isinstance(item, OFFItem) else to_code(item.fdc_id)
+
+
 def _food_items_table(food_items: list[ReadModel]) -> Table:
     table = Table(title="Food items", show_lines=True, header_style="bold cyan")
     table.add_column("Name", style="bold", overflow="fold")
     table.add_column("Code", style="dim")
     for nutrient in _MACRO_COLUMNS:
         table.add_column(f"{nutrient.value} ({canonical_unit(nutrient)})", justify="right")
-    table.add_column("Tags", overflow="fold")
+    table.add_column("Other nutrients", overflow="fold")
 
     for item in food_items:
-        macros = [f"{item.nutrients_per_100g[n]:.1f}" if n in item.nutrients_per_100g else "-" for n in _MACRO_COLUMNS]
-        tags = item.tags if isinstance(item, OFFItem) else []
-        table.add_row(item.name, item.code, *macros, ", ".join(tags) or "-")
+        nutrients = nutrients_from_row(item)
+        macros = [f"{nutrients[n]:.1f}" if n in nutrients else "-" for n in _MACRO_COLUMNS]
+        extras = format_extra_nutrients(nutrients) or "-"
+        table.add_row(_item_name(item), _item_code(item), *macros, extras)
     return table
 
 
 def _food_item_detail_table(food_item: ReadModel) -> Table:
-    table = Table(title=f"Food item: {food_item.name}", show_lines=True, header_style="bold cyan")
+    name = _item_name(food_item)
+    table = Table(title=f"Food item: {name}", show_lines=True, header_style="bold cyan")
     table.add_column("Field", style="bold", overflow="fold")
     table.add_column("Value", overflow="fold")
 
-    table.add_row("name", food_item.name)
-    table.add_row("code", food_item.code)
-    table.add_row("description", food_item.description or "-")
+    table.add_row("name", name)
+    table.add_row("code", _item_code(food_item))
 
     if isinstance(food_item, OFFItem):
-        table.add_row("tags", ", ".join(food_item.tags) or "-")
         table.add_row("brands", food_item.brands or "-")
         table.add_row("categories", food_item.categories or "-")
         table.add_row("compared_to_category", food_item.compared_to_category or "-")
         table.add_row("ingredients_text", food_item.ingredients_text or "-")
+        table.add_row("allergens_tags", ", ".join(food_item.allergens_tags) or "-")
+        table.add_row("labels_tags", ", ".join(food_item.labels_tags) or "-")
     else:
         table.add_row("category", food_item.category or "-")
-        table.add_row("scientific_name", food_item.scientific_name or "-")
 
+    nutrients = nutrients_from_row(food_item)
     for nutrient in NutrientName:
-        amount = food_item.nutrients_per_100g.get(nutrient)
+        amount = nutrients.get(nutrient)
         value = f"{amount:.3g} {canonical_unit(nutrient)}" if amount is not None else "[dim]-[/dim]"
         table.add_row(f"{nutrient.value} / 100g", value)
     return table
@@ -293,6 +287,7 @@ _MANUAL: tuple[tuple[str, str], ...] = (
     ("get_usda_record(code)", "Get the full raw row (dict) from the USDA duckdb."),
     ("sql_usda(sql)", "Run raw SQL against the USDA duckdb -> list[Row]."),
     ("lookup(query, off_limit=5, usda_limit=5)", "Run the full dual-source FoodDb.lookup -> LookupResult."),
+    ("lookup_csv(query, off_limit=5, usda_limit=5)", "Same as lookup, but as the CSV the agent tools return."),
     ("pfi(items)", "Rich-print an OFFItem/USDAItem or a list of them."),
     ("pdict(record)", "Rich pretty-print a raw record dict."),
 )

@@ -8,6 +8,10 @@ Evaluation-only: production never derives or sees constraints - the agent
 must infer restrictions from the profile itself. This function exists so the
 frozen `hard_constraints` in `evaluation/profiles/cases.py` can be verified
 against the profile they were authored from (see `test_cases.py`).
+
+Allergen and diet-pattern adherence are deliberately *not* derived here: they
+are scored by the LLM critic / qualitative G-Eval judge rather than
+deterministic tag matching.
 """
 
 from __future__ import annotations
@@ -15,7 +19,7 @@ from __future__ import annotations
 from dietary_advisor.profile import UserProfile
 from dietary_advisor.totaller.nutrition import NutrientName
 from evaluation.constraints import ConstraintSource, HardConstraint
-from evaluation.profiles.vocab import Condition, DietPattern
+from evaluation.profiles.vocab import Condition
 
 # Clinical safety constants. These are conservative defaults sourced from the
 # literature in the kwerenda; they are *not* clinical guidelines themselves
@@ -64,27 +68,17 @@ _CONDITION_RULES: dict[str, list[HardConstraint]] = {
             rationale="KDOQI: <2.4 g/day potassium for CKD stage 3+.",
         ),
     ],
-    Condition.CELIAC.value: [
-        HardConstraint.allergen("gluten", source=ConstraintSource.SAFETY),
-    ],
-    Condition.LACTOSE_INTOLERANCE.value: [
-        HardConstraint.allergen("milk", source=ConstraintSource.SAFETY),
-    ],
 }
 
 
 def derive_hard_constraints(profile: UserProfile) -> list[HardConstraint]:
-    """Enumerate all hard constraints implied by the profile.
+    """Enumerate deterministic hard constraints implied by the profile.
 
-    The result combines:
-      * one allergen_exclusion per declared allergen
-      * one diet_pattern constraint when the user is not omnivore
-      * one ingredient_exclusion per disliked food
-      * any clinical-condition rules from `_CONDITION_RULES`
+    Combines ingredient exclusions (disliked foods) with clinical-condition
+    nutrient rules from `_CONDITION_RULES`. Allergen / diet-pattern rules are
+    left to the LLM judge.
     """
-    out: list[HardConstraint] = [HardConstraint.allergen(a) for a in profile.allergens]
-    if profile.diet_pattern != DietPattern.OMNIVORE.value:
-        out.append(HardConstraint.diet(profile.diet_pattern))
+    out: list[HardConstraint] = []
     for disliked in profile.disliked_foods:
         out.append(
             HardConstraint(

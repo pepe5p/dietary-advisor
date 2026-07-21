@@ -28,22 +28,21 @@ def test_no_constraints_means_satisfied(rice_food: FoodItem) -> None:
     assert report.hsr == 1.0
 
 
-def test_allergen_exclusion_flags_offender(rice_food: FoodItem, peanut_food: FoodItem) -> None:
+def test_allergen_and_diet_constraints_are_skipped_by_validator(
+    rice_food: FoodItem,
+    peanut_food: FoodItem,
+) -> None:
+    # Allergen/diet kinds are LLM-judged; the code validator ignores them.
     plan = _plan_with(
         Portion(food=rice_food, grams=200),
         Portion(food=peanut_food, grams=20),
     )
-    report = validate_meal_plan(plan, [HardConstraint.allergen("peanuts")])
-    assert not report.hard_satisfied
-    assert any("peanut" in v.detail.lower() for v in report.violations)
-
-
-def test_diet_pattern_requires_tag(chicken_food: FoodItem) -> None:
-    # chicken_food has only "pescatarian" tag; vegan diet pattern should fail.
-    plan = _plan_with(Portion(food=chicken_food, grams=100))
-    report = validate_meal_plan(plan, [HardConstraint.diet("vegan")])
-    assert not report.hard_satisfied
-    assert "vegan" in report.violations[0].detail.lower()
+    report = validate_meal_plan(
+        plan,
+        [HardConstraint.allergen("peanuts"), HardConstraint.diet("vegan")],
+    )
+    assert report.hard_satisfied
+    assert not report.violations
 
 
 def test_max_nutrient_violation(salty_food: FoodItem) -> None:
@@ -92,10 +91,10 @@ def test_hsr_partial_pass(rice_food: FoodItem, peanut_food: FoodItem) -> None:
         Portion(food=peanut_food, grams=10),
     )
     constraints = [
-        HardConstraint.allergen("peanuts"),  # violated
-        HardConstraint.allergen("milk"),  # satisfied
-        HardConstraint.allergen("eggs"),  # satisfied
-        HardConstraint.allergen("crustaceans"),  # satisfied
+        HardConstraint(kind="ingredient_exclusion", target="peanut"),  # violated
+        HardConstraint.meal_count(1),  # satisfied
+        HardConstraint.min_nutrient(NutrientName.FIBER_G, 0.1),  # satisfied
+        HardConstraint.max_nutrient(NutrientName.SODIUM_MG, 10_000.0),  # satisfied
     ]
     report = validate_meal_plan(plan, constraints)
     assert report.hsr == 0.75

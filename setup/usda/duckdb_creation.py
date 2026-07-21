@@ -7,10 +7,11 @@ the OFF DB - so the two databases are searched side by side at runtime.
 
 The relational CSVs (`food`, `food_nutrient`, `nutrient`, `food_category`) are
 pivoted into one flat ``foods`` table shaped like the OFF ``products`` table:
-one row per food, per-100g nutrient columns paired with their source unit, plus
-a full-text index over the description and an embedding for semantic search.
-Unlike OFF, USDA reports minerals/vitamins in their canonical units already, so
-the runtime reader applies no scaling.
+one row per food, per-100g nutrient columns in the canonical units from
+`setup.units.TARGET_UNIT`, plus a full-text index over the description and an
+embedding for semantic search. USDA usually already reports canonical units;
+the build still reads each `unit_name` and rescales so both DBs share one
+convention.
 """
 
 from __future__ import annotations
@@ -19,14 +20,19 @@ import logging
 import os
 import time
 from pathlib import Path
+from typing import Any
 
 import duckdb
 
-from setup.open_food_facts.duckdb_creation import _embed_documents
+from setup.embedding import embed_table
 from setup.settings import SetupSettings
+from setup.units import register_unit_ratio_macro, scaled_amount_sql, stored_column, TARGET_UNIT
 from setup.usda.downloading import resolve_usda_csv_dirs
 
 log = logging.getLogger(__name__)
+
+# Columns streamed into the Python document builder for semantic embeddings.
+_DOCUMENT_COLUMNS: tuple[str, ...] = ("description", "category")
 
 # Canonical nutrient column prefix -> the FDC `nutrient_nbr` code(s) that supply
 # it, in priority order. `nutrient_nbr` (203, 208, ...) is the stable, human-
@@ -108,12 +114,6 @@ def _check_schema(con: duckdb.DuckDBPyConnection, csv_dirs: list[Path]) -> None:
             )
 
 
-def _has_scientific_name(con: duckdb.DuckDBPyConnection, csv_dirs: list[Path]) -> bool:
-    source_sql = _read_csv_sql(_csv_paths(csv_dirs, "food.csv"))
-    described = con.execute(f"DESCRIBE SELECT * FROM {source_sql}").fetchall()  # noqa: S608 (paths are local)
-    return any(row[0] == "scientific_name" for row in described)
-
-
 def _wanted_numbers() -> list[float]:
     seen: list[float] = []
     for numbers in _NUTRIENT_NUMBERS.values():
@@ -124,26 +124,27 @@ def _wanted_numbers() -> list[float]:
 
 
 def _pivot_columns() -> str:
-    """Per-nutrient `<prefix>_100g` amount + `<prefix>_unit` aggregate columns.
+    """Per-nutrient columns named by `stored_column(prefix)` in `TARGET_UNIT[prefix]`.
 
     For prefixes backed by several nutrient numbers (energy, sugars) the amount
     and unit are COALESCEd in priority order, so the preferred source wins when
-    a food happens to report more than one.
+    a food happens to report more than one; then `unit_ratio` rescales.
     """
     parts: list[str] = []
     for prefix, numbers in _NUTRIENT_NUMBERS.items():
-        amount = " ,\n                ".join(f"max(amount) FILTER (WHERE nbr = {n})" for n in numbers)
-        unit = " ,\n                ".join(f"any_value(unit_name) FILTER (WHERE nbr = {n})" for n in numbers)
         if len(numbers) == 1:
-            parts.append(f"max(amount) FILTER (WHERE nbr = {numbers[0]}) AS {prefix}_100g")
-            parts.append(f"any_value(unit_name) FILTER (WHERE nbr = {numbers[0]}) AS {prefix}_unit")
+            amount = f"max(amount) FILTER (WHERE nbr = {numbers[0]})"
+            unit = f"any_value(unit_name) FILTER (WHERE nbr = {numbers[0]})"
         else:
-            parts.append(f"COALESCE(\n                {amount}\n            ) AS {prefix}_100g")
-            parts.append(f"COALESCE(\n                {unit}\n            ) AS {prefix}_unit")
+            amount_parts = " ,\n                ".join(f"max(amount) FILTER (WHERE nbr = {n})" for n in numbers)
+            unit_parts = " ,\n                ".join(f"any_value(unit_name) FILTER (WHERE nbr = {n})" for n in numbers)
+            amount = f"COALESCE(\n                {amount_parts}\n            )"
+            unit = f"COALESCE(\n                {unit_parts}\n            )"
+        parts.append(f"{scaled_amount_sql(amount, unit, prefix)} AS {stored_column(prefix)}")
     return ",\n            ".join(parts)
 
 
-def _build_select_sql(csv_dirs: list[Path], *, has_scientific_name: bool) -> str:
+def _build_select_sql(csv_dirs: list[Path]) -> str:
     """The CREATE TABLE ... AS SELECT body pivoting the FDC CSVs into `foods`.
 
     All interpolated fragments come from static config or the local CSV paths,
@@ -156,17 +157,14 @@ def _build_select_sql(csv_dirs: list[Path], *, has_scientific_name: bool) -> str
 
     data_types = ", ".join(f"'{dt}'" for dt in _FOOD_DATA_TYPES)
     wanted = ", ".join(str(n) for n in _wanted_numbers())
-    scientific = "scientific_name" if has_scientific_name else "NULL"
-    macro_filters = " AND\n          ".join(f"{prefix}_100g IS NOT NULL" for prefix in _REQUIRED_MACROS)
+    macro_filters = " AND\n          ".join(f"{stored_column(prefix)} IS NOT NULL" for prefix in _REQUIRED_MACROS)
 
     return f"""
         WITH food AS (
             SELECT
                 TRY_CAST(fdc_id AS BIGINT) AS fdc_id,
-                data_type,
                 description,
-                TRY_CAST(food_category_id AS BIGINT) AS food_category_id,
-                {scientific} AS scientific_name
+                TRY_CAST(food_category_id AS BIGINT) AS food_category_id
             FROM {food_sql}
             WHERE data_type IN ({data_types})
               AND TRY_CAST(fdc_id AS BIGINT) IS NOT NULL
@@ -198,49 +196,39 @@ def _build_select_sql(csv_dirs: list[Path], *, has_scientific_name: bool) -> str
         SELECT * FROM (
             SELECT
                 food.fdc_id,
-                food.data_type,
                 food.description,
                 cat.category,
-                food.scientific_name,
                 {_pivot_columns()}
             FROM food
             LEFT JOIN cat ON food.food_category_id = cat.id
             LEFT JOIN fnn ON fnn.fdc_id = food.fdc_id
-            GROUP BY food.fdc_id, food.data_type, food.description, cat.category, food.scientific_name
+            GROUP BY food.fdc_id, food.description, cat.category
         )
         WHERE {macro_filters}
     """  # noqa: S608 (fragments are static config / local paths)
 
 
-def _document_sql() -> str:
-    """SQL expression producing the per-food "what this food is" document.
+def _indefinite_article(phrase: str) -> str:
+    return "An" if phrase[:1].casefold() in "aeiou" else "A"
 
-    USDA generic foods carry no brand or ingredient list, so the searchable
-    identity is the description, its food group, and (for Foundation samples)
-    the scientific name; `data_type` is spelled out so a query can lean toward
-    the freshly-analysed Foundation foods over the frozen SR Legacy ones.
+
+def _build_document(row: dict[str, Any]) -> str:
+    """Per-food prose for the embedding model.
+
+    Prose encodes role relationships better than labelled lines. USDA generic
+    foods carry no brand, so identity is the description and food group.
+    Both are always non-null/non-empty in the built table.
     """
-    friendly_type = (
-        "CASE data_type "
-        "WHEN 'foundation_food' THEN 'Foundation' "
-        "WHEN 'sr_legacy_food' THEN 'SR Legacy' "
-        "ELSE data_type END"
-    )
-    parts = (
-        "CASE WHEN description IS NOT NULL THEN 'Name: ' || description END",
-        "CASE WHEN category IS NOT NULL THEN 'Category: ' || category END",
-        "CASE WHEN scientific_name IS NOT NULL THEN 'Scientific name: ' || scientific_name END",
-        f"CASE WHEN data_type IS NOT NULL THEN 'Type: ' || ({friendly_type}) END",
-    )
-    return "concat_ws(chr(10), " + ", ".join(parts) + ")"
+    description = str(row["description"])
+    category = str(row["category"])
+    return f"{description}. {_indefinite_article(category)} {category} product."
 
 
 def _expected_foods_columns() -> set[str]:
     """The full set of columns a freshly built `foods` table should have."""
-    cols = {"fdc_id", "data_type", "description", "category", "scientific_name"}
+    cols = {"fdc_id", "description", "category"}
     for prefix in _NUTRIENT_NUMBERS:
-        cols.add(f"{prefix}_100g")
-        cols.add(f"{prefix}_unit")
+        cols.add(stored_column(prefix))
     cols.add("embedding")
     return cols
 
@@ -248,48 +236,26 @@ def _expected_foods_columns() -> set[str]:
 def _column_comment_sql() -> list[str]:
     statements = [
         "COMMENT ON COLUMN foods.fdc_id IS 'FoodData Central id (primary key). Exposed at runtime as usda:<fdc_id>.'",
-        "COMMENT ON COLUMN foods.data_type IS 'FDC data type: foundation_food or sr_legacy_food.'",
     ]
     for prefix in _NUTRIENT_NUMBERS:
-        statements.append(
-            f"COMMENT ON COLUMN foods.{prefix}_100g IS "
-            f"'{prefix} per 100g, in the unit reported by FDC (see {prefix}_unit; already canonical).'"
-        )
+        unit = TARGET_UNIT[prefix]
+        col = stored_column(prefix)
+        statements.append(f"COMMENT ON COLUMN foods.{col} IS '{prefix} per 100g, in {unit} (canonical).'")
     return statements
 
 
 def _embed_foods(con: duckdb.DuckDBPyConnection, settings: SetupSettings) -> None:
-    """Backfill the `embedding` column and build a VSS HNSW index over it.
-
-    Best-effort HNSW build (the runtime falls back to brute-force cosine, cheap
-    at this row count) so a missing/failed VSS extension never blocks the build.
-    """
-    dim = settings.off_embedding_dim
-    con.execute(f"ALTER TABLE foods ADD COLUMN embedding FLOAT[{dim}]")
-
-    rows = con.execute(f"SELECT fdc_id, {_document_sql()} AS document FROM foods").fetchall()  # noqa: S608
-    if not rows:
-        return
-    ids = [r[0] for r in rows]
-    documents = [r[1] or "" for r in rows]
-
-    log.info("Embedding %d USDA food documents with %s...", len(documents), settings.off_embedding_model)
-    vectors = _embed_documents(documents)
-
-    con.execute(f"CREATE TEMP TABLE _embeddings (fdc_id BIGINT, embedding FLOAT[{dim}])")
-    con.executemany("INSERT INTO _embeddings VALUES (?, ?)", list(zip(ids, vectors, strict=True)))
-    con.execute(
-        "UPDATE foods SET embedding = _embeddings.embedding FROM _embeddings WHERE foods.fdc_id = _embeddings.fdc_id"
+    """Backfill the `embedding` column and build a VSS HNSW index over it."""
+    embed_table(
+        con,
+        table="foods",
+        id_column="fdc_id",
+        id_type="BIGINT",
+        columns=_DOCUMENT_COLUMNS,
+        build_document=_build_document,
+        dim=settings.off_embedding_dim,
+        model_name=settings.off_embedding_model,
     )
-    con.execute("DROP TABLE _embeddings")
-
-    try:
-        con.execute("INSTALL vss")
-        con.execute("LOAD vss")
-        con.execute("SET hnsw_enable_experimental_persistence = true")
-        con.execute("CREATE INDEX foods_embedding_hnsw ON foods USING HNSW (embedding) WITH (metric = 'cosine')")
-    except duckdb.Error as exc:
-        log.warning("Could not build VSS/HNSW index (falling back to brute-force cosine at query time): %s", exc)
 
 
 def _stale_foods_columns(target: Path) -> set[str] | None:
@@ -311,7 +277,9 @@ def _stale_foods_columns(target: Path) -> set[str] | None:
     finally:
         con.close()
     present = {row[0] for row in described}
-    return _expected_foods_columns() - present
+    missing = _expected_foods_columns() - present
+    stale_units = {c for c in present if c.endswith("_unit")}
+    return missing | stale_units
 
 
 def _materialize_usda_db(settings: SetupSettings, csv_dirs: list[Path]) -> Path:
@@ -328,10 +296,10 @@ def _materialize_usda_db(settings: SetupSettings, csv_dirs: list[Path]) -> Path:
         con = duckdb.connect(str(tmp_path))
         try:
             _check_schema(con, csv_dirs)
-            has_scientific = _has_scientific_name(con, csv_dirs)
+            register_unit_ratio_macro(con)
 
             log.info("Pivoting USDA Foundation + SR Legacy foods (%d CSV dirs)...", len(csv_dirs))
-            con.execute(f"CREATE TABLE foods AS {_build_select_sql(csv_dirs, has_scientific_name=has_scientific)}")
+            con.execute(f"CREATE TABLE foods AS {_build_select_sql(csv_dirs)}")
             row_count = con.execute("SELECT count(*) FROM foods").fetchone()[0]  # type: ignore[index]
 
             for stmt in _column_comment_sql():

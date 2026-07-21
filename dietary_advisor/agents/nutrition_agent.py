@@ -58,15 +58,16 @@ async def lookup_food(
     query: str,
     max_results_usda: int = 2,
     max_results_off: int = 2,
-) -> LookupResult:
+) -> str:
     """Search both food databases by name for the best-matching foods.
 
-    Results come back grouped by source: `open_food_facts` (branded/packaged
-    products, often Polish) and `usda` (generic whole foods and reference
-    ingredients like raw carrot or plain chicken breast). Each hit carries a
-    verified `code`, `name`, and per-100g macros - copy both `code` and `name`
-    verbatim into the `PortionRef` for that ingredient. You cannot use any
-    food that isn't a hit from this tool.
+    Returns compact CSV text with two blocks: `# open_food_facts` (branded/
+    packaged products, often Polish) and `# usda` (generic whole foods and
+    reference ingredients like raw carrot or plain chicken breast). Each row
+    has a verified `code`, `name`, context columns, and all per-100g nutrients
+    in canonical units (`energy_kcal`, `protein_g`, `sodium_mg`, …). Copy both
+    `code` and `name` verbatim into the `PortionRef` for that ingredient. You
+    cannot use any food that isn't a hit from this tool.
 
     `max_results_usda`/`max_results_off` cap hits per source independently
     (0 skips that source) - weight towards whichever source actually stocks
@@ -74,24 +75,26 @@ async def lookup_food(
     """
     log.info("lookup_food(%r, max_results_usda=%d, max_results_off=%d)", query, max_results_usda, max_results_off)
     lookup_query = LookupQuery(query=query, max_results_off=max_results_off, max_results_usda=max_results_usda)
-    return await ctx.deps.food_db.lookup([lookup_query])
+    result = await ctx.deps.food_db.lookup([lookup_query])
+    return result.render_csv()
 
 
 async def lookup_foods(
     ctx: RunContext[AgentDeps],
     queries: list[LookupQuery],
-) -> LookupResult:
+) -> str:
     """Batch search of both food databases: one tool call for several ingredient queries.
 
     Each query sets its own `max_results_usda`/`max_results_off`, so you can
     weight some ingredients towards USDA, others towards OFF, or skip a
-    source entirely. Returns hits grouped by source (`open_food_facts`,
-    `usda`) exactly like `lookup_food`, pooling matches across every query.
+    source entirely. Returns the same CSV layout as `lookup_food`, pooling
+    matches across every query.
     """
     log.info("lookup_foods(%d query/queries)", len(queries))
     if not queries:
-        return LookupResult()
-    return await ctx.deps.food_db.lookup(queries)
+        return LookupResult().render_csv()
+    result = await ctx.deps.food_db.lookup(queries)
+    return result.render_csv()
 
 
 async def total_meal_plan(ctx: RunContext[AgentDeps], plan: AgentMealPlan) -> NutrientTotals:

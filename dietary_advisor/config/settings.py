@@ -69,11 +69,10 @@ class Settings(BaseSettings):
     # --- Open Food Facts (local product DB, built by `setup`) ---
     off_db: Path = Field(default=Path(".data/off/off_pl.duckdb"))
     # Semantic product search: fastembed model used to embed the per-product
-    # document at build time and the query at runtime. E5 models are trained
-    # with `passage:`/`query:` prefixes (applied in food_db/embeddings.py) and
-    # cover Polish + English, matching the mixed-language product data.
-    off_embedding_model: str = Field(default="intfloat/multilingual-e5-small")
-    off_embedding_dim: int = Field(default=384, gt=0)
+    # document at build time and the query at runtime. BGE-M3 is multilingual
+    # (Polish + English) and needs no query/passage prefixes.
+    off_embedding_model: str = Field(default="BAAI/bge-m3")
+    off_embedding_dim: int = Field(default=1024, gt=0)
     # fastembed downloads the ONNX model on first use; keep it under the
     # bind-mounted .data so it is fetched once (mirrors onnx_model_dir). Shared
     # by OFF and USDA, so it sits at the .data root rather than under off/.

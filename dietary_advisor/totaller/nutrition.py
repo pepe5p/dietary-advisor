@@ -70,6 +70,28 @@ def canonical_unit(name: NutrientName) -> str:
     return _CANONICAL_UNIT[name]
 
 
+MACRO_NUTRIENTS: frozenset[NutrientName] = frozenset(
+    {
+        NutrientName.ENERGY_KCAL,
+        NutrientName.PROTEIN_G,
+        NutrientName.CARBS_G,
+        NutrientName.FAT_G,
+    }
+)
+
+_UNIT_SUFFIXES: tuple[str, ...] = ("_kcal", "_mg", "_ug", "_g")
+
+
+def nutrient_label(name: NutrientName) -> str:
+    """Human label with the canonical unit suffix stripped (e.g. sodium_mg -> sodium)."""
+    stem = name.value
+    for suffix in _UNIT_SUFFIXES:
+        if stem.endswith(suffix):
+            stem = stem[: -len(suffix)]
+            break
+    return stem.replace("_", " ")
+
+
 class Nutrient(BaseModel):
     """A single nutrient measurement, always in canonical unit.
 
@@ -104,16 +126,13 @@ class FoodItem(BaseModel):
 
     code: str | None = Field(default=None, description="Open Food Facts or USDA identifier.")
     name: str = Field(min_length=1)
-    description: str | None = None
 
     # Per-100g nutrients (canonical units). A dict keyed by NutrientName for
     # O(1) lookup in the Totaller. Values may be missing if the source DB does
     # not provide them.
     nutrients_per_100g: NutrientAmountMap = Field(default_factory=dict)
-
-    # Free-form tags (e.g. "vegetarian", "contains:milk"). The validator uses
-    # `contains:<allergen>` tags to enforce HardConstraint allergen exclusions.
-    tags: list[str] = Field(default_factory=list)
+    # OFF package size in grams (`product_quantity`); absent for USDA foods.
+    quantity_g: float | None = None
 
     @field_validator("nutrients_per_100g")
     @classmethod

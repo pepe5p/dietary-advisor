@@ -6,13 +6,41 @@ from rich.console import Console
 from rich.table import Table
 
 from dietary_advisor.food_db.usda_food_db import is_usda_code
-from dietary_advisor.planning.meal_plan import Portion
+from dietary_advisor.planning.meal_plan import Portion, ShoppingListItem
 from dietary_advisor.planning.pipeline import PipelineResult
 from dietary_advisor.telemetry import RunTelemetry
 from dietary_advisor.totaller.aggregate import total_meal_plan, total_portion
-from dietary_advisor.totaller.nutrition import NutrientName
+from dietary_advisor.totaller.nutrition import canonical_unit, MACRO_NUTRIENTS, nutrient_label, NutrientName
 
 console = Console()
+
+
+def format_extra_nutrients(amounts: dict[NutrientName, float]) -> str:
+    """Compact summary of non-macro nutrients, e.g. '24mg sodium, 3g fiber'."""
+    parts: list[str] = []
+    for nutrient in NutrientName:
+        if nutrient in MACRO_NUTRIENTS:
+            continue
+        amount = amounts.get(nutrient)
+        if amount is None or amount <= 0:
+            continue
+        unit = canonical_unit(nutrient)
+        parts.append(f"{amount:g}{unit} {nutrient_label(nutrient)}")
+    return ", ".join(parts)
+
+
+def _nutrient_row_label(nutrient: NutrientName) -> str:
+    return f"{nutrient_label(nutrient)} {canonical_unit(nutrient)}"
+
+
+def _format_nutrient_amount(amount: float, nutrient: NutrientName) -> str:
+    if nutrient == NutrientName.ENERGY_KCAL:
+        return f"{amount:.0f}"
+    if canonical_unit(nutrient) == "g":
+        return f"{amount:.1f}"
+    if nutrient == NutrientName.VITAMIN_D_UG:
+        return f"{amount:.1f}"
+    return f"{amount:.0f}"
 
 
 def _portion_macros(portion: Portion) -> tuple[float, float, float, float]:
@@ -26,23 +54,32 @@ def _portion_macros(portion: Portion) -> tuple[float, float, float, float]:
     )
 
 
+def _format_total_grams(item: ShoppingListItem) -> str:
+    used = f"{item.total_grams:.0f}"
+    if item.quantity_g is not None:
+        return f"{used} of {item.quantity_g:.0f}"
+    return used
+
+
 def render_result(result: PipelineResult, *, verbose: bool = False) -> None:
     """Pretty-print a `PipelineResult` to the console."""
     console.rule(f"Variant {result.variant} - reflection iterations: {result.iterations}")
 
     totals = total_meal_plan(result.plan)
-    macro_tbl = Table(title="Macro totals (actual vs target)")
-    macro_tbl.add_column("Nutrient")
-    macro_tbl.add_column("Actual", justify="right")
-    macro_tbl.add_column("Target", justify="right")
-    for label, nutrient, target in (
-        ("kcal", NutrientName.ENERGY_KCAL, result.targets.energy_kcal),
-        ("protein g", NutrientName.PROTEIN_G, result.targets.protein_g),
-        ("carbs g", NutrientName.CARBS_G, result.targets.carbs_g),
-        ("fat g", NutrientName.FAT_G, result.targets.fat_g),
-    ):
-        macro_tbl.add_row(label, f"{totals.get(nutrient):.0f}", f"{target:.0f}")
-    console.print(macro_tbl)
+    target_map = result.targets.as_dict()
+    nutrient_tbl = Table(title="Nutrient totals (actual vs target)")
+    nutrient_tbl.add_column("Nutrient")
+    nutrient_tbl.add_column("Actual", justify="right")
+    nutrient_tbl.add_column("Target", justify="right")
+    for nutrient in NutrientName:
+        actual = totals.get(nutrient)
+        target_val = target_map.get(nutrient)
+        nutrient_tbl.add_row(
+            _nutrient_row_label(nutrient),
+            _format_nutrient_amount(actual, nutrient),
+            _format_nutrient_amount(target_val, nutrient) if target_val is not None else "-",
+        )
+    console.print(nutrient_tbl)
 
     if result.plan.rationale:
         console.print(f"\n[bold]Rationale[/bold]: {result.plan.rationale}")
@@ -57,7 +94,7 @@ def render_result(result: PipelineResult, *, verbose: bool = False) -> None:
         lines = []
         for p in meal.portions:
             kcal, protein, carbs, fat = _portion_macros(p)
-            lines.append(f"{p.food.name}: {p.grams:.0f}g — {kcal:.0f} kcal, P{protein:.1f} C{carbs:.1f} F{fat:.1f}")
+            lines.append(f"* {p.food.name}: {p.grams:.0f}g — {kcal:.0f} kcal, P{protein:.1f} C{carbs:.1f} F{fat:.1f}")
         products = "\n".join(lines)
         meal_totals_cell = (
             f"{meal_totals.get(NutrientName.ENERGY_KCAL):.0f} kcal\n"
@@ -65,6 +102,9 @@ def render_result(result: PipelineResult, *, verbose: bool = False) -> None:
             f"C{meal_totals.get(NutrientName.CARBS_G):.1f} "
             f"F{meal_totals.get(NutrientName.FAT_G):.1f}"
         )
+        extras = format_extra_nutrients(meal_totals.totals)
+        if extras:
+            meal_totals_cell = f"{meal_totals_cell}\n{extras}"
         plan_tbl.add_row(meal.kind, meal.name, products, meal_totals_cell, meal.recipe)
     console.print(plan_tbl)
 
@@ -78,17 +118,20 @@ def render_result(result: PipelineResult, *, verbose: bool = False) -> None:
         shop_tbl.add_column("Protein g", justify="right")
         shop_tbl.add_column("Carbs g", justify="right")
         shop_tbl.add_column("Fat g", justify="right")
+        shop_tbl.add_column("Other nutrients")
         for item in result.shopping_list.items:
             source = "[cyan]USDA[/cyan]" if item.code and is_usda_code(item.code) else "[green]OFF[/green]"
+            extras = format_extra_nutrients(item.other_nutrients)
             shop_tbl.add_row(
                 item.name,
                 source,
                 item.code or "-",
-                f"{item.total_grams:.0f}",
+                _format_total_grams(item),
                 f"{item.energy_kcal:.0f}",
                 f"{item.protein_g:.1f}",
                 f"{item.carbs_g:.1f}",
                 f"{item.fat_g:.1f}",
+                extras or "-",
             )
         console.print(shop_tbl)
 

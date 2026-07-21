@@ -13,18 +13,19 @@ are otherwise assumed to exist, so an enabled-but-missing DB raises loudly at
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import logging
 from collections.abc import Sequence
-from typing import Protocol
+from typing import ClassVar, Protocol, Self
 
 from pydantic import BaseModel, Field
 
 from dietary_advisor.config import FoodDbUsage, get_settings, Settings
 from dietary_advisor.food_db.errors import OFFUnknownFoodCodeError, USDAUnknownFoodCodeError
 from dietary_advisor.food_db.models import OFFItem, USDAItem
-from dietary_advisor.food_db.off_food_db import OffFoodDb
-from dietary_advisor.food_db.usda_food_db import is_usda_code, UsdaFoodDb
-from dietary_advisor.totaller.nutrition import NutrientName
+from dietary_advisor.food_db.off_food_db import get_off_item_name, OffFoodDb
+from dietary_advisor.food_db.usda_food_db import get_usda_item_name, is_usda_code, to_code, UsdaFoodDb
 
 log = logging.getLogger(__name__)
 
@@ -32,20 +33,33 @@ log = logging.getLogger(__name__)
 # tool call can't fan out into an unbounded number of DB searches.
 _MAX_BATCH_QUERIES = 20
 
-# The LLM only needs enough per-100g context to allocate grams sensibly (the
-# Totaller re-verifies everything deterministically after), so the four
-# macros are enough - no point spending tokens on every micronutrient.
-_MACRO_KEYS: tuple[tuple[str, NutrientName], ...] = (
-    ("kcal_per_100g", NutrientName.ENERGY_KCAL),
-    ("protein_g_per_100g", NutrientName.PROTEIN_G),
-    ("carbs_g_per_100g", NutrientName.CARBS_G),
-    ("fat_g_per_100g", NutrientName.FAT_G),
-)
-
 # Ingredient lists can run to hundreds of characters; cap the search-result
 # preview so a batch of hits doesn't crowd out the prompt (full text is still
 # available at hydration, straight from the DB row).
 _INGREDIENTS_SUMMARY_MAX_CHARS = 200
+
+# Totaller nutrients shown on every hit, named with their canonical unit suffix.
+_SHARED_NUTRIENT_FIELDS: tuple[tuple[str, str], ...] = (
+    ("energy_kcal", "energy_kcal_in_100g"),
+    ("protein_g", "proteins_g_in_100g"),
+    ("carbs_g", "carbohydrates_g_in_100g"),
+    ("fat_g", "fat_g_in_100g"),
+    ("saturated_fat_g", "saturated_fat_g_in_100g"),
+    ("fiber_g", "fiber_g_in_100g"),
+    ("sugar_g", "sugars_g_in_100g"),
+    ("sodium_mg", "sodium_mg_in_100g"),
+    ("potassium_mg", "potassium_mg_in_100g"),
+    ("calcium_mg", "calcium_mg_in_100g"),
+    ("iron_mg", "iron_mg_in_100g"),
+    ("vitamin_c_mg", "vitamin_c_mg_in_100g"),
+    ("vitamin_d_ug", "vitamin_d_ug_in_100g"),
+    ("cholesterol_mg", "cholesterol_mg_in_100g"),
+)
+
+_OFF_EXTRA_NUTRIENT_FIELDS: tuple[tuple[str, str], ...] = (
+    ("energy_kj", "energy_kj_in_100g"),
+    ("salt_g", "salt_g_in_100g"),
+)
 
 
 class LookupQuery(BaseModel):
@@ -56,47 +70,27 @@ class LookupQuery(BaseModel):
     max_results_usda: int = Field(default=2, ge=0, le=10)
 
 
-class _MacroHit(BaseModel):
-    """The four per-100g macros every hit carries, shared by both sources."""
+class _NutrientHit(BaseModel):
+    """Per-100g nutrients every hit carries (canonical units, already in the DB)."""
 
-    kcal_per_100g: float = 0.0
-    protein_g_per_100g: float = 0.0
-    carbs_g_per_100g: float = 0.0
-    fat_g_per_100g: float = 0.0
-
-
-class OFFHit(_MacroHit):
-    """A single Open Food Facts search hit as surfaced to the agent."""
-
-    code: str
-    name: str
-    brands: str | None = None
-    categories: str | None = None
-    ingredients_text: str | None = None
-    tags: list[str] = Field(default_factory=list)
-
-
-class USDAHit(_MacroHit):
-    """A single USDA search hit as surfaced to the agent."""
-
-    code: str
-    name: str
-    category: str | None = None
+    energy_kcal: float | None = None
+    protein_g: float | None = None
+    carbs_g: float | None = None
+    fat_g: float | None = None
+    saturated_fat_g: float | None = None
+    fiber_g: float | None = None
+    sugar_g: float | None = None
+    sodium_mg: float | None = None
+    potassium_mg: float | None = None
+    calcium_mg: float | None = None
+    iron_mg: float | None = None
+    vitamin_c_mg: float | None = None
+    vitamin_d_ug: float | None = None
+    cholesterol_mg: float | None = None
 
 
-class LookupResult(BaseModel):
-    """Search hits grouped by source, the return shape of the agent lookup tools."""
-
-    open_food_facts: list[OFFHit] = Field(default_factory=list)
-    usda: list[USDAHit] = Field(default_factory=list)
-
-
-class _Searchable[ItemT](Protocol):
-    def search(self, query: str, limit: int = ...) -> list[ItemT]: ...
-
-
-def _macro_fields(item: OFFItem | USDAItem) -> dict[str, float]:
-    return {key: item.nutrients_per_100g.get(nutrient, 0.0) for key, nutrient in _MACRO_KEYS}
+def _nutrient_kwargs(item: OFFItem | USDAItem, fields: tuple[tuple[str, str], ...]) -> dict[str, float | None]:
+    return {hit_key: getattr(item, col) for hit_key, col in fields}
 
 
 def _truncate(text: str | None) -> str | None:
@@ -105,31 +99,114 @@ def _truncate(text: str | None) -> str | None:
     return text[:_INGREDIENTS_SUMMARY_MAX_CHARS].rstrip() + "..."
 
 
-def _off_hits_summary(items: list[OFFItem]) -> list[OFFHit]:
-    return [
-        OFFHit(
-            code=it.code,
-            name=it.name,
-            brands=it.brands,
-            categories=it.categories,
-            ingredients_text=_truncate(it.ingredients_text),
-            tags=it.tags,
-            **_macro_fields(it),
+def _fmt(value: float | None) -> str:
+    if value is None:
+        return ""
+    return f"{value:g}"
+
+
+class OFFHit(_NutrientHit):
+    """A single Open Food Facts search hit as surfaced to the agent."""
+
+    _CSV_CONTEXT: ClassVar[tuple[str, ...]] = ("code", "name", "brands", "categories", "ingredients_text")
+    _CSV_NUTRIENTS: ClassVar[tuple[str, ...]] = tuple(
+        k for k, _ in _SHARED_NUTRIENT_FIELDS + _OFF_EXTRA_NUTRIENT_FIELDS
+    )
+
+    code: str
+    name: str
+    brands: str | None = None
+    categories: str | None = None
+    ingredients_text: str | None = None
+    energy_kj: float | None = None
+    salt_g: float | None = None
+
+    @classmethod
+    def create_from_off_item(cls, item: OFFItem) -> Self:
+        return cls(
+            code=item.code,
+            name=get_off_item_name(item),
+            brands=item.brands,
+            categories=item.categories,
+            ingredients_text=_truncate(item.ingredients_text),
+            **_nutrient_kwargs(item, _SHARED_NUTRIENT_FIELDS + _OFF_EXTRA_NUTRIENT_FIELDS),
         )
-        for it in items
-    ]
+
+    def csv_row(self) -> list[str]:
+        context = [self.code, self.name, self.brands or "", self.categories or "", self.ingredients_text or ""]
+        nutrients = [_fmt(getattr(self, key)) for key in self._CSV_NUTRIENTS]
+        return context + nutrients
+
+
+class USDAHit(_NutrientHit):
+    """A single USDA search hit as surfaced to the agent."""
+
+    _CSV_CONTEXT: ClassVar[tuple[str, ...]] = ("code", "name", "category")
+    _CSV_NUTRIENTS: ClassVar[tuple[str, ...]] = tuple(k for k, _ in _SHARED_NUTRIENT_FIELDS)
+
+    code: str
+    name: str
+    category: str | None = None
+
+    @classmethod
+    def create_from_usda_item(cls, item: USDAItem) -> Self:
+        return cls(
+            code=to_code(item.fdc_id),
+            name=get_usda_item_name(item),
+            category=item.category,
+            **_nutrient_kwargs(item, _SHARED_NUTRIENT_FIELDS),
+        )
+
+    def csv_row(self) -> list[str]:
+        context = [self.code, self.name, self.category or ""]
+        nutrients = [_fmt(getattr(self, key)) for key in self._CSV_NUTRIENTS]
+        return context + nutrients
+
+
+def _csv_block(title: str, header: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
+    if not rows:
+        return f"# {title}\n(no hits)"
+    buf = io.StringIO()
+    buf.write(f"# {title}\n")
+    writer = csv.writer(buf, lineterminator="\n")
+    writer.writerow(header)
+    writer.writerows(rows)
+    return buf.getvalue().rstrip()
+
+
+class LookupResult(BaseModel):
+    """Search hits grouped by source; render to CSV for the LLM tool result."""
+
+    open_food_facts: list[OFFHit] = Field(default_factory=list)
+    usda: list[USDAHit] = Field(default_factory=list)
+
+    def render_csv(self) -> str:
+        """Compact CSV (one block per source) for the nutrition-agent tool result."""
+        off_header = list(OFFHit._CSV_CONTEXT) + list(OFFHit._CSV_NUTRIENTS)
+        usda_header = list(USDAHit._CSV_CONTEXT) + list(USDAHit._CSV_NUTRIENTS)
+        off_block = _csv_block(
+            "open_food_facts",
+            off_header,
+            [h.csv_row() for h in self.open_food_facts],
+        )
+        usda_block = _csv_block(
+            "usda",
+            usda_header,
+            [h.csv_row() for h in self.usda],
+        )
+        return f"{off_block}\n\n{usda_block}"
+
+
+class _Searchable[ItemT](Protocol):
+    def search(self, query: str, limit: int = ...) -> list[ItemT]: ...
+
+
+def _off_hits_summary(items: list[OFFItem]) -> list[OFFHit]:
+    return [OFFHit.create_from_off_item(it) for it in items]
 
 
 def _usda_hits_summary(items: list[USDAItem]) -> list[USDAHit]:
-    return [
-        USDAHit(
-            code=it.code,
-            name=it.name,
-            category=it.category,
-            **_macro_fields(it),
-        )
-        for it in items
-    ]
+    return [USDAHit.create_from_usda_item(it) for it in items]
 
 
 def _safe_search[ItemT](db: _Searchable[ItemT], query: str, limit: int) -> list[ItemT]:

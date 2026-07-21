@@ -14,12 +14,13 @@ import logging
 from fractions import Fraction
 
 from dietary_advisor.planning.meal_plan import MealPlan, ShoppingList, ShoppingListItem
-from dietary_advisor.totaller.nutrition import NutrientName
+from dietary_advisor.totaller.nutrition import MACRO_NUTRIENTS, NutrientName
 
 log = logging.getLogger(__name__)
 
 _PRECISION_DIGITS = 1
 _MACRO_PRECISION_DIGITS = 1
+_OTHER_PRECISION_DIGITS = 1
 
 # Macro columns shown per shopping-list line, alongside total grams.
 _MACRO_NUTRIENTS: tuple[tuple[str, NutrientName], ...] = (
@@ -37,6 +38,7 @@ def build_shopping_list(plan: MealPlan) -> ShoppingList:
     # Keyed the same way as `totals`; each ingredient is assumed to carry the
     # same per-100g nutrients everywhere it's used (same key = same product).
     nutrients_per_100g: dict[tuple[str | None, str], dict[NutrientName, float]] = {}
+    quantity_g: dict[tuple[str | None, str], float | None] = {}
     order: list[tuple[str | None, str]] = []
     for meal in plan.meals:
         for portion in meal.portions:
@@ -46,6 +48,7 @@ def build_shopping_list(plan: MealPlan) -> ShoppingList:
                 totals[key] = Fraction(0)
                 names[key] = food.name
                 nutrients_per_100g[key] = food.nutrients_per_100g
+                quantity_g[key] = food.quantity_g
                 order.append(key)
             totals[key] += Fraction(portion.grams).limit_denominator(10_000_000)
 
@@ -61,11 +64,23 @@ def build_shopping_list(plan: MealPlan) -> ShoppingList:
             )
             for field, nutrient in _MACRO_NUTRIENTS
         }
+        other: dict[NutrientName, float] = {}
+        for nutrient in NutrientName:
+            if nutrient in MACRO_NUTRIENTS:
+                continue
+            amount = per_100g.get(nutrient)
+            if amount is None:
+                continue
+            scaled = float(Fraction(amount).limit_denominator(10_000_000) * scale)
+            if scaled > 0:
+                other[nutrient] = round(scaled, _OTHER_PRECISION_DIGITS)
         items.append(
             ShoppingListItem(
                 name=names[key],
                 total_grams=round(float(grams), _PRECISION_DIGITS),
                 code=key[0],
+                other_nutrients=other,
+                quantity_g=quantity_g[key],
                 **macros,
             ),
         )

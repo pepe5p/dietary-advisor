@@ -62,15 +62,18 @@ async def _score_row(
 
     soft_score: float | None = None
     soft_detail: str | None = None
-    if run_judge and scenario.soft_criteria:
+    safety_adherence: float | None = None
+    if run_judge:
         qual = await score_soft_preferences(
             eval_plan,
             scenario.query,
             scenario.soft_criteria,
+            allergens=eval_profile.profile.allergens,
+            diet_pattern=eval_profile.profile.diet_pattern,
         )
-        if qual is not None:
-            soft_score = qual.aggregate
-            soft_detail = qual.model_dump_json()
+        soft_score = qual.aggregate
+        soft_detail = qual.model_dump_json()
+        safety_adherence = qual.safety_adherence
 
     return {
         "variant": variant_name,
@@ -87,6 +90,7 @@ async def _score_row(
         **{f"err_{k}_pct": v for k, v in err.per_nutrient.items()},
         "SoftScore": soft_score,
         "SoftDetail": soft_detail,
+        "SafetyAdherence": safety_adherence,
         "kcal_target": eval_profile.profile.targets.energy_kcal,
         "kcal_actual": float(nutrient_totals.get(NutrientName.ENERGY_KCAL, 0.0)),
         "elapsed_s": round(elapsed_s, 2),
@@ -206,7 +210,7 @@ async def run_ablation_grid(
 
 def variant_summary(df: pd.DataFrame) -> pd.DataFrame:
     """Aggregate a tidy DataFrame to per-variant means."""
-    metric_cols = ["CSR", "MAE_pct", "MSE_pct", "SoftScore", "iterations", "elapsed_s"]
+    metric_cols = ["CSR", "MAE_pct", "MSE_pct", "SoftScore", "SafetyAdherence", "iterations", "elapsed_s"]
     cols = [c for c in metric_cols if c in df.columns]
     grouped = df.groupby(["variant"])[cols].mean(numeric_only=True).reset_index()
     return grouped.round(3)

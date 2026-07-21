@@ -29,7 +29,6 @@ from dietary_advisor.food_db.facade import LookupQuery, LookupResult, OFFHit
 from dietary_advisor.planning.meal_plan import MealPlan
 from dietary_advisor.planning.pipeline import Pipeline, VariantConfig
 from dietary_advisor.profile import UserProfile
-from dietary_advisor.totaller.nutrition import NutrientName
 
 
 class _FakeFoodDb:
@@ -48,16 +47,16 @@ class _FakeFoodDb:
             OFFHit(
                 code="test:1",
                 name="Test food",
-                kcal_per_100g=200.0,
-                protein_g_per_100g=10.0,
-                carbs_g_per_100g=20.0,
-                fat_g_per_100g=5.0,
+                energy_kcal=200.0,
+                protein_g=10.0,
+                carbs_g=20.0,
+                fat_g=5.0,
             ),
         ]
         return LookupResult(open_food_facts=hits, usda=[])
 
     def get_food(self, code: str) -> OFFItem:
-        return OFFItem(code=code, name="Test food", nutrients_per_100g={NutrientName.ENERGY_KCAL: 200.0})
+        return OFFItem(code=code, product_name="Test food", energy_kcal_in_100g=200.0)
 
     def close(self) -> None:
         pass

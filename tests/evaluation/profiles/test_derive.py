@@ -9,7 +9,7 @@ from evaluation.profiles.derive import derive_hard_constraints
 _TARGETS = MacroTargets(energy_kcal=2200.0, protein_g=120.0, carbs_g=250.0, fat_g=65.0)
 
 
-def test_derives_allergen_constraints() -> None:
+def test_derives_ingredient_exclusions_not_allergens_or_diet() -> None:
     p = UserProfile(
         user_id="x",
         age=27,
@@ -23,10 +23,9 @@ def test_derives_allergen_constraints() -> None:
     )
     constraints = derive_hard_constraints(p)
     kinds = {(c.kind, c.target) for c in constraints}
-    assert ("allergen_exclusion", "peanuts") in kinds
-    assert ("allergen_exclusion", "milk") in kinds
-    assert ("diet_pattern", "vegan") in kinds
     assert ("ingredient_exclusion", "mushroom") in kinds
+    assert not any(k == "allergen_exclusion" for k, _ in kinds)
+    assert not any(k == "diet_pattern" for k, _ in kinds)
 
 
 def test_derives_clinical_rules_for_hypertension() -> None:

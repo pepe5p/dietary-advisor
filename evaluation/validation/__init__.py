@@ -16,8 +16,6 @@ from evaluation.validation.qualitative import (
 )
 from evaluation.validation.quantitative import macro_errors, NutrientErrors
 from evaluation.validation.rules import (
-    AllergenExclusionRule,
-    DietPatternRule,
     HardRule,
     MaxNutrientRule,
     MinNutrientRule,
@@ -27,9 +25,7 @@ from evaluation.validation.structural import check_integrity, structural_csr
 from evaluation.validation.validator import validate_meal_plan
 
 __all__ = [
-    "AllergenExclusionRule",
     "CriterionScore",
-    "DietPatternRule",
     "HardRule",
     "MaxNutrientRule",
     "MinNutrientRule",

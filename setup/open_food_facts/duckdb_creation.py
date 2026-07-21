@@ -9,80 +9,77 @@ and materialize them into a single portable ``.duckdb`` file plus a full-text
 index over product names/brands/categories (see ``_FTS_FIELDS``) for lookup
 by name and descriptive text.
 
-Nutrient amounts are stored exactly as reported by OFF (per 100g), alongside
-their source unit, so unit canonicalization stays an explicit, later step
-(the runtime `OffFoodDb` reader) rather than being baked into this build.
+Nutrient amounts are stored per 100g in the canonical units declared in
+`setup.units.TARGET_UNIT`, converted at build time from each source `_unit`.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 from pathlib import Path
+from typing import Any
 
 import duckdb
 
-from dietary_advisor.food_db.embeddings import load_embedder
+from setup.embedding import embed_table
 from setup.open_food_facts.downloading import resolve_source_parquet
 from setup.settings import SetupSettings
+from setup.units import register_unit_ratio_macro, scaled_amount_sql, stored_column, TARGET_UNIT
 
 log = logging.getLogger(__name__)
 
-# Ingredients lists can be very long; cap them so they don't crowd out the
-# name/category signal within the embedding model's ~512-token window.
-_INGREDIENTS_MAX_CHARS = 600
-
-# E5 document-side prefix. The query-side counterpart lives in
-# dietary_advisor.food_db.embeddings; both share load_embedder so the two
-# vector sets are comparable.
-_PASSAGE_PREFIX = "passage: "
-
 # Columns fed to the BM25 full-text index. Beyond names/brands this includes
-# `categories`/`generic_name`/`ingredients_text` so lexical search can hit the
-# English descriptive text of a product whose name is only in another language
-# (e.g. the Polish "Filet z kaczki" is reachable via its "duck" category).
-# Single source of truth: the build creates the index from this, and
-# `build_off_db` compares it against an existing DB's indexed fields to decide
-# whether an in-place FTS-only rebuild is needed. `categories_tags` is left out
-# deliberately - it's a VARCHAR[] the FTS indexer rejects, and its content
-# duplicates `categories`.
+# `categories` so lexical search can hit the English descriptive text of a
+# product whose name is only in another language (e.g. the Polish
+# "Filet z kaczki" is reachable via its "duck" category). Single source of
+# truth: the build creates the index from this, and `build_off_db` compares it
+# against an existing DB's indexed fields to decide whether an in-place
+# FTS-only rebuild is needed. `categories_tags` is left out deliberately - it's
+# a VARCHAR[] the FTS indexer rejects, and its content duplicates `categories`.
 _FTS_FIELDS: tuple[str, ...] = (
     "product_name",
     "product_name_pl",
     "brands",
-    "generic_name",
     "categories",
 )
 
-# Columns that identify *what a food is* - a product name, a generic
-# description, a category, or an ingredient list. A row with all of these empty
-# cannot be identified or matched by search even if it still carries a brand or
-# label/allergen tags (e.g. barcode 5900766003084: brand "Polskie młyny" but no
-# name, category or ingredients - useless to the agent), so setup drops it.
-# Brand and label/allergen/trace tags are deliberately excluded: they never say
-# what the product actually is. The two groups differ only in the emptiness
-# test (blank string vs. zero-length list).
+# Columns that identify *what a food is* and can form an embedding document
+# (name or category). A row with all of these empty cannot be matched by search
+# even if it still carries a brand, ingredients, or label/allergen tags
+# (e.g. barcode 5900766003084: brand "Polskie młyny" but no name or category -
+# useless to the agent), so setup drops it. Brand/ingredients/tags are
+# deliberately excluded: brand never says what the product is, and ingredients/
+# tag-only rows cannot build a non-empty embedding document.
 _IDENTIFYING_TEXT_COLUMNS: tuple[str, ...] = (
     "product_name",
     "product_name_pl",
-    "generic_name",
     "categories",
     "compared_to_category",
-    "ingredients_text",
 )
-_IDENTIFYING_LIST_COLUMNS: tuple[str, ...] = ("categories_tags",)
+
+# Columns streamed into the Python document builder for semantic embeddings.
+_DOCUMENT_COLUMNS: tuple[str, ...] = (
+    "product_name",
+    "product_name_pl",
+    "categories",
+    "compared_to_category",
+    "brands",
+)
+
+_TAG_PREFIX_RE = re.compile(r"^[a-z]{2,3}:")
 
 
 def _trash_predicate() -> str:
-    """SQL boolean, true for rows with no identifying content (see `_IDENTIFYING_*_COLUMNS`).
+    """SQL boolean, true for rows with no identifying content (see `_IDENTIFYING_TEXT_COLUMNS`).
 
     Shared by the fresh-build filter and the in-place cleanup so both agree on
     exactly which rows are worthless.
     """
     text = [f"NULLIF(trim({c}), '') IS NULL" for c in _IDENTIFYING_TEXT_COLUMNS]
-    lists = [f"COALESCE(len({c}), 0) = 0" for c in _IDENTIFYING_LIST_COLUMNS]
-    return "(" + " AND ".join(text + lists) + ")"
+    return "(" + " AND ".join(text) + ")"
 
 
 # Atwater estimate of kcal/100g from the macronutrients, used to detect energy
@@ -92,8 +89,13 @@ def _trash_predicate() -> str:
 # low-energy labels (teas, waters: 0.1 kcal vs 0.2 expected) makes a purely
 # relative margin delete half of all sub-50-kcal products, hence the absolute
 # floor below.
-_ATWATER_KCAL = "(fat_100g * 9 + proteins_100g * 4 + carbohydrates_100g * 4)"
-_ATWATER_KCAL_WITH_FIBER = f"({_ATWATER_KCAL} + coalesce(fiber_100g, 0) * 2)"
+_ENERGY_KCAL_COL = stored_column("energy_kcal")
+_FAT_COL = stored_column("fat")
+_PROTEINS_COL = stored_column("proteins")
+_CARBS_COL = stored_column("carbohydrates")
+_FIBER_COL = stored_column("fiber")
+_ATWATER_KCAL = f"({_FAT_COL} * 9 + {_PROTEINS_COL} * 4 + {_CARBS_COL} * 4)"
+_ATWATER_KCAL_WITH_FIBER = f"({_ATWATER_KCAL} + coalesce({_FIBER_COL}, 0) * 2)"
 _ENERGY_MARGIN = 0.05
 _ENERGY_MARGIN_FLOOR_KCAL = 20
 
@@ -109,7 +111,7 @@ _MAX_KCAL_100G = 900
 
 def _energy_checkable() -> str:
     """SQL boolean: the four columns the energy checks need are all present."""
-    cols = ("energy_kcal_100g", "fat_100g", "proteins_100g", "carbohydrates_100g")
+    cols = (_ENERGY_KCAL_COL, _FAT_COL, _PROTEINS_COL, _CARBS_COL)
     return "(" + " AND ".join(f"{c} IS NOT NULL" for c in cols) + ")"
 
 
@@ -117,7 +119,7 @@ def _energy_typo_predicate(factor: float) -> str:
     """SQL boolean: dividing kcal by `factor` reconciles it with the Atwater estimate."""
     return (
         f"{_energy_checkable()} AND {_ATWATER_KCAL} > 0 "
-        f"AND abs(energy_kcal_100g / {factor} - {_ATWATER_KCAL}) <= {_ENERGY_MARGIN} * {_ATWATER_KCAL}"
+        f"AND abs({_ENERGY_KCAL_COL} / {factor} - {_ATWATER_KCAL}) <= {_ENERGY_MARGIN} * {_ATWATER_KCAL}"
     )
 
 
@@ -131,8 +133,8 @@ def _energy_mismatch_predicate() -> str:
     margin_high = f"greatest({_ENERGY_MARGIN} * {_ATWATER_KCAL_WITH_FIBER}, {_ENERGY_MARGIN_FLOOR_KCAL})"
     return (
         f"{_energy_checkable()} AND ("
-        f"energy_kcal_100g < {_ATWATER_KCAL} - {margin_low}"
-        f" OR energy_kcal_100g > {_ATWATER_KCAL_WITH_FIBER} + {margin_high})"
+        f"{_ENERGY_KCAL_COL} < {_ATWATER_KCAL} - {margin_low}"
+        f" OR {_ENERGY_KCAL_COL} > {_ATWATER_KCAL_WITH_FIBER} + {margin_high})"
     )
 
 
@@ -149,15 +151,17 @@ def _clean_energy(con: duckdb.DuckDBPyConnection) -> int:
         pred = _energy_typo_predicate(factor)
         fixed = con.execute(f"SELECT count(*) FROM products WHERE {pred}").fetchone()[0]  # type: ignore[index]  # noqa: S608
         if fixed:
-            con.execute(f"UPDATE products SET energy_kcal_100g = energy_kcal_100g / {factor} WHERE {pred}")  # noqa: S608
-            log.info("Rescaled energy_kcal_100g by 1/%s for %d product(s).", factor, fixed)
+            con.execute(
+                f"UPDATE products SET {_ENERGY_KCAL_COL} = {_ENERGY_KCAL_COL} / {factor} WHERE {pred}"  # noqa: S608
+            )
+            log.info("Rescaled %s by 1/%s for %d product(s).", _ENERGY_KCAL_COL, factor, fixed)
 
     over = con.execute(
-        f"SELECT count(*) FROM products WHERE energy_kcal_100g > {_MAX_KCAL_100G}"  # noqa: S608
+        f"SELECT count(*) FROM products WHERE {_ENERGY_KCAL_COL} > {_MAX_KCAL_100G}"  # noqa: S608
     ).fetchone()[0]  # type: ignore[index]
     if over:
-        con.execute(f"DELETE FROM products WHERE energy_kcal_100g > {_MAX_KCAL_100G}")  # noqa: S608
-        log.info("Removed %d product(s) with energy_kcal_100g > %d.", over, _MAX_KCAL_100G)
+        con.execute(f"DELETE FROM products WHERE {_ENERGY_KCAL_COL} > {_MAX_KCAL_100G}")  # noqa: S608
+        log.info("Removed %d product(s) with %s > %d.", over, _ENERGY_KCAL_COL, _MAX_KCAL_100G)
 
     mismatch = _energy_mismatch_predicate()
     bad = con.execute(f"SELECT count(*) FROM products WHERE {mismatch}").fetchone()[0]  # type: ignore[index]  # noqa: S608
@@ -168,15 +172,8 @@ def _clean_energy(con: duckdb.DuckDBPyConnection) -> int:
     return over + bad
 
 
-def _embed_documents(texts: list[str], batch_size: int = 256) -> list[list[float]]:
-    """Embed product documents (build-time only) with the E5 `passage:` prefix."""
-    prefixed = [_PASSAGE_PREFIX + t for t in texts]
-    return [vec.tolist() for vec in load_embedder().embed(prefixed, batch_size=batch_size)]
-
-
 # OFF nutrient key (as found in the `nutriments` struct list) -> our column
-# prefix. Values are stored per-100g, in whatever unit OFF reports (captured
-# alongside in a sibling `<prefix>_unit` column).
+# prefix. Values are stored per-100g in `TARGET_UNIT[prefix]` after conversion.
 _NUTRIENT_COLUMNS: dict[str, str] = {
     "energy-kcal": "energy_kcal",
     "energy-kj": "energy_kj",
@@ -206,7 +203,6 @@ _REQUIRED_MACROS: tuple[str, ...] = ("energy-kcal", "proteins", "carbohydrates",
 _REQUIRED_SOURCE_COLUMNS: tuple[str, ...] = (
     "code",
     "product_name",
-    "generic_name",
     "ingredients_text",
     "brands",
     "brands_tags",
@@ -285,6 +281,7 @@ def _create_macros(con: duckdb.DuckDBPyConnection) -> None:
         )
         """
     )
+    register_unit_ratio_macro(con)
 
 
 # The `products` table schema, as (output column, source SQL expression) pairs.
@@ -295,7 +292,6 @@ _BASE_SELECT: tuple[tuple[str, str], ...] = (
     ("code", "code"),
     ("product_name", "lang_text(product_name, 'en')"),
     ("product_name_pl", "lang_text(product_name, 'pl')"),
-    ("generic_name", "lang_text(generic_name, 'en')"),
     ("ingredients_text", "COALESCE(lang_text(ingredients_text, 'en'), lang_text(ingredients_text, 'pl'))"),
     ("brands", "brands"),
     ("brands_tags", "brands_tags"),
@@ -322,79 +318,87 @@ def _expected_products_columns() -> set[str]:
     """The full set of columns a freshly built `products` table should have."""
     cols = {name for name, _ in _BASE_SELECT}
     for prefix in _NUTRIENT_COLUMNS.values():
-        cols.add(f"{prefix}_100g")
-        cols.add(f"{prefix}_unit")
+        cols.add(stored_column(prefix))
     # Semantic-search vector, backfilled after the base table is materialized.
     cols.add("embedding")
     return cols
 
 
-def _document_sql() -> str:
-    """SQL expression producing the per-product "what this product is" document.
+def _text(value: object) -> str | None:
+    """Non-empty trimmed string, or None for null/blank values."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
 
-    Each valuable column becomes a labelled line; NULL/empty parts are dropped
-    by `concat_ws`. This single text is what gets embedded, so it must line up
-    with the columns a user would describe a product by (name, brand, category,
-    ingredients) rather than provenance/nutrient bookkeeping.
+
+def _category_phrase(row: dict[str, Any]) -> str | None:
+    """Most specific category label, humanized for prose (spaces, no lang prefix)."""
+    compared = _text(row.get("compared_to_category"))
+    if compared:
+        return _TAG_PREFIX_RE.sub("", compared).replace("-", " ")
+    categories = _text(row.get("categories"))
+    if categories:
+        # Hierarchy paths are comma-separated; the last segment is the leaf.
+        return categories.split(",")[-1].strip() or None
+    return None
+
+
+def _indefinite_article(phrase: str) -> str:
+    return "An" if phrase[:1].casefold() in "aeiou" else "A"
+
+
+def _build_document(row: dict[str, Any]) -> str:
+    """Per-product prose for the embedding model.
+
+    Prose ("Diet Coke. A soda product by Coca-Cola.") encodes role relationships
+    better than labelled lines. Only identity fields (name, category, brand) —
+    not provenance, nutrients, ingredients, or labels. The trash filter guarantees
+    a name or category, so the document is never empty.
     """
-    tags = "list_transform(labels_tags, x -> regexp_replace(x, '^[a-z]{2,3}:', ''))"
-    compared = "regexp_replace(compared_to_category, '^[a-z]{2,3}:', '')"
-    parts = (
-        "CASE WHEN product_name IS NOT NULL THEN 'Name: ' || product_name END",
-        "CASE WHEN product_name_pl IS NOT NULL THEN 'Nazwa: ' || product_name_pl END",
-        "CASE WHEN generic_name IS NOT NULL THEN 'Description: ' || generic_name END",
-        "CASE WHEN brands IS NOT NULL THEN 'Brand: ' || brands END",
-        "CASE WHEN categories IS NOT NULL THEN 'Categories: ' || categories END",
-        f"CASE WHEN compared_to_category IS NOT NULL THEN 'Category: ' || {compared} END",
-        f"CASE WHEN len(labels_tags) > 0 THEN 'Labels: ' || array_to_string({tags}, ', ') END",
-        "CASE WHEN ingredients_text IS NOT NULL "
-        f"THEN 'Ingredients: ' || left(ingredients_text, {_INGREDIENTS_MAX_CHARS}) END",
-    )
-    return "concat_ws(chr(10), " + ", ".join(parts) + ")"
+    name = _text(row.get("product_name"))
+    name_pl = _text(row.get("product_name_pl"))
+    if name_pl and name is not None and name_pl.casefold() == name.casefold():
+        name_pl = None
+
+    head = f"{name} ({name_pl})" if name and name_pl else name or name_pl
+    category = _category_phrase(row)
+    brands = _text(row.get("brands"))
+
+    sentences: list[str] = []
+    if head:
+        sentences.append(f"{head}.")
+    if category and brands:
+        sentences.append(f"{_indefinite_article(category)} {category} product by {brands}.")
+    elif category:
+        sentences.append(f"{_indefinite_article(category)} {category} product.")
+    elif brands:
+        sentences.append(f"A product by {brands}.")
+    if not sentences:
+        raise ValueError("empty embedding document; trash filter should have kept a name or category")
+    return " ".join(sentences)
 
 
 def _embed_products(con: duckdb.DuckDBPyConnection, settings: SetupSettings) -> None:
-    """Backfill the `embedding` column and build a VSS HNSW index over it.
-
-    Runs one embedding pass over every product document; the HNSW build is
-    best-effort (the runtime falls back to brute-force cosine, cheap at this
-    row count) so a missing/failed VSS extension never blocks the build.
-    """
-    dim = settings.off_embedding_dim
-    con.execute(f"ALTER TABLE products ADD COLUMN embedding FLOAT[{dim}]")
-
-    rows = con.execute(f"SELECT code, {_document_sql()} AS document FROM products").fetchall()  # noqa: S608
-    if not rows:
-        return
-    codes = [r[0] for r in rows]
-    documents = [r[1] or "" for r in rows]
-
-    log.info("Embedding %d product documents with %s...", len(documents), settings.off_embedding_model)
-    vectors = _embed_documents(documents)
-
-    con.execute(f"CREATE TEMP TABLE _embeddings (code VARCHAR, embedding FLOAT[{dim}])")
-    con.executemany("INSERT INTO _embeddings VALUES (?, ?)", list(zip(codes, vectors, strict=True)))
-    con.execute(
-        "UPDATE products SET embedding = _embeddings.embedding FROM _embeddings WHERE products.code = _embeddings.code"
+    """Backfill the `embedding` column and build a VSS HNSW index over it."""
+    embed_table(
+        con,
+        table="products",
+        id_column="code",
+        id_type="VARCHAR",
+        columns=_DOCUMENT_COLUMNS,
+        build_document=_build_document,
+        dim=settings.off_embedding_dim,
+        model_name=settings.off_embedding_model,
     )
-    con.execute("DROP TABLE _embeddings")
-
-    try:
-        con.execute("INSTALL vss")
-        con.execute("LOAD vss")
-        # Required to create an HNSW index in a disk-backed DB. Safe here: the
-        # artifact is written atomically and only ever opened read-only after.
-        con.execute("SET hnsw_enable_experimental_persistence = true")
-        con.execute("CREATE INDEX products_embedding_hnsw ON products USING HNSW (embedding) WITH (metric = 'cosine')")
-    except duckdb.Error as exc:
-        log.warning("Could not build VSS/HNSW index (falling back to brute-force cosine at query time): %s", exc)
 
 
 def _select_columns() -> str:
     parts = [expr if expr == name else f"{expr} AS {name}" for name, expr in _BASE_SELECT]
     for off_key, prefix in _NUTRIENT_COLUMNS.items():
-        parts.append(f"nutrient_100g(nutriments, '{off_key}') AS {prefix}_100g")
-        parts.append(f"nutrient_unit(nutriments, '{off_key}') AS {prefix}_unit")
+        amount = f"nutrient_100g(nutriments, '{off_key}')"
+        unit = f"nutrient_unit(nutriments, '{off_key}')"
+        parts.append(f"{scaled_amount_sql(amount, unit, prefix)} AS {stored_column(prefix)}")
     return ",\n           ".join(parts)
 
 
@@ -426,17 +430,16 @@ def _build_select_sql(source_sql: str) -> str:
 
 
 def _column_comment_sql(table: str) -> list[str]:
-    """`COMMENT ON COLUMN` statements documenting native OFF units, for anyone browsing the DB directly."""
+    """`COMMENT ON COLUMN` statements documenting canonical units."""
     statements = [
         f"COMMENT ON COLUMN {table}.code IS 'Open Food Facts barcode (primary key).'",
         f"COMMENT ON COLUMN {table}.nutrition_data_per IS "
         "'OFF provenance flag: were nutrients reported per 100g directly, or derived from a serving size?'",
     ]
     for off_key, prefix in _NUTRIENT_COLUMNS.items():
-        statements.append(
-            f"COMMENT ON COLUMN {table}.{prefix}_100g IS "
-            f"'{off_key} per 100g, in the unit reported by OFF (see {prefix}_unit; not yet canonicalized).'"
-        )
+        unit = TARGET_UNIT[prefix]
+        col = stored_column(prefix)
+        statements.append(f"COMMENT ON COLUMN {table}.{col} IS '{off_key} per 100g, in {unit} (canonical).'")
     return statements
 
 
@@ -461,7 +464,11 @@ def _stale_products_columns(target: Path) -> set[str] | None:
     finally:
         con.close()
     present = {row[0] for row in described}
-    return _expected_products_columns() - present
+    missing = _expected_products_columns() - present
+    # Pre-canonical builds kept `<prefix>_unit` columns; their presence alone
+    # must force a rebuild (expected - present is empty when only extras remain).
+    stale_units = {c for c in present if c.endswith("_unit")}
+    return missing | stale_units
 
 
 def _load_vss(con: duckdb.DuckDBPyConnection) -> None:

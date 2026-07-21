@@ -57,7 +57,7 @@ class _FakeFoodDb:
     def get_food(self, code: str) -> OFFItem:
         if code != self._known_code:
             raise OFFUnknownFoodCodeError(f"unknown code: {code!r}")
-        return OFFItem(code=code, name="Known food", nutrients_per_100g={NutrientName.ENERGY_KCAL: 100.0})
+        return OFFItem(code=code, product_name="Known food", energy_kcal_in_100g=100.0)
 
 
 def _fake_ctx(food_db: object) -> RunContext[AgentDeps]:

@@ -7,6 +7,8 @@ searched identically and their results blended by the agent tools.
 
 Codes are the FDC id prefixed with `usda:` so they never collide with OFF
 barcodes and eval hydration can route each code back to the DB that owns it.
+Rows are returned as 1:1 `USDAItem`s; nutrient units are already canonicalized
+at build time.
 """
 
 from __future__ import annotations
@@ -23,34 +25,18 @@ from dietary_advisor.food_db.embeddings import embed_query
 from dietary_advisor.food_db.errors import USDAUnknownFoodCodeError
 from dietary_advisor.food_db.fusion import reciprocal_rank_fusion
 from dietary_advisor.food_db.models import Row, USDAItem
-from dietary_advisor.totaller.nutrition import NutrientName
 
 log = logging.getLogger(__name__)
 
 _CODE_PREFIX = "usda:"
 
-# USDA per-100g column -> (canonical nutrient, factor). FDC already reports
-# minerals in mg, vitamin D in ug and energy in kcal - i.e. the canonical units
-# the Totaller expects - so every factor is 1.0 (unlike OFF, which stores grams
-# and needs scaling). The factor column is kept for symmetry with the OFF reader.
-_NUTRIENT_FACTORS: tuple[tuple[str, NutrientName, float], ...] = (
-    ("energy_kcal_100g", NutrientName.ENERGY_KCAL, 1.0),
-    ("proteins_100g", NutrientName.PROTEIN_G, 1.0),
-    ("carbohydrates_100g", NutrientName.CARBS_G, 1.0),
-    ("fat_100g", NutrientName.FAT_G, 1.0),
-    ("saturated_fat_100g", NutrientName.SATURATED_FAT_G, 1.0),
-    ("fiber_100g", NutrientName.FIBER_G, 1.0),
-    ("sugars_100g", NutrientName.SUGAR_G, 1.0),
-    ("sodium_100g", NutrientName.SODIUM_MG, 1.0),
-    ("potassium_100g", NutrientName.POTASSIUM_MG, 1.0),
-    ("calcium_100g", NutrientName.CALCIUM_MG, 1.0),
-    ("iron_100g", NutrientName.IRON_MG, 1.0),
-    ("vitamin_c_100g", NutrientName.VITAMIN_C_MG, 1.0),
-    ("vitamin_d_100g", NutrientName.VITAMIN_D_UG, 1.0),
-    ("cholesterol_100g", NutrientName.CHOLESTEROL_MG, 1.0),
+_SELECT_COLUMNS = (
+    "fdc_id, description, category, "
+    "energy_kcal_in_100g, proteins_g_in_100g, carbohydrates_g_in_100g, fat_g_in_100g, "
+    "saturated_fat_g_in_100g, fiber_g_in_100g, sugars_g_in_100g, "
+    "sodium_mg_in_100g, potassium_mg_in_100g, calcium_mg_in_100g, iron_mg_in_100g, "
+    "vitamin_c_mg_in_100g, vitamin_d_ug_in_100g, cholesterol_mg_in_100g"
 )
-
-_SELECT_COLUMNS = "fdc_id, description, category, scientific_name, " + ", ".join(col for col, _, _ in _NUTRIENT_FACTORS)
 
 
 def to_code(fdc_id: int | str) -> str:
@@ -70,26 +56,17 @@ def _fdc_id(code: str) -> int:
         raise USDAUnknownFoodCodeError(f"not a USDA code: {code!r}") from exc
 
 
-def _row_to_usda_item(row: Mapping[str, Any]) -> USDAItem:
-    """Map a `foods` row to a `USDAItem` (pure; no DB access)."""
-    nutrients: dict[NutrientName, float] = {}
-    for col, nutrient, factor in _NUTRIENT_FACTORS:
-        value = row.get(col)
-        if value is None:
-            continue
-        scaled = float(value) * factor
-        if scaled >= 0:
-            nutrients[nutrient] = scaled
+def get_usda_item_name(item: USDAItem | Mapping[str, Any]) -> str:
+    get = item.get if isinstance(item, Mapping) else lambda k: getattr(item, k, None)
+    description = get("description")
+    if description:
+        return str(description)
+    fdc_id = get("fdc_id")
+    return to_code(fdc_id) if fdc_id is not None else "unknown"
 
-    name = row.get("description") or to_code(row["fdc_id"])
-    return USDAItem(
-        code=to_code(row["fdc_id"]),
-        name=str(name),
-        description=row.get("scientific_name"),
-        nutrients_per_100g=nutrients,
-        category=row.get("category"),
-        scientific_name=row.get("scientific_name"),
-    )
+
+def _row_to_usda_item(row: Mapping[str, Any]) -> USDAItem:
+    return USDAItem.model_validate(dict(row))
 
 
 class UsdaFoodDb:

@@ -86,7 +86,6 @@ def chicken_food() -> FoodItem:
             NutrientName.CARBS_G: 0.0,
             NutrientName.FAT_G: 3.6,
         },
-        tags=["pescatarian"],
     )
 
 
@@ -102,7 +101,6 @@ def rice_food() -> FoodItem:
             NutrientName.FIBER_G: 0.4,
             NutrientName.SODIUM_MG: 1.0,
         },
-        tags=["vegan", "vegetarian", "pescatarian"],
     )
 
 
@@ -116,7 +114,6 @@ def peanut_food() -> FoodItem:
             NutrientName.CARBS_G: 20.0,
             NutrientName.FAT_G: 50.0,
         },
-        tags=["vegan", "vegetarian", "contains:peanuts"],
     )
 
 
@@ -129,5 +126,4 @@ def salty_food() -> FoodItem:
             NutrientName.PROTEIN_G: 21.0,
             NutrientName.SODIUM_MG: 1500.0,
         },
-        tags=["omnivore"],
     )

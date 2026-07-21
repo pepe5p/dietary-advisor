@@ -58,7 +58,7 @@ def food_db(off_db: OffFoodDb) -> FoodDb:
 def any_code() -> str:
     """A real barcode of a product with a positive calorie value."""
     code = _query_code(
-        "SELECT code FROM products WHERE product_name IS NOT NULL AND energy_kcal_100g > 0 LIMIT 1",
+        "SELECT code FROM products WHERE product_name IS NOT NULL AND energy_kcal_in_100g > 0 LIMIT 1",
     )
     if code is None:
         pytest.skip("OFF product DB unavailable or empty")
@@ -88,6 +88,17 @@ def peanut_code() -> str:
     )
     if code is None:
         pytest.skip("no peanut-containing product in OFF DB")
+    return code
+
+
+@pytest.fixture()
+def mushroom_code() -> str:
+    """A product whose name contains 'mushrooms' (matches L2_01 ingredient_exclusion)."""
+    code = _query_code(
+        "SELECT code FROM products WHERE product_name ILIKE '%mushrooms%' AND energy_kcal_in_100g > 0 LIMIT 1",
+    )
+    if code is None:
+        pytest.skip("no mushrooms-named product in OFF DB")
     return code
 
 

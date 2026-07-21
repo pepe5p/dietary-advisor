@@ -104,6 +104,8 @@ class ShoppingListItem(BaseModel):
     protein_g: float = Field(default=0.0, ge=0.0)
     carbs_g: float = Field(default=0.0, ge=0.0)
     fat_g: float = Field(default=0.0, ge=0.0)
+    other_nutrients: NutrientAmountMap = Field(default_factory=dict)
+    quantity_g: float | None = None
 
 
 class ShoppingList(BaseModel):

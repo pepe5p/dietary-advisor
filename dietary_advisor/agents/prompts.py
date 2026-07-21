@@ -83,10 +83,14 @@ _RULE_SEARCH_FIRST = """For EVERY ingredient you want to include, you MUST ALWAY
      higher) so you have enough OFF candidates to pick the closest match,
      while still keeping a USDA fallback."""
 
-_RULE_ALLERGENS = """Never include a food whose tags contain `contains:<allergen>` for any
-   allergen declared in the user's profile."""
+_RULE_ALLERGENS = """Never include a food that conflicts with any allergen declared in
+   the user's profile. Judge allergens from the food `name` and (for Open Food
+   Facts hits) the `ingredients_text` column in the lookup CSV - there are no
+   reliable allergen tags on the hits."""
 
-_RULE_DIET_PATTERN = "Respect the profile's diet pattern (e.g. vegan, vegetarian)"
+_RULE_DIET_PATTERN = """Respect the profile's diet pattern (e.g. vegan, vegetarian).
+   Judge diet fit from the food `name`, categories, and ingredients_text in the
+   lookup CSV - do not rely on diet tags."""
 
 _RULE_MEAL_IDEA = """When a "Meal concepts" section is supplied below, build one meal per
    concept, using it as your creative starting point and swapping in whatever

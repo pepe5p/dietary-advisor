@@ -14,6 +14,7 @@ import pytest
 
 from dietary_advisor.config import FoodDbUsage, get_settings
 from dietary_advisor.food_db import off_food_db as off_mod
+from dietary_advisor.food_db.nutrients import COLUMN_TO_NUTRIENT
 from dietary_advisor.food_db.off_food_db import _reciprocal_rank_fusion, OffFoodDb
 
 # Toy 3-d embedding space: mozzarella-like products point along axis 0, yogurt
@@ -24,12 +25,15 @@ _PRODUCTS = [
     ("222", "Light mozzarella cheese", "Ser mozzarella light", "cheese", "Piatnica", [0.9, 0.1, 0.0]),
     ("333", "Natural yogurt", "Jogurt naturalny", "yogurt", "Danone", [0.0, 1.0, 0.0]),
 ]
+# (code, product_name, product_name_pl, categories, brands, embedding)
 
 _QUERY_VECTORS = {
     "mozzarella": [1.0, 0.0, 0.0],
     "yogurt": [0.0, 1.0, 0.0],
     "creamy italian dairy": [0.95, 0.05, 0.0],
 }
+
+_NUTRIENT_COLS = sorted({*COLUMN_TO_NUTRIENT, "energy_kj_in_100g", "salt_g_in_100g"})
 
 
 @pytest.fixture()
@@ -39,22 +43,26 @@ def off_db_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
     db_path = tmp_path / "off_test.duckdb"
     con = duckdb.connect(str(db_path))
-    nutrient_cols = ", ".join(f"{col} DOUBLE" for col, _, _ in off_mod._NUTRIENT_FACTORS)
+    nutrient_cols = ", ".join(f"{col} DOUBLE" for col in _NUTRIENT_COLS)
     con.execute(
         "CREATE TABLE products ("
-        "code VARCHAR, product_name VARCHAR, product_name_pl VARCHAR, generic_name VARCHAR, "
+        "code VARCHAR, product_name VARCHAR, product_name_pl VARCHAR, "
+        "ingredients_text VARCHAR, brands VARCHAR, brands_tags VARCHAR[], "
+        "quantity VARCHAR, serving_size VARCHAR, serving_quantity DOUBLE, "
+        "product_quantity DOUBLE, product_quantity_unit VARCHAR, nutrition_data_per VARCHAR, "
+        "categories VARCHAR, categories_tags VARCHAR[], compared_to_category VARCHAR, "
         "labels_tags VARCHAR[], allergens_tags VARCHAR[], traces_tags VARCHAR[], "
-        "brands VARCHAR, brands_tags VARCHAR[], categories VARCHAR, categories_tags VARCHAR[], "
-        "compared_to_category VARCHAR, ingredients_text VARCHAR, embedding FLOAT[3], "
+        "additives_tags VARCHAR[], nova_group DOUBLE, nutriscore_grade VARCHAR, "
+        "nutriscore_score DOUBLE, embedding FLOAT[3], "
         f"{nutrient_cols})"
     )
-    for code, name, name_pl, generic, brand, vec in _PRODUCTS:
+    for code, name, name_pl, categories, brand, vec in _PRODUCTS:
         con.execute(
-            "INSERT INTO products (code, product_name, product_name_pl, generic_name, "
-            "labels_tags, allergens_tags, traces_tags, brands, brands_tags, categories, "
-            "categories_tags, compared_to_category, ingredients_text, embedding) "
-            "VALUES (?, ?, ?, ?, [], [], [], ?, [], ?, [], NULL, NULL, ?)",
-            [code, name, name_pl, generic, brand, generic, vec],
+            "INSERT INTO products (code, product_name, product_name_pl, "
+            "brands, brands_tags, categories, categories_tags, "
+            "labels_tags, allergens_tags, traces_tags, additives_tags, embedding) "
+            "VALUES (?, ?, ?, ?, [], ?, [], [], [], [], [], ?)",
+            [code, name, name_pl, brand, categories, vec],
         )
     con.execute("PRAGMA create_fts_index('products', 'code', 'product_name', 'product_name_pl', 'brands')")
     con.close()
