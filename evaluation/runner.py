@@ -11,6 +11,7 @@ from collections.abc import Awaitable, Callable
 import pandas as pd
 
 from dietary_advisor.food_db import FoodDb
+from dietary_advisor.planning.hydration import hydrate_meal_plan, total_agent_meal_plan
 from dietary_advisor.planning.pipeline import Pipeline, PipelineResult, VariantConfig
 from dietary_advisor.schemas.agent_output import AgentMealPlan
 from dietary_advisor.schemas.nutrition import NutrientName
@@ -18,7 +19,6 @@ from dietary_advisor.schemas.profile import UserProfile
 from evaluation.profiles.cases import get_case
 from evaluation.profiles.eval_profile import EvalProfile
 from evaluation.scenarios import Scenario, SCENARIOS
-from evaluation.validation.hydrate import hydrate_meal_plan, total_agent_meal_plan
 from evaluation.validation.qualitative import score_soft_preferences
 from evaluation.validation.quantitative import macro_errors
 from evaluation.validation.structural import structural_csr

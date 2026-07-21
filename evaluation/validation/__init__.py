@@ -5,7 +5,7 @@ constraints are ground truth for scoring only, so the deterministic checker
 that enforces them lives in the evaluation package, not in production.
 """
 
-from evaluation.validation.hydrate import (
+from dietary_advisor.planning.hydration import (
     hydrate_meal_plan,
     total_agent_meal_plan,
 )

@@ -3,8 +3,8 @@
 The nutrition agent never sees a `FoodItem`; it only ever sees search-result
 summaries and returns `PortionRef` codes (see `schemas.agent_output`). This
 is the one place those codes resolve back to a `FoodItem`/`MealPlan`, both in
-production (`Pipeline.run`) and in the evaluation harness
-(`evaluation.validation`), so the LLM can never fake a nutrient value.
+production (`Pipeline.run`) and in the evaluation harness, so the LLM can
+never fake a nutrient value.
 """
 
 from __future__ import annotations

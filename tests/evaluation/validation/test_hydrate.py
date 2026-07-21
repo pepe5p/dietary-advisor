@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dietary_advisor.food_db import FoodDb
-from evaluation.validation.hydrate import hydrate_meal_plan
+from dietary_advisor.planning.hydration import hydrate_meal_plan
 from tests.evaluation.conftest import agent_plan_single
 
 

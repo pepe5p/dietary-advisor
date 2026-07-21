@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from dietary_advisor.food_db import FoodDb
+from dietary_advisor.planning.hydration import hydrate_meal_plan
 from dietary_advisor.schemas.agent_output import AgentMealPlan
 from evaluation.profiles.eval_profile import EvalProfile
-from evaluation.validation.hydrate import hydrate_meal_plan
 from evaluation.validation.validator import validate_meal_plan
 
 
