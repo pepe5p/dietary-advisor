@@ -10,6 +10,7 @@ retriever simply runs whatever queries it returns.
 from __future__ import annotations
 
 from pydantic_ai import Agent, ModelSettings
+from pydantic_ai.models import Model
 
 from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.prompts import RAG_QUERY_AGENT_SYSTEM
@@ -17,10 +18,10 @@ from dietary_advisor.agents.rag_query import RetrievalQueries
 from dietary_advisor.config import get_settings
 
 
-def build_rag_query_agent() -> Agent[AgentDeps, RetrievalQueries]:
+def build_rag_query_agent(*, model: Model | None = None) -> Agent[AgentDeps, RetrievalQueries]:
     settings = get_settings()
     return Agent(
-        settings.resolved_llm_model,
+        model if model is not None else settings.resolved_llm_model,
         deps_type=AgentDeps,
         output_type=RetrievalQueries,
         system_prompt=RAG_QUERY_AGENT_SYSTEM,

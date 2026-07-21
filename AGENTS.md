@@ -13,8 +13,8 @@ dependency rule:
 - **`setup/`** — one-off build/provisioning code (downloading the Open Food
   Facts export, building the DuckDB, embedding product documents, ingesting the
   RAG corpus). Runs via `just setup`, never in the request path.
-- **`evaluation/`** — the ablation harness and scoring. Runs via `just
-  evaluate`, never in the request path.
+- **`evaluation/`** — the ablation harness (case collection via `just
+  run-cases`, scoring via `just evaluate`). Never in the request path.
 - **`repl/`** — interactive debugging helpers loaded by `ipython_startup.py`
   (`just ps`). One module per concern (e.g. `food_db.py`); each module prints
   its own manual table on import via `repl/manual.py`. Free to reach into

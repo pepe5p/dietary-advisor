@@ -12,6 +12,7 @@ concept if no matching real product exists.
 from __future__ import annotations
 
 from pydantic_ai import Agent, ModelSettings
+from pydantic_ai.models import Model
 
 from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.meal_idea import MealConcept
@@ -19,10 +20,10 @@ from dietary_advisor.agents.prompts import MEAL_IDEA_AGENT_SYSTEM
 from dietary_advisor.config import get_settings
 
 
-def build_meal_idea_agent() -> Agent[AgentDeps, list[MealConcept]]:
+def build_meal_idea_agent(*, model: Model | None = None) -> Agent[AgentDeps, list[MealConcept]]:
     settings = get_settings()
     return Agent(
-        settings.resolved_llm_model,
+        model if model is not None else settings.resolved_llm_model,
         deps_type=AgentDeps,
         output_type=list[MealConcept],
         system_prompt=MEAL_IDEA_AGENT_SYSTEM,

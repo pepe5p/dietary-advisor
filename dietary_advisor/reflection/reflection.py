@@ -17,6 +17,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
+from pydantic_ai.models import Model
+
 from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.agents.critic_agent import build_critic_agent
 from dietary_advisor.agents.deps import AgentDeps
@@ -167,6 +169,7 @@ async def reflect_and_refine(
     max_loops: int | None = None,
     totaller_enabled: bool = True,
     rag_citations: list[Citation] | None = None,
+    model: Model | None = None,
 ) -> ReflectionResult:
     """Run up to `max_loops` critique-then-refine passes, stopping once the critic reports no issues."""
     settings = get_settings()
@@ -175,8 +178,8 @@ async def reflect_and_refine(
         return ReflectionResult(plan=initial_plan, iterations=0)
 
     citations = rag_citations or []
-    critic = build_critic_agent()
-    refiner = build_refiner_agent(totaller_enabled=totaller_enabled)
+    critic = build_critic_agent(model=model)
+    refiner = build_refiner_agent(totaller_enabled=totaller_enabled, model=model)
     plan = initial_plan
     telemetry = RunTelemetry()
 

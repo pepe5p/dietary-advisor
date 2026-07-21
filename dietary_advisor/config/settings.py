@@ -114,7 +114,8 @@ class Settings(BaseSettings):
         for f in (self.off_db, self.usda_db):
             f.parent.mkdir(parents=True, exist_ok=True)
 
-    def _resolve(self, model_id: str) -> Model:
+    def resolve_model(self, model_id: str) -> Model:
+        """Resolve a pydantic-ai model identifier to a concrete `Model`."""
         return resolve_llm_model(
             model_id,
             groq_api_key=get_api_keys().groq_api_key,
@@ -129,7 +130,7 @@ class Settings(BaseSettings):
         Resolved lazily (on first access) rather than in `get_settings()` so that
         LLM-free commands (`setup`, `info`) don't fail on a missing API key.
         """
-        return self._resolve(self.llm_model)
+        return self.resolve_model(self.llm_model)
 
 
 # A second settings group for raw third-party API keys. We read these as

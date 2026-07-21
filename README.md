@@ -65,27 +65,28 @@ Build a plan around what you have with `--available "salmon, spinach, lemon"`.
 Each ablatable module can be toggled off to feel its effect:
 `--no-totaller`, `--no-rag`, `--no-reflective-loop`.
 
-## Run the evaluation
+## Collect case runs (and evaluate later)
 
-The ablation runs the full system plus one leave-one-out config per disabled module,
-scored against ground-truth hard constraints frozen in
-[`evaluation/profiles/cases.py`](evaluation/profiles/cases.py) (independent from the
-CLI profiles above).
+Case collection runs the full system plus one leave-one-out config per disabled
+module against the scenarios in
+[`evaluation/scenarios.py`](evaluation/scenarios.py) (profiles frozen in
+[`evaluation/profiles/cases.py`](evaluation/profiles/cases.py), independent from
+the CLI profiles above). The (model, variant, scenario) grid is hardcoded in
+[`evaluation/case_runner/grid.py`](evaluation/case_runner/grid.py); re-running
+skips any result file already present under `outputs/`.
 
 ```bash
-just evaluate --repeats 3
+just run-cases
 ```
 
-This writes three artefacts to `evaluation/reports/` (visible on the host via the bind
-mount): `ablation.csv` (per-run rows), `ablation.md` (aggregated summary), and
-`ablation.png` (CSR / SoftScore / MAE / MSE charts). With `--repeats 3`, 15 profiles ×
-4 configs = 180 runs; expect 30-90 min with `gpt-4o-mini`. Add `--no-judge` to skip the
-G-Eval soft-preference scoring.
+Successful runs land as JSON under `outputs/` (visible on the host via the bind
+mount). Scoring of those stored results (`just evaluate`) is pending a later
+rework.
 
 Full reproduction from a clean host:
 
 ```bash
-just build && just dc setup && just dc evaluate --repeats 3
+just build && just dc setup && just dc run-cases
 ```
 
 ## Configuration

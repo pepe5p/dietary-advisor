@@ -18,7 +18,7 @@ class EvaluationSettings(Settings):
 
     @cached_property
     def resolved_judge_model(self) -> Model:
-        return self._resolve(self.judge_model)
+        return self.resolve_model(self.judge_model)
 
 
 @lru_cache(maxsize=1)

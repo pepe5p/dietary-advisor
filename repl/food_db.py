@@ -39,6 +39,8 @@ __all__ = [
     "search_usda",
     "search_usda_bm25",
     "search_usda_semantic",
+    "sql_off",
+    "sql_usda",
 ]
 
 # The two food_db read models don't share a base class (see food_db/models.py).
@@ -51,6 +53,14 @@ _MACRO_COLUMNS: tuple[NutrientName, ...] = (
     NutrientName.CARBS_G,
     NutrientName.FAT_G,
 )
+
+
+def _execute_sql(con: duckdb.DuckDBPyConnection, sql: str) -> list[Row]:
+    cur = con.execute(sql)
+    if cur.description is None:
+        return []
+    columns = [d[0] for d in cur.description]
+    return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
 
 
 def _fetch_record(con: duckdb.DuckDBPyConnection, sql: str, params: list[Any], code: str) -> Row:
@@ -114,6 +124,14 @@ def get_off_record(code: str) -> Row:
         con.close()
 
 
+def sql_off(sql: str) -> list[Row]:
+    con = duckdb.connect(str(get_settings().off_db), read_only=True)
+    try:
+        return _execute_sql(con, sql)
+    finally:
+        con.close()
+
+
 def search_usda(query: str, limit: int = 5) -> list[USDAItem]:
     with UsdaFoodDb() as usda_food_db:
         return usda_food_db.search(query=query, limit=limit)
@@ -141,6 +159,14 @@ def get_usda_record(code: str) -> Row:
     con = duckdb.connect(str(get_settings().usda_db), read_only=True)
     try:
         return _fetch_record(con, "SELECT * FROM foods WHERE fdc_id = ? LIMIT 1", [_fdc_id(code)], code)
+    finally:
+        con.close()
+
+
+def sql_usda(sql: str) -> list[Row]:
+    con = duckdb.connect(str(get_settings().usda_db), read_only=True)
+    try:
+        return _execute_sql(con, sql)
     finally:
         con.close()
 
@@ -258,12 +284,14 @@ _MANUAL: tuple[tuple[str, str], ...] = (
     ("search_off_semantic(query, limit=5)", "Search OFF, embedding (semantic) channel only."),
     ("get_off_item(code)", "Get one product as an OFFItem."),
     ("get_off_record(code)", "Get the full raw row (dict) from the OFF duckdb."),
+    ("sql_off(sql)", "Run raw SQL against the OFF duckdb -> list[Row]."),
     ("get_parquet_record(code)", "Get the full raw row (dict) from the OFF parquet export."),
     ("search_usda(query, limit=5)", "Search USDA (hybrid BM25 + semantic) -> list[USDAItem]."),
     ("search_usda_bm25(query, limit=5)", "Search USDA, lexical (BM25) channel only."),
     ("search_usda_semantic(query, limit=5)", "Search USDA, embedding (semantic) channel only."),
     ("get_usda_item(code)", "Get one food as a USDAItem."),
     ("get_usda_record(code)", "Get the full raw row (dict) from the USDA duckdb."),
+    ("sql_usda(sql)", "Run raw SQL against the USDA duckdb -> list[Row]."),
     ("lookup(query, off_limit=5, usda_limit=5)", "Run the full dual-source FoodDb.lookup -> LookupResult."),
     ("pfi(items)", "Rich-print an OFFItem/USDAItem or a list of them."),
     ("pdict(record)", "Rich pretty-print a raw record dict."),

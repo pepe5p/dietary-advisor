@@ -39,6 +39,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
+from pydantic_ai.models import Model
+
 from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.meal_idea import MealConcept
@@ -144,6 +146,7 @@ class Pipeline:
         *,
         food_db: FoodDb | None = None,
         retriever: HybridRetriever | None = None,
+        model: str | None = None,
     ) -> None:
         self.variant = variant if variant is not None else VariantConfig()
         self._settings = get_settings()
@@ -151,6 +154,11 @@ class Pipeline:
         self._food_db = food_db
         self._owns_food_db = False  # Only close DBs we created ourselves.
         self._retriever = retriever
+        # Resolve once so every agent in this pipeline shares the same Model.
+        self._model: Model = (
+            self._settings.resolve_model(model) if model is not None else self._settings.resolved_llm_model
+        )
+        self._model_id = model if model is not None else self._settings.llm_model
 
     def _ensure_food_db(self) -> FoodDb:
         """Open the food DB facade (both sources, per their usage settings)."""
@@ -204,7 +212,7 @@ class Pipeline:
         """
         prompt = self._compose_rag_query_prompt(deps.profile, user_query)
         try:
-            agent = build_rag_query_agent()
+            agent = build_rag_query_agent(model=self._model)
             result = await run_agent_logged(agent, prompt, deps=deps, label="rag_query")
         except Exception as exc:  # noqa: BLE001 - LLMs raise many things; never sink the request for this
             log.warning("RAG query agent failed, falling back to heuristic query: %s", exc)
@@ -251,7 +259,7 @@ class Pipeline:
         """
         prompt = self._compose_meal_idea_prompt(deps.profile, deps.targets, user_query, rag_citations)
         try:
-            agent = build_meal_idea_agent()
+            agent = build_meal_idea_agent(model=self._model)
             result = await run_agent_logged(agent, prompt, deps=deps, label="meal_idea")
         except Exception as exc:  # noqa: BLE001 - LLMs raise many things; never sink the request for this
             log.warning("Meal-idea agent failed, continuing without meal concepts: %s", exc)
@@ -290,6 +298,7 @@ class Pipeline:
         agent = build_nutrition_agent(
             totaller_enabled=self.variant.totaller_enabled,
             rag_enabled=self.variant.rag_enabled,
+            model=self._model,
         )
         prompt = self._compose_prompt(
             profile,
@@ -301,7 +310,7 @@ class Pipeline:
         )
         log.info(
             "Invoking nutrition agent (model=%s, totaller=%s)...",
-            self._settings.resolved_llm_model,
+            self._model_id,
             self.variant.totaller_enabled,
         )
         result = await run_agent_logged(agent, prompt, deps=deps, label="nutrition")
@@ -330,6 +339,7 @@ class Pipeline:
                 user_query,
                 totaller_enabled=self.variant.totaller_enabled,
                 rag_citations=rag_citations,
+                model=self._model,
             )
             agent_plan = refl.plan
             iterations = refl.iterations

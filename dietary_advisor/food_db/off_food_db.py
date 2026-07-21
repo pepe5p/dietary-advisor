@@ -103,6 +103,16 @@ def _allergen_tags(*tag_lists: list[str] | None) -> list[str]:
     return out
 
 
+def get_off_item_name(row: Mapping[str, Any]) -> str:
+    return (
+        row.get("product_name")
+        or row.get("product_name_pl")
+        or row.get("generic_name")
+        or row.get("brands")
+        or "unknown"
+    )
+
+
 def _row_to_off_item(row: Mapping[str, Any]) -> OFFItem:
     """Map a `products` row to an `OFFItem` (pure; no DB access)."""
     nutrients: dict[NutrientName, float] = {}
@@ -114,7 +124,7 @@ def _row_to_off_item(row: Mapping[str, Any]) -> OFFItem:
         if scaled >= 0:
             nutrients[nutrient] = scaled
 
-    name = row.get("product_name") or row.get("product_name_pl") or row.get("code") or "unknown"
+    name = get_off_item_name(row)
     tags = _diet_tags(row.get("labels_tags") or []) + _allergen_tags(
         row.get("allergens_tags"),
         row.get("traces_tags"),

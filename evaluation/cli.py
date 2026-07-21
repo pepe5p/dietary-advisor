@@ -1,18 +1,16 @@
-"""`evaluation` Typer CLI: run the leave-one-out ablation grid."""
+"""`evaluation` Typer CLI: collect case runs, then (later) score them."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from pathlib import Path
 
 import typer
 from rich.console import Console
 
-app = typer.Typer(help="Run the neuro-symbolic dietary advisor ablation evaluation.")
+app = typer.Typer(help="Collect dietary-advisor case runs and evaluate stored results.")
 
 console = Console()
-log = logging.getLogger(__name__)
 
 
 def _configure_logging(verbose: bool) -> None:
@@ -22,35 +20,49 @@ def _configure_logging(verbose: bool) -> None:
     )
 
 
-@app.command()
-def evaluate(
-    output: Path = typer.Option(Path("evaluation/reports/ablation.csv"), "--output"),
-    repeats: int = typer.Option(1, "--repeats", help="Repeat each (variant,profile,query) N times."),
-    no_judge: bool = typer.Option(False, "--no-judge", help="Skip G-Eval soft-preference scoring."),
+@app.command("run-cases")
+def run_cases(
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
-    """Run the leave-one-out ablation grid (full system + one config per disabled module)."""
+    """Execute remaining (model, variant, scenario) runs into `outputs/`."""
     _configure_logging(verbose)
-    # Local imports keep `evaluate --help` fast even when matplotlib isn't built.
-    from evaluation.ablation import leave_one_out_variants
-    from evaluation.report import write_markdown_summary, write_plots
-    from evaluation.runner import run_ablation_grid
+    from evaluation.case_runner import collect_runs, is_done, planned_runs
 
-    df = asyncio.run(
-        run_ablation_grid(
-            variants=leave_one_out_variants(),
-            repeats=repeats,
-            run_judge=not no_judge,
-        ),
+    specs = planned_runs()
+    already_done = sum(1 for s in specs if is_done(s))
+    remaining = len(specs) - already_done
+    console.print(
+        f"Planned [bold]{len(specs)}[/bold] runs "
+        f"([green]{already_done}[/green] already done, "
+        f"[cyan]{remaining}[/cyan] remaining)."
     )
-    output.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(output, index=False)
-    console.print(f"[green]Saved CSV[/green] {output} ({len(df)} rows)")
+    if remaining == 0:
+        console.print("[green]Nothing to do.[/green]")
+        return
 
-    summary_md = output.with_suffix(".md")
-    write_markdown_summary(df, summary_md)
-    console.print(f"[green]Saved summary[/green] {summary_md}")
+    summary = asyncio.run(collect_runs(specs))
+    console.print(
+        f"[green]Succeeded[/green] {summary.succeeded} / "
+        f"[red]failed[/red] {summary.failed} "
+        f"(of {summary.attempted} attempted; {summary.already_done} were already done)."
+    )
+    if summary.failed:
+        raise typer.Exit(code=1)
 
-    plot_path = output.with_suffix(".png")
-    write_plots(df, plot_path)
-    console.print(f"[green]Saved plots[/green] {plot_path}")
+
+@app.command()
+def evaluate(
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Score existing `outputs/` records (pending the scoring-stage rework)."""
+    _configure_logging(verbose)
+    console.print(
+        "[yellow]Scoring stage is pending rework.[/yellow] "
+        "Collect runs with `run-cases` first; evaluation against stored "
+        "results will land in a later change."
+    )
+    raise typer.Exit(code=1)
+
+
+if __name__ == "__main__":  # pragma: no cover
+    app()

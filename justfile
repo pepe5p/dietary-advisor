@@ -2,6 +2,7 @@ set dotenv-load
 set positional-arguments
 
 PATHS_TO_LINT := "dietary_advisor evaluation setup repl tests ipython_startup.py"
+
 TEST_PATH := "tests"
 ANSWERS_FILE := ".copier/.copier-answers.copier-python-project.yml"
 CONTAINER_NAME := "dietary_advisor"
@@ -20,9 +21,14 @@ default: help
 	uv run python -m dietary_advisor "$@"
 
 [group("cli")]
-[doc("Run the leave-one-out ablation evaluation grid")]
+[doc("Collect remaining (model, variant, scenario) case runs into outputs/")]
+@run-cases *args:
+	uv run python -m evaluation run-cases "$@"
+
+[group("cli")]
+[doc("Score stored case-run results (pending scoring-stage rework)")]
 @evaluate *args:
-	uv run python -m evaluation "$@"
+	uv run python -m evaluation evaluate "$@"
 
 [group("cli")]
 [doc("Run local data setup (Open Food Facts product DB, RAG corpus ingest)")]

@@ -11,7 +11,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from evaluation.runner import variant_summary  # noqa: E402
+from evaluation.legacy.runner import variant_summary  # noqa: E402
 
 _METRIC_ORDER = ["CSR", "MAE_pct", "MSE_pct", "SoftScore", "iterations", "elapsed_s"]
 

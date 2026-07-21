@@ -8,6 +8,7 @@ handed in the prompt, so its critique cannot recurse into its own tool calls.
 from __future__ import annotations
 
 from pydantic_ai import Agent, ModelSettings
+from pydantic_ai.models import Model
 
 from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.prompts import CRITIC_AGENT_SYSTEM
@@ -15,11 +16,11 @@ from dietary_advisor.agents.reflection import PlanCritique
 from dietary_advisor.config import get_settings
 
 
-def build_critic_agent() -> Agent[AgentDeps, PlanCritique]:
+def build_critic_agent(*, model: Model | None = None) -> Agent[AgentDeps, PlanCritique]:
     """Construct a fresh, tool-less critic `Agent` bound to `PlanCritique` output."""
     settings = get_settings()
     return Agent(
-        settings.resolved_llm_model,
+        model if model is not None else settings.resolved_llm_model,
         deps_type=AgentDeps,
         output_type=PlanCritique,
         system_prompt=CRITIC_AGENT_SYSTEM,

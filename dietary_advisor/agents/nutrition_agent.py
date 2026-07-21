@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 
 from pydantic_ai import Agent, ModelRetry, ModelSettings, RunContext
+from pydantic_ai.models import Model
 
 from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.agents.deps import AgentDeps
@@ -103,10 +104,15 @@ async def total_meal_plan(ctx: RunContext[AgentDeps], plan: AgentMealPlan) -> Nu
         ) from exc
 
 
-def _build_agent(system_prompt: str, *, totaller_enabled: bool) -> Agent[AgentDeps, AgentMealPlan]:
+def _build_agent(
+    system_prompt: str,
+    *,
+    totaller_enabled: bool,
+    model: Model | None = None,
+) -> Agent[AgentDeps, AgentMealPlan]:
     settings = get_settings()
     agent: Agent[AgentDeps, AgentMealPlan] = Agent(
-        settings.resolved_llm_model,
+        model if model is not None else settings.resolved_llm_model,
         deps_type=AgentDeps,
         output_type=AgentMealPlan,
         system_prompt=system_prompt,
@@ -125,6 +131,7 @@ def build_nutrition_agent(
     *,
     totaller_enabled: bool = True,
     rag_enabled: bool = True,
+    model: Model | None = None,
 ) -> Agent[AgentDeps, AgentMealPlan]:
     """Construct a fresh `Agent` instance bound to AgentDeps + AgentMealPlan output.
 
@@ -132,10 +139,14 @@ def build_nutrition_agent(
     the nutrition agent never owns the retriever as a tool.
     """
     prompt = nutrition_agent_system(totaller_enabled=totaller_enabled, rag_enabled=rag_enabled)
-    return _build_agent(prompt, totaller_enabled=totaller_enabled)
+    return _build_agent(prompt, totaller_enabled=totaller_enabled, model=model)
 
 
-def build_refiner_agent(*, totaller_enabled: bool = True) -> Agent[AgentDeps, AgentMealPlan]:
+def build_refiner_agent(
+    *,
+    totaller_enabled: bool = True,
+    model: Model | None = None,
+) -> Agent[AgentDeps, AgentMealPlan]:
     """Refinement agent for the Reflection Loop.
 
     Same toolset as the main nutrition agent (including the lookup tools, so
@@ -143,4 +154,4 @@ def build_refiner_agent(*, totaller_enabled: bool = True) -> Agent[AgentDeps, Ag
     prompt focused on fixing exactly the issues the critic agent reported
     (see `dietary_advisor.reflection`), not a blind self-review pass.
     """
-    return _build_agent(REFLECTION_REFINER_AGENT_SYSTEM, totaller_enabled=totaller_enabled)
+    return _build_agent(REFLECTION_REFINER_AGENT_SYSTEM, totaller_enabled=totaller_enabled, model=model)
