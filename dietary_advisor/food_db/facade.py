@@ -24,7 +24,7 @@ from dietary_advisor.food_db.errors import OFFUnknownFoodCodeError, USDAUnknownF
 from dietary_advisor.food_db.models import OFFItem, USDAItem
 from dietary_advisor.food_db.off_food_db import OffFoodDb
 from dietary_advisor.food_db.usda_food_db import is_usda_code, UsdaFoodDb
-from dietary_advisor.schemas.nutrition import NutrientName
+from dietary_advisor.totaller.nutrition import NutrientName
 
 log = logging.getLogger(__name__)
 

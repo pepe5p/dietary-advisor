@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from dietary_advisor.schemas.profile import UserProfile
+from dietary_advisor.profile import UserProfile
 from evaluation.constraints import HardConstraint
 
 

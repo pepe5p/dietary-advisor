@@ -24,13 +24,13 @@ from dietary_advisor.food_db.embeddings import embed_query
 from dietary_advisor.food_db.errors import OFFUnknownFoodCodeError
 from dietary_advisor.food_db.fusion import reciprocal_rank_fusion as _reciprocal_rank_fusion
 from dietary_advisor.food_db.models import OFFItem, Row
-from dietary_advisor.schemas.nutrition import NutrientName
+from dietary_advisor.totaller.nutrition import NutrientName
 
 log = logging.getLogger(__name__)
 
 # OFF per-100g column -> (canonical nutrient, factor to canonical unit).
 # OFF normalizes `*_100g` to grams (energy in kcal); the Totaller expects the
-# canonical units declared in schemas/nutrition.py, so minerals/vitamins in
+# canonical units declared in totaller/nutrition.py, so minerals/vitamins in
 # grams are scaled to mg / ug here.
 _NUTRIENT_FACTORS: tuple[tuple[str, NutrientName, float], ...] = (
     ("energy_kcal_100g", NutrientName.ENERGY_KCAL, 1.0),

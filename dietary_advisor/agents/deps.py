@@ -10,8 +10,8 @@ from dataclasses import dataclass
 
 from dietary_advisor.dietary_rag.retriever import HybridRetriever
 from dietary_advisor.food_db import FoodDb
-from dietary_advisor.schemas.nutrition import MacroTargets
-from dietary_advisor.schemas.profile import UserProfile
+from dietary_advisor.profile import UserProfile
+from dietary_advisor.totaller.nutrition import MacroTargets
 
 
 @dataclass

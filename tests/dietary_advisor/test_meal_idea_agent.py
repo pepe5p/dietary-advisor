@@ -5,9 +5,9 @@ from __future__ import annotations
 import pytest
 from pydantic_ai.models.test import TestModel
 
+from dietary_advisor.agents.meal_idea import MealConcept
 from dietary_advisor.agents.meal_idea_agent import build_meal_idea_agent
 from dietary_advisor.config import get_settings
-from dietary_advisor.schemas.meal_idea import MealConcept
 
 
 def _tool_names(agent: object) -> set[str]:

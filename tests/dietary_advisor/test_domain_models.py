@@ -1,4 +1,4 @@
-"""Sanity checks on the DSL schemas."""
+"""Sanity checks on core domain models."""
 
 from __future__ import annotations
 
@@ -7,13 +7,13 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from dietary_advisor.schemas.meal_plan import (
+from dietary_advisor.planning.meal_plan import (
     Meal,
     MealPlan,
     Portion,
 )
-from dietary_advisor.schemas.nutrition import FoodItem, MacroTargets, NutrientName
-from dietary_advisor.schemas.profile import UserProfile
+from dietary_advisor.profile import UserProfile
+from dietary_advisor.totaller.nutrition import FoodItem, MacroTargets, NutrientName
 from tests.conftest import LONG_INSTRUCTIONS
 
 _TARGETS = MacroTargets(energy_kcal=2200.0, protein_g=120.0, carbs_g=250.0, fat_g=65.0)

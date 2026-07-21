@@ -14,8 +14,8 @@ from __future__ import annotations
 import logging
 from fractions import Fraction
 
-from dietary_advisor.schemas.meal_plan import MealNutrientTotals, MealPlan, NutrientTotals, Portion
-from dietary_advisor.schemas.nutrition import NutrientName
+from dietary_advisor.planning.meal_plan import MealNutrientTotals, MealPlan, NutrientTotals, Portion
+from dietary_advisor.totaller.nutrition import NutrientName
 
 log = logging.getLogger(__name__)
 

@@ -10,7 +10,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from dietary_advisor.schemas.nutrition import MacroTargets
+from dietary_advisor.totaller.nutrition import MacroTargets
 
 
 class ActivityLevel(str, Enum):

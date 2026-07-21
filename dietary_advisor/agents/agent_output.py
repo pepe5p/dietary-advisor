@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dietary_advisor.schemas.meal_plan import Citation
+from dietary_advisor.planning.meal_plan import Citation
 
 
 class PortionRef(BaseModel):

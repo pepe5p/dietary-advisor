@@ -8,13 +8,13 @@ from __future__ import annotations
 
 from collections import Counter
 
+from dietary_advisor.agents.agent_output import AgentMeal, AgentMealPlan, AgentRecipe, PortionRef
 from dietary_advisor.cli.rendering import render_result
+from dietary_advisor.planning.meal_plan import Citation, Meal, MealPlan, Portion
 from dietary_advisor.planning.pipeline import PipelineResult
 from dietary_advisor.planning.shopping_list import build_shopping_list
-from dietary_advisor.schemas.agent_output import AgentMeal, AgentMealPlan, AgentRecipe, PortionRef
-from dietary_advisor.schemas.meal_plan import Citation, Meal, MealPlan, Portion
-from dietary_advisor.schemas.nutrition import FoodItem, MacroTargets, NutrientName
 from dietary_advisor.telemetry import RunTelemetry
+from dietary_advisor.totaller.nutrition import FoodItem, MacroTargets, NutrientName
 from repl.manual import print_manual
 
 __all__ = ["print_run_result", "sample_result"]

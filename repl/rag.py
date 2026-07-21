@@ -11,7 +11,7 @@ from rich.table import Table
 
 from dietary_advisor.dietary_rag.retriever import HybridRetriever, RetrievedChunk
 from dietary_advisor.dietary_rag.store import Chunk
-from dietary_advisor.schemas.meal_plan import Citation
+from dietary_advisor.planning.meal_plan import Citation
 from repl.manual import console, print_manual
 
 __all__ = [

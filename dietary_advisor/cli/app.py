@@ -14,8 +14,8 @@ from rich.table import Table
 from dietary_advisor.cli.rendering import console, render_result
 from dietary_advisor.config import get_settings
 from dietary_advisor.planning.pipeline import Pipeline, PipelineResult, VariantConfig
+from dietary_advisor.profile import UserProfile
 from dietary_advisor.profiles import get_profile
-from dietary_advisor.schemas.profile import UserProfile
 
 app = typer.Typer(help="Neuro-symbolic dietary advisor (master's thesis CLI).")
 

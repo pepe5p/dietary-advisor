@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dietary_advisor.schemas.nutrition import FoodItem, NutrientAmountMap, NutrientName
+from dietary_advisor.totaller.nutrition import FoodItem, NutrientAmountMap, NutrientName
 
 
 class Portion(BaseModel):

@@ -39,7 +39,9 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
+from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.agents.deps import AgentDeps
+from dietary_advisor.agents.meal_idea import MealConcept
 from dietary_advisor.agents.meal_idea_agent import build_meal_idea_agent
 from dietary_advisor.agents.nutrition_agent import build_nutrition_agent
 from dietary_advisor.agents.prompts import format_guideline_excerpts
@@ -49,14 +51,12 @@ from dietary_advisor.config import get_settings
 from dietary_advisor.dietary_rag.retriever import HybridRetriever, RetrievedChunk
 from dietary_advisor.food_db import FoodDb
 from dietary_advisor.planning.hydration import hydrate_meal_plan
+from dietary_advisor.planning.meal_plan import Citation, MealPlan, ShoppingList
 from dietary_advisor.planning.shopping_list import build_shopping_list
+from dietary_advisor.profile import UserProfile
 from dietary_advisor.reflection import reflect_and_refine, ReflectionResult
-from dietary_advisor.schemas.agent_output import AgentMealPlan
-from dietary_advisor.schemas.meal_idea import MealConcept
-from dietary_advisor.schemas.meal_plan import Citation, MealPlan, ShoppingList
-from dietary_advisor.schemas.nutrition import MacroTargets
-from dietary_advisor.schemas.profile import UserProfile
 from dietary_advisor.telemetry import collect_from_result, RunTelemetry
+from dietary_advisor.totaller.nutrition import MacroTargets
 
 log = logging.getLogger(__name__)
 

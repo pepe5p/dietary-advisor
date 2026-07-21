@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dietary_advisor.schemas.nutrition import MacroTargets, NutrientName
-from dietary_advisor.schemas.profile import UserProfile
+from dietary_advisor.profile import UserProfile
+from dietary_advisor.totaller.nutrition import MacroTargets, NutrientName
 from evaluation.profiles.derive import derive_hard_constraints
 
 _TARGETS = MacroTargets(energy_kcal=2200.0, protein_g=120.0, carbs_g=250.0, fat_g=65.0)

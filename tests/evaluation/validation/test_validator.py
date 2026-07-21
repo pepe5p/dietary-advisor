@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from dietary_advisor.schemas.meal_plan import (
+from dietary_advisor.planning.meal_plan import (
     Meal,
     MealPlan,
     Portion,
 )
-from dietary_advisor.schemas.nutrition import FoodItem, NutrientName
+from dietary_advisor.totaller.nutrition import FoodItem, NutrientName
 from evaluation.constraints import HardConstraint
 from evaluation.validation.validator import validate_meal_plan
 from tests.conftest import LONG_INSTRUCTIONS

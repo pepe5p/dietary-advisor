@@ -14,9 +14,9 @@ from pathlib import Path
 import duckdb
 import pytest
 
+from dietary_advisor.agents.agent_output import AgentMeal, AgentMealPlan, AgentRecipe, PortionRef
 from dietary_advisor.config import get_settings
 from dietary_advisor.food_db import FoodDb, OffFoodDb
-from dietary_advisor.schemas.agent_output import AgentMeal, AgentMealPlan, AgentRecipe, PortionRef
 from tests.conftest import LONG_INSTRUCTIONS
 
 # Placeholder barcode for plans that are never hydrated against the DB

@@ -22,14 +22,14 @@ import pytest
 from pydantic_ai.models.test import TestModel
 
 import dietary_advisor.planning.pipeline as pipeline_module
+from dietary_advisor.agents.meal_idea import MealConcept
 from dietary_advisor.config import get_settings
 from dietary_advisor.food_db import OFFItem
 from dietary_advisor.food_db.facade import LookupQuery, LookupResult, OFFHit
+from dietary_advisor.planning.meal_plan import MealPlan
 from dietary_advisor.planning.pipeline import Pipeline, VariantConfig
-from dietary_advisor.schemas.meal_idea import MealConcept
-from dietary_advisor.schemas.meal_plan import MealPlan
-from dietary_advisor.schemas.nutrition import NutrientName
-from dietary_advisor.schemas.profile import UserProfile
+from dietary_advisor.profile import UserProfile
+from dietary_advisor.totaller.nutrition import NutrientName
 
 
 class _FakeFoodDb:

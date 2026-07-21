@@ -16,7 +16,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dietary_advisor.schemas.nutrition import NutrientAmountMap, NutrientName
+from dietary_advisor.totaller.nutrition import NutrientAmountMap, NutrientName
 
 
 class ConstraintSource(str, Enum):

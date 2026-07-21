@@ -17,14 +17,14 @@ from pydantic_ai.models.test import TestModel
 from pydantic_ai.usage import RunUsage
 
 import dietary_advisor.reflection.reflection as reflection_module
+from dietary_advisor.agents.agent_output import AgentMeal, AgentMealPlan, AgentRecipe, PortionRef
 from dietary_advisor.agents.deps import AgentDeps
+from dietary_advisor.agents.reflection import PlanCritique
 from dietary_advisor.config import get_settings
 from dietary_advisor.food_db import OFFItem
+from dietary_advisor.profile import UserProfile
 from dietary_advisor.reflection import reflect_and_refine
-from dietary_advisor.schemas.agent_output import AgentMeal, AgentMealPlan, AgentRecipe, PortionRef
-from dietary_advisor.schemas.nutrition import NutrientName
-from dietary_advisor.schemas.profile import UserProfile
-from dietary_advisor.schemas.reflection import PlanCritique
+from dietary_advisor.totaller.nutrition import NutrientName
 from tests.conftest import LONG_INSTRUCTIONS
 
 _KNOWN_CODE = "known"

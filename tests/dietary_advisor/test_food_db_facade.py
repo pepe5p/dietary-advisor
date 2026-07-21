@@ -19,7 +19,7 @@ from dietary_advisor.food_db import (
     USDAUnknownFoodCodeError,
 )
 from dietary_advisor.food_db.facade import LookupQuery, LookupResult
-from dietary_advisor.schemas.nutrition import NutrientName
+from dietary_advisor.totaller.nutrition import NutrientName
 
 
 class _FakeDb:

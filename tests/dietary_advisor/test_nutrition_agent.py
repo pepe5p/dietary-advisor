@@ -7,6 +7,7 @@ from pydantic_ai import ModelRetry, RunContext
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.usage import RunUsage
 
+from dietary_advisor.agents.agent_output import AgentMeal, AgentMealPlan, AgentRecipe, PortionRef
 from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.nutrition_agent import (
     _validate_codes,
@@ -16,9 +17,8 @@ from dietary_advisor.agents.nutrition_agent import (
 )
 from dietary_advisor.config import get_settings
 from dietary_advisor.food_db import OFFItem, OFFUnknownFoodCodeError
-from dietary_advisor.schemas.agent_output import AgentMeal, AgentMealPlan, AgentRecipe, PortionRef
-from dietary_advisor.schemas.nutrition import MacroTargets, NutrientName
-from dietary_advisor.schemas.profile import UserProfile
+from dietary_advisor.profile import UserProfile
+from dietary_advisor.totaller.nutrition import MacroTargets, NutrientName
 from tests.conftest import LONG_INSTRUCTIONS
 
 _ALWAYS_ON_TOOLS = {"lookup_food", "lookup_foods", "total_meal_plan"}

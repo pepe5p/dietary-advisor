@@ -16,7 +16,7 @@ from rank_bm25 import BM25Okapi
 
 from dietary_advisor.config import get_settings
 from dietary_advisor.dietary_rag.store import Chunk, ChunkMeta, QueryHit, VectorStore
-from dietary_advisor.schemas.meal_plan import Citation
+from dietary_advisor.planning.meal_plan import Citation
 
 log = logging.getLogger(__name__)
 

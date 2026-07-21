@@ -12,8 +12,8 @@ against the profile they were authored from (see `test_cases.py`).
 
 from __future__ import annotations
 
-from dietary_advisor.schemas.nutrition import NutrientName
-from dietary_advisor.schemas.profile import UserProfile
+from dietary_advisor.profile import UserProfile
+from dietary_advisor.totaller.nutrition import NutrientName
 from evaluation.constraints import ConstraintSource, HardConstraint
 from evaluation.profiles.vocab import Condition, DietPattern
 

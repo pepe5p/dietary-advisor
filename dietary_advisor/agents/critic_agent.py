@@ -11,8 +11,8 @@ from pydantic_ai import Agent, ModelSettings
 
 from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.prompts import CRITIC_AGENT_SYSTEM
+from dietary_advisor.agents.reflection import PlanCritique
 from dietary_advisor.config import get_settings
-from dietary_advisor.schemas.reflection import PlanCritique
 
 
 def build_critic_agent() -> Agent[AgentDeps, PlanCritique]:

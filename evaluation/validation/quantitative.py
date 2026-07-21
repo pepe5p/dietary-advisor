@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.food_db import FoodDb
 from dietary_advisor.planning.hydration import total_agent_meal_plan
-from dietary_advisor.schemas.agent_output import AgentMealPlan
-from dietary_advisor.schemas.nutrition import MacroTargets, NutrientName
+from dietary_advisor.totaller.nutrition import MacroTargets, NutrientName
 
 _MACRO_NUTRIENTS = (
     NutrientName.ENERGY_KCAL,

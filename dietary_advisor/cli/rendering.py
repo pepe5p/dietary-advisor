@@ -6,11 +6,11 @@ from rich.console import Console
 from rich.table import Table
 
 from dietary_advisor.food_db.usda_food_db import is_usda_code
+from dietary_advisor.planning.meal_plan import Portion
 from dietary_advisor.planning.pipeline import PipelineResult
-from dietary_advisor.schemas.meal_plan import Portion
-from dietary_advisor.schemas.nutrition import NutrientName
 from dietary_advisor.telemetry import RunTelemetry
-from dietary_advisor.totaller import total_meal_plan, total_portion
+from dietary_advisor.totaller.aggregate import total_meal_plan, total_portion
+from dietary_advisor.totaller.nutrition import NutrientName
 
 console = Console()
 

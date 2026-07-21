@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 
 from dietary_advisor.config import get_api_keys, get_settings
-from dietary_advisor.schemas.nutrition import FoodItem, MacroTargets, NutrientName
-from dietary_advisor.schemas.profile import UserProfile
+from dietary_advisor.profile import UserProfile
+from dietary_advisor.totaller.nutrition import FoodItem, MacroTargets, NutrientName
 from evaluation.settings import get_evaluation_settings
 from setup.settings import get_setup_settings
 

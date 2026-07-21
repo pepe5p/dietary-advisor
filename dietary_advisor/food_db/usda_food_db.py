@@ -23,7 +23,7 @@ from dietary_advisor.food_db.embeddings import embed_query
 from dietary_advisor.food_db.errors import USDAUnknownFoodCodeError
 from dietary_advisor.food_db.fusion import reciprocal_rank_fusion
 from dietary_advisor.food_db.models import Row, USDAItem
-from dietary_advisor.schemas.nutrition import NutrientName
+from dietary_advisor.totaller.nutrition import NutrientName
 
 log = logging.getLogger(__name__)
 

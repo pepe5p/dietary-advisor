@@ -17,19 +17,19 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
+from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.agents.critic_agent import build_critic_agent
 from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.nutrition_agent import build_refiner_agent
 from dietary_advisor.agents.prompts import format_guideline_excerpts
+from dietary_advisor.agents.reflection import PlanCritique
 from dietary_advisor.agents.runner import run_agent_logged
 from dietary_advisor.config import get_settings
 from dietary_advisor.food_db.errors import UnknownFoodCodeError
 from dietary_advisor.planning.hydration import total_agent_meal_plan
-from dietary_advisor.schemas.agent_output import AgentMealPlan
-from dietary_advisor.schemas.meal_plan import Citation, NutrientTotals
-from dietary_advisor.schemas.nutrition import MacroTargets, NutrientName
-from dietary_advisor.schemas.reflection import PlanCritique
+from dietary_advisor.planning.meal_plan import Citation, NutrientTotals
 from dietary_advisor.telemetry import collect_from_result, RunTelemetry
+from dietary_advisor.totaller.nutrition import MacroTargets, NutrientName
 
 log = logging.getLogger(__name__)
 

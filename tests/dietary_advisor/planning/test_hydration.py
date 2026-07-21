@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dietary_advisor.food_db import OFFItem, USDAItem
 from dietary_advisor.planning.hydration import to_food_item
-from dietary_advisor.schemas.nutrition import NutrientName
+from dietary_advisor.totaller.nutrition import NutrientName
 
 
 def test_off_item_maps_to_food_item() -> None:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dietary_advisor.schemas.nutrition import FoodItem
+from dietary_advisor.totaller.nutrition import FoodItem
 from evaluation.validation.rules import food_contains_allergen
 
 

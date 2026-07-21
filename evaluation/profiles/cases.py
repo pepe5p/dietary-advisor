@@ -10,8 +10,8 @@ data for each case.
 
 from __future__ import annotations
 
-from dietary_advisor.schemas.nutrition import MacroTargets, NutrientName
-from dietary_advisor.schemas.profile import ActivityLevel, UserProfile
+from dietary_advisor.profile import ActivityLevel, UserProfile
+from dietary_advisor.totaller.nutrition import MacroTargets, NutrientName
 from evaluation.constraints import ConstraintSource, HardConstraint
 from evaluation.profiles.eval_profile import EvalProfile
 

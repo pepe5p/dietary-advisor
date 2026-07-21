@@ -1,7 +1,7 @@
 """Hydrate agent-emitted references into full domain entities.
 
 The nutrition agent never sees a `FoodItem`; it only ever sees search-result
-summaries and returns `PortionRef` codes (see `schemas.agent_output`). This
+summaries and returns `PortionRef` codes (see `agents.agent_output`). This
 is the one place those codes resolve back to a `FoodItem`/`MealPlan`, both in
 production (`Pipeline.run`) and in the evaluation harness, so the LLM can
 never fake a nutrient value.
@@ -11,11 +11,11 @@ from __future__ import annotations
 
 import logging
 
+from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.food_db import FoodDb, OFFItem, USDAItem
-from dietary_advisor.schemas.agent_output import AgentMealPlan
-from dietary_advisor.schemas.meal_plan import Meal, MealPlan, NutrientTotals, Portion
-from dietary_advisor.schemas.nutrition import FoodItem
-from dietary_advisor.totaller import total_meal_plan
+from dietary_advisor.planning.meal_plan import Meal, MealPlan, NutrientTotals, Portion
+from dietary_advisor.totaller.aggregate import total_meal_plan
+from dietary_advisor.totaller.nutrition import FoodItem
 
 log = logging.getLogger(__name__)
 

@@ -17,14 +17,14 @@ import logging
 
 from pydantic_ai import Agent, ModelRetry, ModelSettings, RunContext
 
+from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.prompts import nutrition_agent_system, REFLECTION_REFINER_AGENT_SYSTEM
 from dietary_advisor.config import get_settings
 from dietary_advisor.food_db.errors import UnknownFoodCodeError
 from dietary_advisor.food_db.facade import LookupQuery, LookupResult
 from dietary_advisor.planning.hydration import total_agent_meal_plan
-from dietary_advisor.schemas.agent_output import AgentMealPlan
-from dietary_advisor.schemas.meal_plan import NutrientTotals
+from dietary_advisor.planning.meal_plan import NutrientTotals
 
 log = logging.getLogger(__name__)
 

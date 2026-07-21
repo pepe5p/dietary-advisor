@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai import Agent
 
-from dietary_advisor.schemas.agent_output import AgentMealPlan
+from dietary_advisor.agents.agent_output import AgentMealPlan
 from evaluation.scenarios import SoftCriterion
 from evaluation.settings import get_evaluation_settings
 

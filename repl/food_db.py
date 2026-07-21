@@ -20,7 +20,7 @@ from dietary_advisor.food_db import FoodDb, LookupQuery, LookupResult, OffFoodDb
 from dietary_advisor.food_db.models import Row
 from dietary_advisor.food_db.off_food_db import _row_to_off_item
 from dietary_advisor.food_db.usda_food_db import _fdc_id, _row_to_usda_item
-from dietary_advisor.schemas.nutrition import canonical_unit, NutrientName
+from dietary_advisor.totaller.nutrition import canonical_unit, NutrientName
 from repl.manual import console, print_manual
 from setup.settings import get_setup_settings
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import duckdb
 
 from dietary_advisor.food_db.usda_food_db import _NUTRIENT_FACTORS
-from dietary_advisor.schemas.nutrition import NutrientName
+from dietary_advisor.totaller.nutrition import NutrientName
 from setup.usda.duckdb_creation import _document_sql, _expected_foods_columns, _NUTRIENT_NUMBERS
 
 

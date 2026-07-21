@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dietary_advisor.schemas.meal_plan import Citation
+    from dietary_advisor.planning.meal_plan import Citation
 
 
 def format_guideline_excerpts(citations: list[Citation], *, header: str) -> str | None:

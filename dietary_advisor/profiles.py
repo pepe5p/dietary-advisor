@@ -9,8 +9,8 @@ profile data in `evaluation/profiles/cases.py`.
 
 from __future__ import annotations
 
-from dietary_advisor.schemas.nutrition import MacroTargets
-from dietary_advisor.schemas.profile import ActivityLevel, UserProfile
+from dietary_advisor.profile import ActivityLevel, UserProfile
+from dietary_advisor.totaller.nutrition import MacroTargets
 
 PROFILES: dict[str, UserProfile] = {
     "karas": UserProfile(

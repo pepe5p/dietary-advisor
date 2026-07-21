@@ -6,8 +6,8 @@ import pytest
 
 from dietary_advisor.food_db import FoodDb
 from dietary_advisor.planning.hydration import to_food_item
+from dietary_advisor.planning.meal_plan import Meal, MealPlan, Portion
 from dietary_advisor.planning.pipeline import PipelineResult, VariantConfig
-from dietary_advisor.schemas.meal_plan import Meal, MealPlan, Portion
 from evaluation.profiles.cases import get_case
 from evaluation.runner import run_ablation_grid
 from tests.conftest import LONG_INSTRUCTIONS

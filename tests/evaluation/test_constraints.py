@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dietary_advisor.schemas.nutrition import NutrientName
+from dietary_advisor.totaller.nutrition import NutrientName
 from evaluation.constraints import HardConstraint
 
 

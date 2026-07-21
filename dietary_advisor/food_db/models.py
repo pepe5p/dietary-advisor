@@ -1,7 +1,7 @@
 """Read models for the two underlying food databases.
 
 `OFFItem`/`USDAItem` mirror the raw shape of each DuckDB source; unlike the
-domain `dietary_advisor.schemas.nutrition.FoodItem`, they are read-only,
+domain `dietary_advisor.totaller.nutrition.FoodItem`, they are read-only,
 never emitted by the LLM, and deliberately do not share a base class - each
 DB has different provenance/context fields, and forcing a common shape would
 either lose information or fabricate fields the source doesn't have.
@@ -15,7 +15,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dietary_advisor.schemas.nutrition import NutrientAmountMap
+from dietary_advisor.totaller.nutrition import NutrientAmountMap
 
 # A raw DuckDB row keyed by column name. The column set varies per query (and is
 # open-ended under `SELECT *`), so it is deliberately not a fixed model.

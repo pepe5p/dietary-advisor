@@ -16,7 +16,7 @@ from dietary_advisor.config import FoodDbUsage, get_settings
 from dietary_advisor.food_db import usda_food_db as usda_mod
 from dietary_advisor.food_db.errors import USDAUnknownFoodCodeError
 from dietary_advisor.food_db.usda_food_db import UsdaFoodDb
-from dietary_advisor.schemas.nutrition import NutrientName
+from dietary_advisor.totaller.nutrition import NutrientName
 
 # fdc_id, description, category, data_type, embedding vector.
 _FOODS = [

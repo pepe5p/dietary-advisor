@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dietary_advisor.food_db import FoodDb
 from dietary_advisor.planning.hydration import total_agent_meal_plan
-from dietary_advisor.schemas.nutrition import MacroTargets, NutrientName
+from dietary_advisor.totaller.nutrition import MacroTargets, NutrientName
 from evaluation.validation.quantitative import macro_errors
 from tests.evaluation.conftest import agent_plan_single
 

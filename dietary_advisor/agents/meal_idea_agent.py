@@ -14,9 +14,9 @@ from __future__ import annotations
 from pydantic_ai import Agent, ModelSettings
 
 from dietary_advisor.agents.deps import AgentDeps
+from dietary_advisor.agents.meal_idea import MealConcept
 from dietary_advisor.agents.prompts import MEAL_IDEA_AGENT_SYSTEM
 from dietary_advisor.config import get_settings
-from dietary_advisor.schemas.meal_idea import MealConcept
 
 
 def build_meal_idea_agent() -> Agent[AgentDeps, list[MealConcept]]:

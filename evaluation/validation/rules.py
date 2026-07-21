@@ -11,8 +11,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from dietary_advisor.schemas.meal_plan import MealPlan, NutrientTotals
-from dietary_advisor.schemas.nutrition import FoodItem, NutrientName
+from dietary_advisor.planning.meal_plan import MealPlan, NutrientTotals
+from dietary_advisor.totaller.nutrition import FoodItem, NutrientName
 from evaluation.constraints import HardConstraint, Violation
 
 
