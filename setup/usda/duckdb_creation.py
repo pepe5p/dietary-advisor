@@ -1,7 +1,7 @@
 """Build a local DuckDB database of USDA FoodData Central generic foods.
 
 Source: the FoodData Central CSV exports for Foundation Foods and SR Legacy
-(fetched by ``setup.usda_downloading``). These are generic, minimally-processed
+(fetched by ``setup.usda.downloading``). These are generic, minimally-processed
 / reference foods - the whole-food counterpart to the branded Polish products in
 the OFF DB - so the two databases are searched side by side at runtime.
 
@@ -23,8 +23,8 @@ from pathlib import Path
 import duckdb
 
 from dietary_advisor.config import Settings
-from setup.duckdb_creation import _embed_documents
-from setup.usda_downloading import resolve_usda_csv_dirs
+from setup.open_food_facts.duckdb_creation import _embed_documents
+from setup.usda.downloading import resolve_usda_csv_dirs
 
 log = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ def _check_schema(con: duckdb.DuckDBPyConnection, csv_dirs: list[Path]) -> None:
             raise UsdaSchemaError(
                 f"USDA {name} export is missing expected column(s): {missing}. "
                 "The FoodData Central schema likely changed - update "
-                "setup/usda_duckdb_creation.py before retrying."
+                "setup/usda/duckdb_creation.py before retrying."
             )
 
 

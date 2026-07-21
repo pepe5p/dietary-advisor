@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import duckdb
 
-from setup.duckdb_creation import _document_sql, _expected_products_columns, _trash_predicate
+from setup.open_food_facts.duckdb_creation import _document_sql, _expected_products_columns, _trash_predicate
 
 
 def _document_for(**columns: object) -> str:

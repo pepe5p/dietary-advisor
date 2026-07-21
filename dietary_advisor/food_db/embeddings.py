@@ -1,9 +1,10 @@
 """Runtime text embedder for semantic product search.
 
 Only the query side lives here (runtime code). The build-time document
-embedder is in `setup` (see `setup.duckdb_creation`), but both must share
-`load_embedder` so their vectors land in the same space; the E5 family is
-trained with asymmetric `query:` / `passage:` prefixes, applied per side.
+embedder is in `setup` (see `setup.open_food_facts.duckdb_creation`), but both
+must share `load_embedder` so their vectors land in the same space; the E5
+family is trained with asymmetric `query:` / `passage:` prefixes, applied per
+side.
 """
 
 from __future__ import annotations

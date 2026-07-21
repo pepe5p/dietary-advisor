@@ -114,9 +114,16 @@ def _render_telemetry(telemetry: RunTelemetry) -> None:
         debug_tbl.add_row(tool_name, str(count))
     debug_tbl.add_row("[dim]total tool calls[/dim]", str(telemetry.total_tool_calls))
     console.print(debug_tbl)
+    input_cell = f"input tokens: {telemetry.input_tokens}"
+    if telemetry.cache_read_tokens:
+        input_cell += f" (cached: {telemetry.cache_read_tokens})"
+    output_cell = f"output tokens: {telemetry.output_tokens}"
+    if telemetry.reasoning_tokens:
+        output_cell += f" (reasoning: {telemetry.reasoning_tokens})"
+    cache_write_cell = f" | cache write tokens: {telemetry.cache_write_tokens}" if telemetry.cache_write_tokens else ""
     console.print(
         f"[dim]LLM requests: {telemetry.requests} | "
-        f"input tokens: {telemetry.input_tokens} | "
-        f"output tokens: {telemetry.output_tokens} | "
+        f"{input_cell} | "
+        f"{output_cell}{cache_write_cell} | "
         f"total tokens: {telemetry.total_tokens}[/dim]",
     )

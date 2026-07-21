@@ -1,10 +1,11 @@
 """Fetch the Open Food Facts Parquet export to a local cache.
 
 The full export is ~7.6 GB. We download it once to a local cache and then
-filter from that file (see ``setup.duckdb_creation``), rather than streaming it
-over ``httpfs`` on every run: DuckDB's remote Parquet reads fan out into
-hundreds of ranged HTTP requests, which Hugging Face rate-limits (HTTP 429). A
-single resumable download is both friendlier to HF and far faster to re-run.
+filter from that file (see ``setup.open_food_facts.duckdb_creation``), rather
+than streaming it over ``httpfs`` on every run: DuckDB's remote Parquet reads
+fan out into hundreds of ranged HTTP requests, which Hugging Face rate-limits
+(HTTP 429). A single resumable download is both friendlier to HF and far
+faster to re-run.
 """
 
 from __future__ import annotations

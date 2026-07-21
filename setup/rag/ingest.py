@@ -20,7 +20,7 @@ import pypdf
 
 from dietary_advisor.config import Settings
 from dietary_advisor.dietary_rag.store import Chunk, ChunkMeta, VectorStore
-from setup.sources import CorpusSource, SOURCES
+from setup.rag.sources import CorpusSource, SOURCES
 
 log = logging.getLogger(__name__)
 
@@ -188,5 +188,12 @@ def build_rag_corpus(settings: Settings) -> IngestStats:
         total_chunks += len(chunks)
 
     _purge_stale_chunks(store)
+
+    log.info(
+        "Indexed correctly %d chunks",
+        total_chunks,
+    )
+    if len(failed) > 0:
+        log.error("Failed to index %d chunks", len(failed))
 
     return IngestStats(fetched=fetched, failed=failed, chunks_indexed=total_chunks)

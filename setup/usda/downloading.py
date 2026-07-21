@@ -14,7 +14,7 @@ import zipfile
 from pathlib import Path
 
 from dietary_advisor.config import Settings
-from setup.off_downloading import _download_parquet
+from setup.open_food_facts.downloading import _download_parquet
 
 log = logging.getLogger(__name__)
 

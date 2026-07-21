@@ -346,13 +346,22 @@ class Pipeline:
         plan = hydrate_meal_plan(agent_plan, deps.food_db)
 
         log.info(
-            "Pipeline complete: variant=%s meals=%d citations=%d iterations=%d requests=%d tool_calls=%d",
+            (
+                "Pipeline complete: variant=%s meals=%d citations=%d iterations=%d requests=%d "
+                "tool_calls=%d input_tokens=%d output_tokens=%d total_tokens=%d "
+                "cache_read_tokens=%d reasoning_tokens=%d"
+            ),
             self.variant.label,
             len(plan.meals),
             len(plan.citations),
             iterations,
             telemetry.requests,
             telemetry.total_tool_calls,
+            telemetry.input_tokens,
+            telemetry.output_tokens,
+            telemetry.total_tokens,
+            telemetry.cache_read_tokens,
+            telemetry.reasoning_tokens,
         )
         return PipelineResult(
             plan=plan,

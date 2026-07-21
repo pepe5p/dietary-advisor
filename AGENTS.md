@@ -46,5 +46,5 @@ shared primitive in `dietary_advisor` and call it from the outer package — do
 not pull build-only helpers into `dietary_advisor`. Example: the fastembed
 model loader (`dietary_advisor/food_db/embeddings.py:load_embedder`) is shared,
 but the build-time document embedder lives in
-`setup/duckdb_creation.py` (`_embed_documents`) while only the runtime query
+`setup/open_food_facts/duckdb_creation.py` (`_embed_documents`) while only the runtime query
 embedder (`embed_query`) stays in `dietary_advisor`.

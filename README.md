@@ -10,7 +10,8 @@ ablation across three patient complexity levels (L1-L3).
 ## Requirements
 
 - [Docker](https://docs.docker.com/get-docker/) + Docker Compose v2 (the supported runtime)
-- An LLM API key (OpenAI by default; Anthropic and Gemini also wired in via `pydantic-ai`)
+- An LLM API key (OpenAI by default; Anthropic, Gemini and Groq also wired in via
+  `pydantic-ai`) - or a locally-served OpenAI-compatible model (e.g. Ollama), no key needed
 - Optional: [`just`](https://github.com/casey/just) on the host for the wrappers below;
   everything also works with bare `docker compose run --rm dietary_advisor ...`
 
@@ -91,6 +92,14 @@ just build && just dc setup && just dc evaluate --repeats 3
 
 `docker-compose.yml` loads `.env` via `env_file`; all variables are read by
 `dietary_advisor.config.Settings`.
+
+`DA_LLM_MODEL`/`DA_JUDGE_MODEL` are `pydantic-ai` model identifiers
+(`openai:gpt-4o-mini`, `anthropic:claude-3-5-sonnet-latest`, `groq:llama-3.3-70b-versatile`,
+...). Local models served through an OpenAI-compatible endpoint (e.g.
+[Ollama](https://ollama.com/)) work the same way via `ollama:<tag>` plus
+`OLLAMA_BASE_URL` - see the commented-out block in
+[`.env.example`](.env.example). From inside the container, point
+`OLLAMA_BASE_URL` at `http://host.docker.internal:11434/v1`, not `localhost`.
 
 ## Tests and lint
 

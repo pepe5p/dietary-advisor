@@ -28,6 +28,13 @@ class RunTelemetry:
     requests: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+    # Provider-specific usage extras keyed by provider-defined names (e.g.
+    # Gemini's "thoughts_tokens", "cached_content_tokens"); kept generic
+    # rather than as named fields since each provider reports a different
+    # set. See `reasoning_tokens` for the cross-provider reasoning lookup.
+    details: Counter[str] = field(default_factory=Counter)
 
     @property
     def total_tool_calls(self) -> int:
@@ -37,15 +44,29 @@ class RunTelemetry:
     def total_tokens(self) -> int:
         return self.input_tokens + self.output_tokens
 
+    @property
+    def reasoning_tokens(self) -> int:
+        """Reasoning/thinking tokens, already included in `output_tokens`.
+
+        Gemini reports these as "thoughts_tokens"; OpenAI's o-series/GPT-5
+        reasoning models report "reasoning_tokens".
+        """
+        return self.details.get("thoughts_tokens", 0) or self.details.get("reasoning_tokens", 0)
+
     def merge(self, other: RunTelemetry) -> RunTelemetry:
         """Return a new `RunTelemetry` combining `self` and `other`."""
-        merged = Counter(self.tool_calls)
-        merged.update(other.tool_calls)
+        merged_tool_calls = Counter(self.tool_calls)
+        merged_tool_calls.update(other.tool_calls)
+        merged_details = Counter(self.details)
+        merged_details.update(other.details)
         return RunTelemetry(
-            tool_calls=merged,
+            tool_calls=merged_tool_calls,
             requests=self.requests + other.requests,
             input_tokens=self.input_tokens + other.input_tokens,
             output_tokens=self.output_tokens + other.output_tokens,
+            cache_read_tokens=self.cache_read_tokens + other.cache_read_tokens,
+            cache_write_tokens=self.cache_write_tokens + other.cache_write_tokens,
+            details=merged_details,
         )
 
     def as_dict(self) -> dict[str, object]:
@@ -56,6 +77,10 @@ class RunTelemetry:
             "input_tokens": self.input_tokens,
             "output_tokens": self.output_tokens,
             "total_tokens": self.total_tokens,
+            "cache_read_tokens": self.cache_read_tokens,
+            "cache_write_tokens": self.cache_write_tokens,
+            "reasoning_tokens": self.reasoning_tokens,
+            "details": dict(self.details),
         }
 
 
@@ -73,4 +98,7 @@ def collect_from_result(result: _AgentRunResultLike) -> RunTelemetry:
         requests=usage.requests,
         input_tokens=usage.input_tokens,
         output_tokens=usage.output_tokens,
+        cache_read_tokens=usage.cache_read_tokens,
+        cache_write_tokens=usage.cache_write_tokens,
+        details=Counter(usage.details),
     )

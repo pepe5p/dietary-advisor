@@ -59,13 +59,50 @@ def test_collect_from_result_handles_no_tool_calls() -> None:
     assert telemetry.total_tool_calls == 0
 
 
+def test_collect_from_result_copies_cache_and_details() -> None:
+    """Gemini reports cache/thoughts tokens via `RunUsage.cache_read_tokens`/`details`."""
+    messages: list[ModelMessage] = [ModelResponse(parts=[TextPart(content="done")])]
+    run_usage = RunUsage(
+        requests=1,
+        input_tokens=1000,
+        output_tokens=390,
+        cache_read_tokens=300,
+        details={"thoughts_tokens": 150, "cached_content_tokens": 300, "tool_use_prompt_tokens": 40},
+    )
+    result = _FakeResult(messages=messages, run_usage=run_usage)
+
+    telemetry = collect_from_result(result)
+
+    assert telemetry.cache_read_tokens == 300
+    assert telemetry.cache_write_tokens == 0
+    assert telemetry.details == {"thoughts_tokens": 150, "cached_content_tokens": 300, "tool_use_prompt_tokens": 40}
+    assert telemetry.reasoning_tokens == 150
+
+
+def test_reasoning_tokens_falls_back_to_openai_style_key() -> None:
+    telemetry = RunTelemetry(details=Counter({"reasoning_tokens": 64}))
+
+    assert telemetry.reasoning_tokens == 64
+
+
 def test_run_telemetry_merge_combines_counts_and_usage() -> None:
-    a = RunTelemetry(tool_calls=Counter({"lookup_food": 2}), requests=1, input_tokens=100, output_tokens=20)
+    a = RunTelemetry(
+        tool_calls=Counter({"lookup_food": 2}),
+        requests=1,
+        input_tokens=100,
+        output_tokens=20,
+        cache_read_tokens=10,
+        cache_write_tokens=5,
+        details=Counter({"thoughts_tokens": 8}),
+    )
     b = RunTelemetry(
         tool_calls=Counter({"lookup_food": 1, "total_meal_plan": 3}),
         requests=2,
         input_tokens=50,
         output_tokens=10,
+        cache_read_tokens=4,
+        cache_write_tokens=0,
+        details=Counter({"thoughts_tokens": 2, "cached_content_tokens": 1}),
     )
 
     merged = a.merge(b)
@@ -75,13 +112,26 @@ def test_run_telemetry_merge_combines_counts_and_usage() -> None:
     assert merged.input_tokens == 150
     assert merged.output_tokens == 30
     assert merged.total_tokens == 180
+    assert merged.cache_read_tokens == 14
+    assert merged.cache_write_tokens == 5
+    assert merged.details == {"thoughts_tokens": 10, "cached_content_tokens": 1}
     # merge() must not mutate either operand.
     assert a.tool_calls == {"lookup_food": 2}
     assert b.tool_calls == {"lookup_food": 1, "total_meal_plan": 3}
+    assert a.details == {"thoughts_tokens": 8}
+    assert b.details == {"thoughts_tokens": 2, "cached_content_tokens": 1}
 
 
 def test_run_telemetry_as_dict_is_json_friendly() -> None:
-    telemetry = RunTelemetry(tool_calls=Counter({"lookup_food": 2}), requests=1, input_tokens=100, output_tokens=20)
+    telemetry = RunTelemetry(
+        tool_calls=Counter({"lookup_food": 2}),
+        requests=1,
+        input_tokens=100,
+        output_tokens=20,
+        cache_read_tokens=15,
+        cache_write_tokens=0,
+        details=Counter({"thoughts_tokens": 5}),
+    )
     payload = telemetry.as_dict()
 
     assert payload == {
@@ -91,4 +141,8 @@ def test_run_telemetry_as_dict_is_json_friendly() -> None:
         "input_tokens": 100,
         "output_tokens": 20,
         "total_tokens": 120,
+        "cache_read_tokens": 15,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 5,
+        "details": {"thoughts_tokens": 5},
     }

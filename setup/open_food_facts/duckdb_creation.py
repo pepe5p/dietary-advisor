@@ -2,12 +2,12 @@
 
 Source: the Open Food Facts Hugging Face Parquet export (already slimmed vs.
 the raw MongoDB/JSONL dump), fetched to a local cache by
-``setup.off_downloading``. We filter down to products sold in Poland with a
-complete macro profile, drop unidentifiable rows (see ``_trash_predicate``), keep
-only the columns useful to the dietary advisor, and materialize them into a
-single portable ``.duckdb`` file plus a full-text index over product
-names/brands/categories (see ``_FTS_FIELDS``) for lookup by name and
-descriptive text.
+``setup.open_food_facts.downloading``. We filter down to products sold in
+Poland with a complete macro profile, drop unidentifiable rows (see
+``_trash_predicate``), keep only the columns useful to the dietary advisor,
+and materialize them into a single portable ``.duckdb`` file plus a full-text
+index over product names/brands/categories (see ``_FTS_FIELDS``) for lookup
+by name and descriptive text.
 
 Nutrient amounts are stored exactly as reported by OFF (per 100g), alongside
 their source unit, so unit canonicalization stays an explicit, later step
@@ -25,7 +25,7 @@ import duckdb
 
 from dietary_advisor.config import Settings
 from dietary_advisor.food_db.embeddings import load_embedder
-from setup.off_downloading import resolve_source_parquet
+from setup.open_food_facts.downloading import resolve_source_parquet
 
 log = logging.getLogger(__name__)
 
@@ -258,7 +258,7 @@ def _check_schema(con: duckdb.DuckDBPyConnection, source_sql: str) -> None:
         raise OffSchemaError(
             "Open Food Facts Parquet export is missing expected column(s): "
             f"{missing}. The upstream schema likely changed - update "
-            "setup/duckdb_creation.py's column mapping before retrying."
+            "setup/open_food_facts/duckdb_creation.py's column mapping before retrying."
         )
 
 

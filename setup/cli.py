@@ -13,9 +13,9 @@ import logging
 import typer
 
 from dietary_advisor.config import get_settings, Settings
-from setup.duckdb_creation import build_off_db
-from setup.rag import build_rag_corpus
-from setup.usda_duckdb_creation import build_usda_db
+from setup.open_food_facts.duckdb_creation import build_off_db
+from setup.rag.ingest import build_rag_corpus
+from setup.usda.duckdb_creation import build_usda_db
 
 app = typer.Typer(
     help="Provision local project data (Open Food Facts DB, USDA DB, RAG corpus, and future setup steps)."
@@ -43,12 +43,7 @@ def _step_usda(settings: Settings) -> None:
 
 def _step_rag(settings: Settings) -> None:
     log.info("RAG clinical-guideline corpus")
-    stats = build_rag_corpus(settings)
-    log.info(
-        "Corpus: %d chunks indexed (failed: %s).",
-        stats.chunks_indexed,
-        stats.failed or "-",
-    )
+    build_rag_corpus(settings)
 
 
 # Ordered so `setup` runs steps in dependency order; keys are the CLI step names.
