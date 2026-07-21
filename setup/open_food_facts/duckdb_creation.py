@@ -23,9 +23,9 @@ from pathlib import Path
 
 import duckdb
 
-from dietary_advisor.config import Settings
 from dietary_advisor.food_db.embeddings import load_embedder
 from setup.open_food_facts.downloading import resolve_source_parquet
+from setup.settings import SetupSettings
 
 log = logging.getLogger(__name__)
 
@@ -353,7 +353,7 @@ def _document_sql() -> str:
     return "concat_ws(chr(10), " + ", ".join(parts) + ")"
 
 
-def _embed_products(con: duckdb.DuckDBPyConnection, settings: Settings) -> None:
+def _embed_products(con: duckdb.DuckDBPyConnection, settings: SetupSettings) -> None:
     """Backfill the `embedding` column and build a VSS HNSW index over it.
 
     Runs one embedding pass over every product document; the HNSW build is
@@ -507,7 +507,7 @@ def _existing_fts_fields(target: Path) -> set[str] | None:
     return {row[0] for row in rows}
 
 
-def _materialize_off_db(settings: Settings, parquet_path: Path) -> Path:
+def _materialize_off_db(settings: SetupSettings, parquet_path: Path) -> Path:
     """Filter `parquet_path` into a fresh `products` DuckDB at `settings.off_db`.
 
     Writes to a sibling temp file and renames on success so an interrupted
@@ -561,7 +561,7 @@ def _materialize_off_db(settings: Settings, parquet_path: Path) -> Path:
     return target
 
 
-def build_off_db(settings: Settings) -> Path:
+def build_off_db(settings: SetupSettings) -> Path:
     """Ensure the local Polish OFF product DB exists and is current at `settings.off_db`.
 
     A DB predating a schema change (a column missing from `_BASE_SELECT`) is

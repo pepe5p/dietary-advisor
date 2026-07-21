@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from pydantic_ai.models.test import TestModel
 
-from dietary_advisor.config import get_settings
 from evaluation.scenarios import SoftCriterion
+from evaluation.settings import get_evaluation_settings
 from evaluation.validation.qualitative import CriterionScore, QualitativeResult, score_soft_preferences
 from tests.evaluation.conftest import agent_plan_rice_lunch
 
@@ -26,7 +26,7 @@ async def test_score_soft_preferences_with_test_model(monkeypatch: pytest.Monkey
         aggregate=0.85,
     )
     monkeypatch.setitem(
-        get_settings().__dict__,
+        get_evaluation_settings().__dict__,
         "resolved_judge_model",
         TestModel(custom_output_args=expected.model_dump()),
     )

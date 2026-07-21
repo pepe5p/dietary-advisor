@@ -5,9 +5,9 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai import Agent
 
-from dietary_advisor.config import get_settings
 from dietary_advisor.schemas.agent_output import AgentMealPlan
 from evaluation.scenarios import SoftCriterion
+from evaluation.settings import get_evaluation_settings
 
 JUDGE_SOFT_PREFERENCES_SYSTEM = """You are a G-Eval judge for dietary meal-plan quality. You score how well a
 generated one-day meal plan satisfies *soft* session preferences from the user's
@@ -57,7 +57,7 @@ async def score_soft_preferences(
     if not criteria:
         return None
 
-    settings = get_settings()
+    settings = get_evaluation_settings()
     judge = Agent(
         settings.resolved_judge_model,
         output_type=QualitativeResult,

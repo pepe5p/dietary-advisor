@@ -10,6 +10,8 @@ import pytest
 from dietary_advisor.config import get_api_keys, get_settings
 from dietary_advisor.schemas.nutrition import FoodItem, MacroTargets, NutrientName
 from dietary_advisor.schemas.profile import UserProfile
+from evaluation.settings import get_evaluation_settings
+from setup.settings import get_setup_settings
 
 # Realistic placeholder meal `recipe` text for tests that don't care about the
 # specific recipe content.
@@ -25,13 +27,14 @@ def _isolate_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Force every Settings-derived path under `tmp_path` and reset the cache."""
     monkeypatch.setenv("DA_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("DA_CHROMA_DIR", str(tmp_path / "data" / "chroma"))
-    monkeypatch.setenv("DA_CORPUS_DIR", str(tmp_path / "corpus"))
     # Provide a dummy key so pydantic-ai's openai provider can be instantiated
     # in tests; we still override the model itself with TestModel before any
     # network call is attempted.
     monkeypatch.setenv("OPENAI_API_KEY", os.environ.get("OPENAI_API_KEY", "test-dummy"))
     get_settings.cache_clear()
     get_api_keys.cache_clear()
+    get_setup_settings.cache_clear()
+    get_evaluation_settings.cache_clear()
 
 
 @pytest.fixture()

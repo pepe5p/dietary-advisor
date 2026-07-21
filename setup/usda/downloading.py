@@ -13,8 +13,8 @@ import logging
 import zipfile
 from pathlib import Path
 
-from dietary_advisor.config import Settings
 from setup.open_food_facts.downloading import _download_parquet
+from setup.settings import SetupSettings
 
 log = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ def _ensure_extracted(zip_path: Path, extract_root: Path) -> Path:
     return csv_dir
 
 
-def resolve_usda_csv_dirs(settings: Settings) -> list[Path]:
+def resolve_usda_csv_dirs(settings: SetupSettings) -> list[Path]:
     """Return the CSV directories for the Foundation + SR Legacy datasets.
 
     Downloads each archive to `settings.usda_raw_dir` when missing and unzips it

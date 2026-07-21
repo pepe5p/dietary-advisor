@@ -12,9 +12,9 @@ import logging
 
 import typer
 
-from dietary_advisor.config import get_settings, Settings
 from setup.open_food_facts.duckdb_creation import build_off_db
 from setup.rag.ingest import build_rag_corpus
+from setup.settings import get_setup_settings, SetupSettings
 from setup.usda.duckdb_creation import build_usda_db
 
 app = typer.Typer(
@@ -31,17 +31,17 @@ def _configure_logging(verbose: bool) -> None:
     )
 
 
-def _step_off(settings: Settings) -> None:
+def _step_off(settings: SetupSettings) -> None:
     log.info("Open Food Facts product DB")
     build_off_db(settings)
 
 
-def _step_usda(settings: Settings) -> None:
+def _step_usda(settings: SetupSettings) -> None:
     log.info("USDA FoodData Central product DB")
     build_usda_db(settings)
 
 
-def _step_rag(settings: Settings) -> None:
+def _step_rag(settings: SetupSettings) -> None:
     log.info("RAG clinical-guideline corpus")
     build_rag_corpus(settings)
 
@@ -70,7 +70,7 @@ def main(ctx: typer.Context, verbose: bool = _VERBOSE) -> None:
         return
 
     _configure_logging(verbose)
-    settings = get_settings()
+    settings = get_setup_settings()
 
     total = len(_STEPS)
     for i, (name, step) in enumerate(_STEPS.items(), start=1):
@@ -82,7 +82,7 @@ def main(ctx: typer.Context, verbose: bool = _VERBOSE) -> None:
 
 def _run_step(name: str, verbose: bool) -> None:
     _configure_logging(verbose)
-    _STEPS[name](get_settings())
+    _STEPS[name](get_setup_settings())
     log.info("Step %r complete.", name)
 
 

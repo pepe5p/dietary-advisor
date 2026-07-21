@@ -18,9 +18,9 @@ from pathlib import Path
 import httpx
 import pypdf
 
-from dietary_advisor.config import Settings
 from dietary_advisor.dietary_rag.store import Chunk, ChunkMeta, VectorStore
 from setup.rag.sources import CorpusSource, SOURCES
+from setup.settings import SetupSettings
 
 log = logging.getLogger(__name__)
 
@@ -101,7 +101,7 @@ def _detect_page(chunk: str) -> int | None:
     return int(m.group(1)) if m else None
 
 
-def _build_chunks_for(source: CorpusSource, raw_text: str, settings: Settings) -> list[Chunk]:
+def _build_chunks_for(source: CorpusSource, raw_text: str, settings: SetupSettings) -> list[Chunk]:
     chunks = _chunk(
         raw_text,
         chunk_size=settings.rag_chunk_size,
@@ -151,7 +151,7 @@ def _purge_stale_chunks(store: VectorStore) -> None:
         store.delete_docs(stale)
 
 
-def build_rag_corpus(settings: Settings) -> IngestStats:
+def build_rag_corpus(settings: SetupSettings) -> IngestStats:
     """Ensure the RAG corpus is downloaded, chunked, embedded, and indexed."""
     corpus_dir = settings.corpus_dir
     corpus_dir.mkdir(parents=True, exist_ok=True)

@@ -22,6 +22,7 @@ from dietary_advisor.food_db.off_food_db import _row_to_off_item
 from dietary_advisor.food_db.usda_food_db import _fdc_id, _row_to_usda_item
 from dietary_advisor.schemas.nutrition import canonical_unit, NutrientName
 from repl.manual import console, print_manual
+from setup.settings import get_setup_settings
 
 __all__ = [
     "get_off_item",
@@ -166,7 +167,7 @@ def get_parquet_record(code: str) -> Row:
     column is available for exploration. Each lookup is a full file scan (a few
     seconds); it is a debugging aid, not a hot path.
     """
-    parquet = get_settings().off_raw_parquet
+    parquet = get_setup_settings().off_raw_parquet
     con = duckdb.connect()
     try:
         return _fetch_record(

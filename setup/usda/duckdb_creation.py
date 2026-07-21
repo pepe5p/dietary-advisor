@@ -22,8 +22,8 @@ from pathlib import Path
 
 import duckdb
 
-from dietary_advisor.config import Settings
 from setup.open_food_facts.duckdb_creation import _embed_documents
+from setup.settings import SetupSettings
 from setup.usda.downloading import resolve_usda_csv_dirs
 
 log = logging.getLogger(__name__)
@@ -258,7 +258,7 @@ def _column_comment_sql() -> list[str]:
     return statements
 
 
-def _embed_foods(con: duckdb.DuckDBPyConnection, settings: Settings) -> None:
+def _embed_foods(con: duckdb.DuckDBPyConnection, settings: SetupSettings) -> None:
     """Backfill the `embedding` column and build a VSS HNSW index over it.
 
     Best-effort HNSW build (the runtime falls back to brute-force cosine, cheap
@@ -314,7 +314,7 @@ def _stale_foods_columns(target: Path) -> set[str] | None:
     return _expected_foods_columns() - present
 
 
-def _materialize_usda_db(settings: Settings, csv_dirs: list[Path]) -> Path:
+def _materialize_usda_db(settings: SetupSettings, csv_dirs: list[Path]) -> Path:
     """Pivot the FDC CSVs into a fresh `foods` DuckDB at `settings.usda_db`.
 
     Writes to a sibling temp file and renames on success so an interrupted build
@@ -369,7 +369,7 @@ def _materialize_usda_db(settings: Settings, csv_dirs: list[Path]) -> Path:
     return target
 
 
-def build_usda_db(settings: Settings) -> Path:
+def build_usda_db(settings: SetupSettings) -> Path:
     """Ensure the local USDA food DB exists and is current at `settings.usda_db`.
 
     Skips the build only when an existing DB already has every expected column;

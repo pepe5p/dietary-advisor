@@ -48,8 +48,6 @@ class Settings(BaseSettings):
     # pydantic-ai model identifier, e.g. "openai:gpt-4o-mini",
     # "anthropic:claude-3-5-sonnet-latest", "ollama:llama3.1".
     llm_model: str = Field(...)
-    # "judge" model used for the G-Eval soft-preference judge
-    judge_model: str = Field(...)
     # Sampling temperature for the nutrition/refiner/RAG agents. Provider defaults
     # tend to be conservative for tool-calling flows, which combined with fully
     # deterministic retrieval (BM25 + cosine similarity, no randomness) makes the
@@ -63,7 +61,6 @@ class Settings(BaseSettings):
     # --- Storage ---
     data_dir: Path = Field(default=Path(".data"))
     chroma_dir: Path = Field(default=Path(".data/rag/chroma"))
-    corpus_dir: Path = Field(default=Path(".data/rag/corpus"))
     # Chroma downloads its bundled MiniLM ONNX model (~80 MB) on first use.
     # Its default cache is under $HOME, which is ephemeral in the container;
     # keeping it under the bind-mounted .data means it's fetched only once.
@@ -71,12 +68,6 @@ class Settings(BaseSettings):
 
     # --- Open Food Facts (local product DB, built by `setup`) ---
     off_db: Path = Field(default=Path(".data/off/off_pl.duckdb"))
-    # Local cache of the full OFF Parquet export (~7.6 GB). Downloaded once and
-    # filtered locally; streaming it remotely trips Hugging Face rate limits.
-    off_raw_parquet: Path = Field(default=Path(".data/off/food.parquet"))
-    off_source_url: str = Field(
-        default="https://huggingface.co/datasets/openfoodfacts/product-database/resolve/main/food.parquet"
-    )
     # Semantic product search: fastembed model used to embed the per-product
     # document at build time and the query at runtime. E5 models are trained
     # with `passage:`/`query:` prefixes (applied in food_db/embeddings.py) and
@@ -96,17 +87,6 @@ class Settings(BaseSettings):
     # Polish products: these are the generic whole foods OFF largely lacks.
     # Same embedding model/dim/cache as OFF, so the query vectors are shared.
     usda_db: Path = Field(default=Path(".data/usda/usda.duckdb"))
-    # Local cache dir for the downloaded FDC CSV zips (extracted in place).
-    usda_raw_dir: Path = Field(default=Path(".data/usda/raw"))
-    # FDC ships fixed-vintage zips; SR Legacy is final (April 2018). URLs are
-    # overridable so a newer Foundation vintage can be swapped in without code
-    # changes (the build verifies the archive still has the CSVs it needs).
-    usda_foundation_source_url: str = Field(
-        default="https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_foundation_food_csv_2024-10-31.zip"
-    )
-    usda_sr_legacy_source_url: str = Field(
-        default="https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_csv_2018-04.zip"
-    )
     # Which retrieval channel(s) the USDA reader uses (or `disabled` to skip it).
     usda_usage: FoodDbUsage = Field(default=FoodDbUsage.FULL)
 
@@ -116,29 +96,22 @@ class Settings(BaseSettings):
     # --- RAG ---
     rag_top_k: int = Field(default=6, ge=1, le=50)
     rag_bm25_weight: float = Field(default=0.3, ge=0.0, le=1.0)
-    rag_chunk_size: int = Field(default=900, ge=200, le=4000)
-    rag_chunk_overlap: int = Field(default=120, ge=0, le=500)
 
     # --- LLM HTTP (Groq free tier often returns 429 with long Retry-After backoff) ---
     llm_request_timeout_s: float = Field(default=300.0, gt=0)
     llm_max_retries: int = Field(default=6, ge=0, le=20)
-
-    # --- Misc ---
-    request_timeout_s: float = Field(default=60.0, gt=0)
 
     def ensure_dirs(self) -> None:
         """Create the local data directories (idempotent)."""
         for p in (
             self.data_dir,
             self.chroma_dir,
-            self.corpus_dir,
             self.onnx_model_dir,
             self.off_embedding_cache,
-            self.usda_raw_dir,
         ):
             p.mkdir(parents=True, exist_ok=True)
-        # Parent dirs for duckdb files and the OFF Parquet cache.
-        for f in (self.off_db, self.off_raw_parquet, self.usda_db):
+        # Parent dirs for the duckdb files.
+        for f in (self.off_db, self.usda_db):
             f.parent.mkdir(parents=True, exist_ok=True)
 
     def _resolve(self, model_id: str) -> Model:
@@ -157,10 +130,6 @@ class Settings(BaseSettings):
         LLM-free commands (`setup`, `info`) don't fail on a missing API key.
         """
         return self._resolve(self.llm_model)
-
-    @cached_property
-    def resolved_judge_model(self) -> Model:
-        return self._resolve(self.judge_model)
 
 
 # A second settings group for raw third-party API keys. We read these as

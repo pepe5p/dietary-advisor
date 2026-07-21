@@ -16,7 +16,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from dietary_advisor.config import Settings
+from setup.settings import SetupSettings
 
 log = logging.getLogger(__name__)
 
@@ -99,7 +99,7 @@ def _download_parquet(url: str, dest: Path) -> None:
     raise RuntimeError(f"Failed to download OFF Parquet from {url} after {_DOWNLOAD_RETRIES} attempts: {last_exc}")
 
 
-def resolve_source_parquet(settings: Settings) -> Path:
+def resolve_source_parquet(settings: SetupSettings) -> Path:
     """Return a local Parquet path to filter, downloading the OFF export to the cache if needed.
 
     Uses the cache at `settings.off_raw_parquet`, downloading it from

@@ -91,7 +91,10 @@ just build && just dc setup && just dc evaluate --repeats 3
 ## Configuration
 
 `docker-compose.yml` loads `.env` via `env_file`; all variables are read by
-`dietary_advisor.config.Settings`.
+`dietary_advisor.config.Settings`, plus setup-only knobs (source URLs, download
+caches, RAG chunking) in `setup.settings.SetupSettings` and the evaluation
+judge model in `evaluation.settings.EvaluationSettings` - both extend the
+shared `Settings`.
 
 `DA_LLM_MODEL`/`DA_JUDGE_MODEL` are `pydantic-ai` model identifiers
 (`openai:gpt-4o-mini`, `anthropic:claude-3-5-sonnet-latest`, `groq:llama-3.3-70b-versatile`,
