@@ -23,6 +23,7 @@ class NutrientName(str, Enum):
     SATURATED_FAT_G = "saturated_fat_g"
     FIBER_G = "fiber_g"
     SUGAR_G = "sugar_g"
+    SALT_G = "salt_g"
     SODIUM_MG = "sodium_mg"
     POTASSIUM_MG = "potassium_mg"
     CALCIUM_MG = "calcium_mg"
@@ -56,6 +57,7 @@ _CANONICAL_UNIT: dict[NutrientName, str] = {
     NutrientName.SATURATED_FAT_G: "g",
     NutrientName.FIBER_G: "g",
     NutrientName.SUGAR_G: "g",
+    NutrientName.SALT_G: "g",
     NutrientName.SODIUM_MG: "mg",
     NutrientName.POTASSIUM_MG: "mg",
     NutrientName.CALCIUM_MG: "mg",

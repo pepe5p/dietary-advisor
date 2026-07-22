@@ -6,7 +6,7 @@ from rich.console import Console
 from rich.table import Table
 
 from dietary_advisor.food_db.usda_food_db import is_usda_code
-from dietary_advisor.planning.meal_plan import Portion, ShoppingListItem
+from dietary_advisor.planning.meal_plan import MealNutrientTotals, Portion, ShoppingListItem
 from dietary_advisor.planning.pipeline import PipelineResult
 from dietary_advisor.telemetry import RunTelemetry
 from dietary_advisor.totaller.aggregate import total_meal_plan, total_portion
@@ -14,12 +14,25 @@ from dietary_advisor.totaller.nutrition import canonical_unit, MACRO_NUTRIENTS, 
 
 console = Console()
 
+_INLINE_NUTRIENTS: frozenset[NutrientName] = frozenset(
+    {
+        NutrientName.SATURATED_FAT_G,
+        NutrientName.SUGAR_G,
+    }
+)
+_EXTRA_EXCLUDE = MACRO_NUTRIENTS | _INLINE_NUTRIENTS
+_SHOP_EXTRA_EXCLUDE = _EXTRA_EXCLUDE | frozenset({NutrientName.SALT_G})
 
-def format_extra_nutrients(amounts: dict[NutrientName, float]) -> str:
-    """Compact summary of non-macro nutrients, e.g. '24mg sodium, 3g fiber'."""
+
+def format_extra_nutrients(
+    amounts: dict[NutrientName, float],
+    *,
+    exclude: frozenset[NutrientName] = MACRO_NUTRIENTS,
+) -> str:
+    """Compact summary of nutrients not in `exclude`, e.g. '24mg sodium, 3g fiber'."""
     parts: list[str] = []
     for nutrient in NutrientName:
-        if nutrient in MACRO_NUTRIENTS:
+        if nutrient in exclude:
             continue
         amount = amounts.get(nutrient)
         if amount is None or amount <= 0:
@@ -30,7 +43,7 @@ def format_extra_nutrients(amounts: dict[NutrientName, float]) -> str:
 
 
 def _nutrient_row_label(nutrient: NutrientName) -> str:
-    return f"{nutrient_label(nutrient)} {canonical_unit(nutrient)}"
+    return f"{nutrient_label(nutrient).capitalize()} ({canonical_unit(nutrient)})"
 
 
 def _format_nutrient_amount(amount: float, nutrient: NutrientName) -> str:
@@ -41,6 +54,46 @@ def _format_nutrient_amount(amount: float, nutrient: NutrientName) -> str:
     if nutrient == NutrientName.VITAMIN_D_UG:
         return f"{amount:.1f}"
     return f"{amount:.0f}"
+
+
+def _fmt_sub(amounts: dict[NutrientName, float], nutrient: NutrientName) -> str:
+    amount = amounts.get(nutrient)
+    if amount is None or amount <= 0:
+        return "-"
+    return _format_nutrient_amount(amount, nutrient)
+
+
+def _meal_line(label: str, amount: str, nutrient: NutrientName, *, indent: bool = False) -> str:
+    prefix = "  " if indent else ""
+    if amount == "-":
+        return f"{prefix}{label} -"
+    return f"{prefix}{label} {amount}{canonical_unit(nutrient)}"
+
+
+def _meal_totals_cell(meal_totals: MealNutrientTotals) -> str:
+    totals = meal_totals.totals
+    energy = NutrientName.ENERGY_KCAL
+    protein = NutrientName.PROTEIN_G
+    carbs = NutrientName.CARBS_G
+    sugar = NutrientName.SUGAR_G
+    fat = NutrientName.FAT_G
+    sat = NutrientName.SATURATED_FAT_G
+    sections = [
+        f"{_format_nutrient_amount(meal_totals.get(energy), energy)} {canonical_unit(energy)}",
+        "\n".join(
+            [
+                _meal_line("Protein", _format_nutrient_amount(meal_totals.get(protein), protein), protein),
+                _meal_line("Carbs", _format_nutrient_amount(meal_totals.get(carbs), carbs), carbs),
+                _meal_line("Sugar", _fmt_sub(totals, sugar), sugar, indent=True),
+                _meal_line("Fat", _format_nutrient_amount(meal_totals.get(fat), fat), fat),
+                _meal_line("Saturated", _fmt_sub(totals, sat), sat, indent=True),
+            ]
+        ),
+    ]
+    extras = format_extra_nutrients(totals, exclude=_EXTRA_EXCLUDE)
+    if extras:
+        sections.append(extras)
+    return "\n\n".join(sections)
 
 
 def _portion_macros(portion: Portion) -> tuple[float, float, float, float]:
@@ -94,43 +147,44 @@ def render_result(result: PipelineResult, *, verbose: bool = False) -> None:
         lines = []
         for p in meal.portions:
             kcal, protein, carbs, fat = _portion_macros(p)
-            lines.append(f"* {p.food.name}: {p.grams:.0f}g — {kcal:.0f} kcal, P{protein:.1f} C{carbs:.1f} F{fat:.1f}")
+            lines.append(
+                (
+                    f"[yellow]*[/yellow] {p.food.name}: {p.grams:.0f}g "
+                    f"— {kcal:.0f} kcal, P{protein:.1f} C{carbs:.1f} F{fat:.1f}"
+                )
+            )
         products = "\n".join(lines)
-        meal_totals_cell = (
-            f"{meal_totals.get(NutrientName.ENERGY_KCAL):.0f} kcal\n"
-            f"P{meal_totals.get(NutrientName.PROTEIN_G):.1f} "
-            f"C{meal_totals.get(NutrientName.CARBS_G):.1f} "
-            f"F{meal_totals.get(NutrientName.FAT_G):.1f}"
-        )
-        extras = format_extra_nutrients(meal_totals.totals)
-        if extras:
-            meal_totals_cell = f"{meal_totals_cell}\n{extras}"
-        plan_tbl.add_row(meal.kind, meal.name, products, meal_totals_cell, meal.recipe)
+        plan_tbl.add_row(meal.kind, meal.name, products, _meal_totals_cell(meal_totals), meal.recipe)
     console.print(plan_tbl)
 
     if result.shopping_list.items:
-        shop_tbl = Table(title="Shopping list")
+        shop_tbl = Table(title="Shopping list", show_lines=True)
         shop_tbl.add_column("Ingredient")
-        shop_tbl.add_column("Source")
         shop_tbl.add_column("DB ID")
         shop_tbl.add_column("Total (g)", justify="right")
-        shop_tbl.add_column("kcal", justify="right")
-        shop_tbl.add_column("Protein g", justify="right")
-        shop_tbl.add_column("Carbs g", justify="right")
-        shop_tbl.add_column("Fat g", justify="right")
+        shop_tbl.add_column(_nutrient_row_label(NutrientName.ENERGY_KCAL), justify="right")
+        shop_tbl.add_column(_nutrient_row_label(NutrientName.PROTEIN_G), justify="right")
+        shop_tbl.add_column(_nutrient_row_label(NutrientName.CARBS_G), justify="right")
+        shop_tbl.add_column(_nutrient_row_label(NutrientName.SUGAR_G), justify="right")
+        shop_tbl.add_column(_nutrient_row_label(NutrientName.FAT_G), justify="right")
+        shop_tbl.add_column(_nutrient_row_label(NutrientName.SATURATED_FAT_G), justify="right")
+        shop_tbl.add_column(_nutrient_row_label(NutrientName.SALT_G), justify="right")
         shop_tbl.add_column("Other nutrients")
-        for item in result.shopping_list.items:
-            source = "[cyan]USDA[/cyan]" if item.code and is_usda_code(item.code) else "[green]OFF[/green]"
-            extras = format_extra_nutrients(item.other_nutrients)
+        for item in sorted(result.shopping_list.items, key=lambda i: i.energy_kcal, reverse=True):
+            code = item.code or "-"
+            db_id = f"[cyan]{code}[/cyan]" if item.code and is_usda_code(item.code) else f"[green]{code}[/green]"
+            extras = format_extra_nutrients(item.other_nutrients, exclude=_SHOP_EXTRA_EXCLUDE)
             shop_tbl.add_row(
                 item.name,
-                source,
-                item.code or "-",
+                db_id,
                 _format_total_grams(item),
                 f"{item.energy_kcal:.0f}",
                 f"{item.protein_g:.1f}",
                 f"{item.carbs_g:.1f}",
+                _fmt_sub(item.other_nutrients, NutrientName.SUGAR_G),
                 f"{item.fat_g:.1f}",
+                _fmt_sub(item.other_nutrients, NutrientName.SATURATED_FAT_G),
+                _fmt_sub(item.other_nutrients, NutrientName.SALT_G),
                 extras or "-",
             )
         console.print(shop_tbl)
