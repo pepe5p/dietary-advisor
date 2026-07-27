@@ -6,7 +6,7 @@ respects the profile (allergens, diet pattern) and approximates the targets.
 It never sees hard constraints - those are an evaluation-only concept.
 
 The agent cannot invent a food or its nutrients: every `PortionRef.code` must
-come from a `lookup_food`/`lookup_foods` hit, and `_validate_codes` rejects
+come from a `lookup_foods` hit, and `_validate_codes` rejects
 any output whose codes don't resolve against the real database, forcing a
 retry rather than letting a fabricated code reach hydration.
 """
@@ -20,10 +20,10 @@ from pydantic_ai.models import Model
 
 from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.agents.deps import AgentDeps
-from dietary_advisor.agents.prompts import nutrition_agent_system, REFLECTION_REFINER_AGENT_SYSTEM
+from dietary_advisor.agents.nutrition.prompts import nutrition_agent_system, REFLECTION_REFINER_AGENT_SYSTEM
 from dietary_advisor.config import get_settings
 from dietary_advisor.food_db.errors import UnknownFoodCodeError
-from dietary_advisor.food_db.facade import LookupQuery, LookupResult
+from dietary_advisor.food_db.facade import BatchLookupResult, LookupQuery
 from dietary_advisor.planning.hydration import total_agent_meal_plan
 from dietary_advisor.planning.meal_plan import NutrientTotals
 
@@ -47,36 +47,10 @@ async def _validate_codes(ctx: RunContext[AgentDeps], output: AgentMealPlan) -> 
     if unknown:
         raise ModelRetry(
             f"These codes do not exist in the food database: {sorted(set(unknown))}. "
-            "Every `code` must be copied verbatim from a `lookup_food`/`lookup_foods` result - "
+            "Every `code` must be copied verbatim from a `lookup_foods` result - "
             "search again and use a code you actually received."
         )
     return output
-
-
-async def lookup_food(
-    ctx: RunContext[AgentDeps],
-    query: str,
-    max_results_usda: int = 2,
-    max_results_off: int = 2,
-) -> str:
-    """Search both food databases by name for the best-matching foods.
-
-    Returns compact CSV text with two blocks: `# open_food_facts` (branded/
-    packaged products, often Polish) and `# usda` (generic whole foods and
-    reference ingredients like raw carrot or plain chicken breast). Each row
-    has a verified `code`, `name`, context columns, and all per-100g nutrients
-    in canonical units (`energy_kcal`, `protein_g`, `sodium_mg`, …). Copy both
-    `code` and `name` verbatim into the `PortionRef` for that ingredient. You
-    cannot use any food that isn't a hit from this tool.
-
-    `max_results_usda`/`max_results_off` cap hits per source independently
-    (0 skips that source) - weight towards whichever source actually stocks
-    this ingredient.
-    """
-    log.info("lookup_food(%r, max_results_usda=%d, max_results_off=%d)", query, max_results_usda, max_results_off)
-    lookup_query = LookupQuery(query=query, max_results_off=max_results_off, max_results_usda=max_results_usda)
-    result = await ctx.deps.food_db.lookup([lookup_query])
-    return result.render_csv()
 
 
 async def lookup_foods(
@@ -85,20 +59,35 @@ async def lookup_foods(
 ) -> str:
     """Batch search of both food databases: one tool call for several ingredient queries.
 
+    Returns compact JSON with one entry per input query in input order.
+    Each entry has `query`, then `results.open_food_facts` (branded/packaged
+    products, often Polish) and `results.usda` (generic whole foods and
+    reference ingredients like raw carrot or plain chicken breast). Each hit
+    object carries a verified `code`, a `name`, context fields, and per-100g
+    nutrients in canonical units (`energy_kcal`, `protein_g`, `sodium_mg`, …);
+    unknown nutrients are omitted. Copy `code` and `name` verbatim into the
+    `PortionRef` for that ingredient - `code` holds the identifier alone, never
+    the name or grams appended to it. You cannot use any food that isn't a hit
+    from this tool.
+
     Each query sets its own `max_results_usda`/`max_results_off`, so you can
-    weight some ingredients towards USDA, others towards OFF, or skip a
-    source entirely. Returns the same CSV layout as `lookup_food`, pooling
-    matches across every query.
+    weight some ingredients towards USDA, others towards OFF, or skip a source
+    entirely (0 skips that source). Pass a single-element list for a one-off
+    follow-up search.
     """
     log.info("lookup_foods(%d query/queries)", len(queries))
     if not queries:
-        return LookupResult().render_csv()
+        return BatchLookupResult().render_json()
     result = await ctx.deps.food_db.lookup(queries)
-    return result.render_csv()
+    return result.render_json()
 
 
 async def total_meal_plan(ctx: RunContext[AgentDeps], plan: AgentMealPlan) -> NutrientTotals:
-    """Deterministically hydrate `plan`'s codes and total nutrients, overall and per meal."""
+    """Deterministically hydrate `plan`'s codes and total nutrients, overall and per meal.
+
+    Check ``warnings`` for nutrients where some foods had no DB value: those totals
+    are a floor, not a complete measurement.
+    """
     try:
         return total_agent_meal_plan(plan, ctx.deps.food_db)
     except UnknownFoodCodeError as exc:
@@ -123,7 +112,6 @@ def _build_agent(
         retries=2,
     )
     agent.output_validator(_validate_codes)
-    agent.tool(lookup_food)
     agent.tool(lookup_foods)
     if totaller_enabled:
         agent.tool(total_meal_plan)
@@ -134,6 +122,7 @@ def build_nutrition_agent(
     *,
     totaller_enabled: bool = True,
     rag_enabled: bool = True,
+    has_user_request: bool = True,
     model: Model | None = None,
 ) -> Agent[AgentDeps, AgentMealPlan]:
     """Construct a fresh `Agent` instance bound to AgentDeps + AgentMealPlan output.
@@ -141,7 +130,11 @@ def build_nutrition_agent(
     `rag_enabled` only shapes the prompt (whether the citation rule is stated);
     the nutrition agent never owns the retriever as a tool.
     """
-    prompt = nutrition_agent_system(totaller_enabled=totaller_enabled, rag_enabled=rag_enabled)
+    prompt = nutrition_agent_system(
+        totaller_enabled=totaller_enabled,
+        rag_enabled=rag_enabled,
+        has_user_request=has_user_request,
+    )
     return _build_agent(prompt, totaller_enabled=totaller_enabled, model=model)
 
 

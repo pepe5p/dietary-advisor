@@ -127,7 +127,7 @@ class Settings(BaseSettings):
         """`llm_model` resolved to a concrete `Model`, cached for the process lifetime.
 
         Resolved lazily (on first access) rather than in `get_settings()` so that
-        LLM-free commands (`setup`, `info`) don't fail on a missing API key.
+        LLM-free commands (`setup`) don't fail on a missing API key.
         """
         return self.resolve_model(self.llm_model)
 

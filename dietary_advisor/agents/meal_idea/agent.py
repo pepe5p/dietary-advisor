@@ -15,8 +15,8 @@ from pydantic_ai import Agent, ModelSettings
 from pydantic_ai.models import Model
 
 from dietary_advisor.agents.deps import AgentDeps
-from dietary_advisor.agents.meal_idea import MealConcept
-from dietary_advisor.agents.prompts import MEAL_IDEA_AGENT_SYSTEM
+from dietary_advisor.agents.meal_idea.contract import MealConcept
+from dietary_advisor.agents.meal_idea.prompts import MEAL_IDEA_AGENT_SYSTEM
 from dietary_advisor.config import get_settings
 
 

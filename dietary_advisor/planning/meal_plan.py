@@ -67,6 +67,13 @@ class NutrientTotals(BaseModel):
     totals: NutrientAmountMap = Field(default_factory=dict)
     # Ordered like MealPlan.meals; a list (not a dict) because meal names can collide.
     per_meal: list[MealNutrientTotals] = Field(default_factory=list)
+    warnings: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Per-nutrient data-coverage caveats: which totals are understated "
+            "because some foods have no value for that nutrient in the source DB."
+        ),
+    )
 
     def get(self, name: NutrientName, default: float = 0.0) -> float:
         return self.totals.get(name, default)
@@ -81,7 +88,11 @@ class MealPlan(BaseModel):
     meals: list[Meal] = Field(min_length=1)
     rationale: str = Field(
         default="",
-        description="Patient-facing explanation; each claim should be backed by a citation.",
+        description=(
+            "Patient-facing explanation of the day's plan, plus any supplementation "
+            "the profile warrants (nutrient, reason, form and dose range); each "
+            "clinical claim should be backed by a citation when available."
+        ),
     )
     citations: list[Citation] = Field(
         default_factory=list,

@@ -29,17 +29,7 @@ class ActivityLevel(str, Enum):
 
 
 class UserProfile(BaseModel):
-    """Full user profile - the deterministic source of truth for personalization.
-
-    Per the thesis concept, this is the input on which all three complexity
-    levels operate. Level 1 only requires demographics + activity; Level 2
-    adds allergens and a diet pattern; Level 3 adds clinical conditions.
-
-    Allergens, conditions and diet pattern are free-form strings rather than
-    closed enums: validating them is out of scope for this project (see
-    `evaluation.profiles.vocab` for the exemplary vocabulary used to author
-    and check evaluation cases).
-    """
+    """Full user profile - the deterministic source of truth for personalization"""
 
     model_config = ConfigDict(extra="forbid")
 

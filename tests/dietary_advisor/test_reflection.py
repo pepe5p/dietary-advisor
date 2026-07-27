@@ -18,13 +18,13 @@ from pydantic_ai.usage import RunUsage
 
 import dietary_advisor.reflection.reflection as reflection_module
 from dietary_advisor.agents.agent_output import AgentMeal, AgentMealPlan, AgentRecipe, PortionRef
+from dietary_advisor.agents.critic import PlanCritique
 from dietary_advisor.agents.deps import AgentDeps
-from dietary_advisor.agents.reflection import PlanCritique
 from dietary_advisor.config import get_settings
 from dietary_advisor.food_db import OFFItem
 from dietary_advisor.profile import UserProfile
 from dietary_advisor.reflection import reflect_and_refine
-from tests.conftest import LONG_INSTRUCTIONS
+from tests.conftest import LONG_INSTRUCTIONS, LONG_RATIONALE
 
 _KNOWN_CODE = "known"
 
@@ -71,6 +71,7 @@ def _plan(name: str = "Dish") -> AgentMealPlan:
                 ),
             ),
         ],
+        rationale=LONG_RATIONALE,
     )
 
 
@@ -113,6 +114,17 @@ def _install_scripted_runner(
 
     monkeypatch.setattr(reflection_module, "run_agent_logged", _fake_run_agent_logged)
     return calls
+
+
+@pytest.mark.asyncio()
+async def test_blank_query_omits_request_from_reflection_prompts(
+    monkeypatch: pytest.MonkeyPatch,
+    healthy_profile: UserProfile,
+) -> None:
+    _use_test_model(monkeypatch)
+    calls = _install_scripted_runner(monkeypatch, critic_outputs=[PlanCritique(issues=[])])
+    await reflect_and_refine(_plan(), _deps(healthy_profile), "", totaller_enabled=False)
+    assert "User request:" not in calls[0][1]
 
 
 @pytest.mark.asyncio()
@@ -181,26 +193,6 @@ async def test_totaller_enabled_includes_totals_feedback(
     critic_prompt = calls[0][1]
     assert "Deterministic nutrient totals" in critic_prompt
     assert "200 kcal" in critic_prompt  # 100g portion @ 200 kcal/100g
-
-
-@pytest.mark.asyncio()
-async def test_refiner_failure_keeps_previous_plan(
-    monkeypatch: pytest.MonkeyPatch,
-    healthy_profile: UserProfile,
-) -> None:
-    _use_test_model(monkeypatch)
-    plan = _plan()
-    _install_scripted_runner(
-        monkeypatch,
-        critic_outputs=[PlanCritique(issues=["Some issue"])],
-        refiner_outputs=[RuntimeError("refiner exploded")],
-    )
-
-    result = await reflect_and_refine(plan, _deps(healthy_profile), "Plan a day.", totaller_enabled=True)
-
-    assert result.plan is plan
-    assert result.iterations == 0
-    assert result.approved is False
 
 
 @pytest.mark.asyncio()

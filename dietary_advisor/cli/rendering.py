@@ -134,6 +134,11 @@ def render_result(result: PipelineResult, *, verbose: bool = False) -> None:
         )
     console.print(nutrient_tbl)
 
+    if totals.warnings:
+        console.print("\n[bold yellow]Data-coverage caveats[/bold yellow]")
+        for warning in totals.warnings:
+            console.print(f"  [yellow]•[/yellow] {warning}")
+
     if result.plan.rationale:
         console.print(f"\n[bold]Rationale[/bold]: {result.plan.rationale}")
 

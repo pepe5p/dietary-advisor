@@ -9,7 +9,7 @@ from pydantic_ai.usage import RunUsage
 
 from dietary_advisor.agents.agent_output import AgentMeal, AgentMealPlan, AgentRecipe, PortionRef
 from dietary_advisor.agents.deps import AgentDeps
-from dietary_advisor.agents.nutrition_agent import (
+from dietary_advisor.agents.nutrition.agent import (
     _validate_codes,
     build_nutrition_agent,
     build_refiner_agent,
@@ -19,9 +19,9 @@ from dietary_advisor.config import get_settings
 from dietary_advisor.food_db import OFFItem, OFFUnknownFoodCodeError
 from dietary_advisor.profile import UserProfile
 from dietary_advisor.totaller.nutrition import MacroTargets, NutrientName
-from tests.conftest import LONG_INSTRUCTIONS
+from tests.conftest import LONG_INSTRUCTIONS, LONG_RATIONALE
 
-_ALWAYS_ON_TOOLS = {"lookup_food", "lookup_foods", "total_meal_plan"}
+_ALWAYS_ON_TOOLS = {"lookup_foods", "total_meal_plan"}
 
 
 def _tool_names(agent: object) -> set[str]:
@@ -45,7 +45,7 @@ def test_totaller_tool_omitted_when_disabled(monkeypatch: pytest.MonkeyPatch) ->
 
     agent = build_nutrition_agent(totaller_enabled=False)
     assert "total_meal_plan" not in _tool_names(agent)
-    assert {"lookup_food", "lookup_foods"} <= _tool_names(agent)
+    assert "lookup_foods" in _tool_names(agent)
 
 
 class _FakeFoodDb:
@@ -83,6 +83,7 @@ def _plan_with_code(code: str) -> AgentMealPlan:
                 ),
             ),
         ],
+        rationale=LONG_RATIONALE,
     )
 
 

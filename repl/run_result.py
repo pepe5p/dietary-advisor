@@ -20,7 +20,7 @@ from repl.manual import print_manual
 __all__ = ["print_run_result", "sample_result"]
 
 _OATS = FoodItem(
-    code="3017620422003",
+    code="off:3017620422003",
     name="Rolled oats",
     quantity_g=500.0,
     nutrients_per_100g={
@@ -64,7 +64,7 @@ _CHICKEN_BREAST = FoodItem(
     },
 )
 _QUINOA = FoodItem(
-    code="8712345678901",
+    code="off:8712345678901",
     name="Cooked quinoa",
     quantity_g=250.0,
     nutrients_per_100g={
@@ -78,7 +78,7 @@ _QUINOA = FoodItem(
     },
 )
 _SALMON = FoodItem(
-    code="20123456",
+    code="off:20123456",
     name="Baked salmon fillet",
     quantity_g=400.0,
     nutrients_per_100g={
@@ -154,8 +154,8 @@ def sample_result() -> PipelineResult:
     """Build a hardcoded `PipelineResult` covering every branch of `_render_result`.
 
     Reuses the same ingredient (`_QUINOA`, `_BROCCOLI`) across lunch and dinner so the shopping
-    list's cross-meal aggregation is also exercised, and mixes an Open Food Facts code with
-    `usda:`-prefixed codes so both `Source` column branches render.
+    list's cross-meal aggregation is also exercised, and mixes `off:`- and `usda:`-prefixed
+    codes so both `Source` column branches render.
     """
     meals = [
         Meal(
@@ -212,7 +212,7 @@ def sample_result() -> PipelineResult:
         variant="full",
         shopping_list=build_shopping_list(plan),
         telemetry=RunTelemetry(
-            tool_calls=Counter({"lookup_food": 6, "lookup_foods": 2, "total_meal_plan": 3}),
+            tool_calls=Counter({"lookup_foods": 8, "total_meal_plan": 3}),
             requests=4,
             input_tokens=5200,
             output_tokens=1800,

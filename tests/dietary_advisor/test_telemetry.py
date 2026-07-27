@@ -30,8 +30,8 @@ def test_collect_from_result_counts_tool_calls_by_name() -> None:
         ModelRequest(parts=[UserPromptPart(content="hello")]),
         ModelResponse(
             parts=[
-                ToolCallPart(tool_name="lookup_food", args={"query": "rice"}, tool_call_id="1"),
-                ToolCallPart(tool_name="lookup_food", args={"query": "chicken"}, tool_call_id="2"),
+                ToolCallPart(tool_name="lookup_foods", args={"query": "rice"}, tool_call_id="1"),
+                ToolCallPart(tool_name="lookup_foods", args={"query": "chicken"}, tool_call_id="2"),
                 ToolCallPart(tool_name="total_meal_plan", args={}, tool_call_id="3"),
             ],
         ),
@@ -41,7 +41,7 @@ def test_collect_from_result_counts_tool_calls_by_name() -> None:
 
     telemetry = collect_from_result(result)
 
-    assert telemetry.tool_calls == {"lookup_food": 2, "total_meal_plan": 1}
+    assert telemetry.tool_calls == {"lookup_foods": 2, "total_meal_plan": 1}
     assert telemetry.total_tool_calls == 3
     assert telemetry.requests == 2
     assert telemetry.input_tokens == 120
@@ -87,7 +87,7 @@ def test_reasoning_tokens_falls_back_to_openai_style_key() -> None:
 
 def test_run_telemetry_merge_combines_counts_and_usage() -> None:
     a = RunTelemetry(
-        tool_calls=Counter({"lookup_food": 2}),
+        tool_calls=Counter({"lookup_foods": 2}),
         requests=1,
         input_tokens=100,
         output_tokens=20,
@@ -96,7 +96,7 @@ def test_run_telemetry_merge_combines_counts_and_usage() -> None:
         details=Counter({"thoughts_tokens": 8}),
     )
     b = RunTelemetry(
-        tool_calls=Counter({"lookup_food": 1, "total_meal_plan": 3}),
+        tool_calls=Counter({"lookup_foods": 1, "total_meal_plan": 3}),
         requests=2,
         input_tokens=50,
         output_tokens=10,
@@ -107,7 +107,7 @@ def test_run_telemetry_merge_combines_counts_and_usage() -> None:
 
     merged = a.merge(b)
 
-    assert merged.tool_calls == {"lookup_food": 3, "total_meal_plan": 3}
+    assert merged.tool_calls == {"lookup_foods": 3, "total_meal_plan": 3}
     assert merged.requests == 3
     assert merged.input_tokens == 150
     assert merged.output_tokens == 30
@@ -116,15 +116,15 @@ def test_run_telemetry_merge_combines_counts_and_usage() -> None:
     assert merged.cache_write_tokens == 5
     assert merged.details == {"thoughts_tokens": 10, "cached_content_tokens": 1}
     # merge() must not mutate either operand.
-    assert a.tool_calls == {"lookup_food": 2}
-    assert b.tool_calls == {"lookup_food": 1, "total_meal_plan": 3}
+    assert a.tool_calls == {"lookup_foods": 2}
+    assert b.tool_calls == {"lookup_foods": 1, "total_meal_plan": 3}
     assert a.details == {"thoughts_tokens": 8}
     assert b.details == {"thoughts_tokens": 2, "cached_content_tokens": 1}
 
 
 def test_run_telemetry_as_dict_is_json_friendly() -> None:
     telemetry = RunTelemetry(
-        tool_calls=Counter({"lookup_food": 2}),
+        tool_calls=Counter({"lookup_foods": 2}),
         requests=1,
         input_tokens=100,
         output_tokens=20,
@@ -135,7 +135,7 @@ def test_run_telemetry_as_dict_is_json_friendly() -> None:
     payload = telemetry.as_dict()
 
     assert payload == {
-        "tool_calls": {"lookup_food": 2},
+        "tool_calls": {"lookup_foods": 2},
         "total_tool_calls": 2,
         "requests": 1,
         "input_tokens": 100,

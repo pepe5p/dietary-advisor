@@ -126,7 +126,7 @@ class FoodItem(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    code: str | None = Field(default=None, description="Open Food Facts or USDA identifier.")
+    code: str | None = Field(default=None, description="`off:<barcode>` or `usda:<fdc_id>` identifier.")
     name: str = Field(min_length=1)
 
     # Per-100g nutrients (canonical units). A dict keyed by NutrientName for

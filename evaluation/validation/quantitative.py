@@ -1,7 +1,5 @@
 """Stage 1: deterministic macro error vs frozen targets (Totaller-backed)."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 from dietary_advisor.agents.agent_output import AgentMealPlan

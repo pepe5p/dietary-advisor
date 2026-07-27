@@ -16,12 +16,12 @@ default: help
 	just --list
 
 [group("cli")]
-[doc("Run the dietary-advisor tool (recommend, info)")]
+[doc("Run the dietary-advisor tool")]
 @run *args:
 	uv run python -m dietary_advisor "$@"
 
 [group("cli")]
-[doc("Collect remaining (model, variant, scenario) case runs into outputs/")]
+[doc("Collect remaining (model, variant, scenario) case runs into the output dir")]
 @run-cases *args:
 	uv run python -m evaluation run-cases "$@"
 
@@ -111,11 +111,6 @@ dc command *args:
 [doc("Build the dev/runtime docker image")]
 build:
 	docker compose build {{CONTAINER_NAME}}
-
-[group("docker")]
-[doc("Run the CLI inside docker as a one-shot. For interactive use prefer `just dc bash` and then `just run ...`.")]
-cli *args:
-	docker compose run --rm -w {{WORKDIR}} {{CONTAINER_NAME}} just run "$@"
 
 [group("development")]
 [doc("Open bash console (useful when prefixed with dc, as it opens bash inside docker)")]

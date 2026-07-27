@@ -17,11 +17,12 @@ import pytest
 from dietary_advisor.agents.agent_output import AgentMeal, AgentMealPlan, AgentRecipe, PortionRef
 from dietary_advisor.config import get_settings
 from dietary_advisor.food_db import FoodDb, OffFoodDb
-from tests.conftest import LONG_INSTRUCTIONS
+from dietary_advisor.food_db.off_food_db import to_code
+from tests.conftest import LONG_INSTRUCTIONS, LONG_RATIONALE
 
 # Placeholder barcode for plans that are never hydrated against the DB
-# (e.g. integrity checks, the soft-preference judge).
-PLACEHOLDER_CODE = "0000000000000"
+# (e.g. the soft-preference judge).
+PLACEHOLDER_CODE = "off:0000000000000"
 
 
 def _off_db_path() -> Path:
@@ -35,7 +36,7 @@ def _query_code(sql: str) -> str | None:
     con = duckdb.connect(str(path), read_only=True)
     try:
         row = con.execute(sql).fetchone()
-        return row[0] if row else None
+        return to_code(row[0]) if row else None
     finally:
         con.close()
 
@@ -65,43 +66,6 @@ def any_code() -> str:
     return code
 
 
-@pytest.fixture()
-def vegetarian_code() -> str:
-    """A vegan-labelled product free of peanuts/tree-nuts (satisfies L2_01's constraints)."""
-    code = _query_code(
-        "SELECT code FROM products WHERE list_contains(labels_tags, 'en:vegan') "
-        "AND NOT list_contains(allergens_tags, 'en:peanuts') "
-        "AND NOT list_contains(allergens_tags, 'en:nuts') "
-        "AND product_name IS NOT NULL AND product_name NOT ILIKE '%mushroom%' LIMIT 1",
-    )
-    if code is None:
-        pytest.skip("no suitable vegetarian product in OFF DB")
-    return code
-
-
-@pytest.fixture()
-def peanut_code() -> str:
-    """A product flagged as containing peanuts."""
-    code = _query_code(
-        "SELECT code FROM products WHERE list_contains(allergens_tags, 'en:peanuts') "
-        "AND product_name IS NOT NULL LIMIT 1",
-    )
-    if code is None:
-        pytest.skip("no peanut-containing product in OFF DB")
-    return code
-
-
-@pytest.fixture()
-def mushroom_code() -> str:
-    """A product whose name contains 'mushrooms' (matches L2_01 ingredient_exclusion)."""
-    code = _query_code(
-        "SELECT code FROM products WHERE product_name ILIKE '%mushrooms%' AND energy_kcal_in_100g > 0 LIMIT 1",
-    )
-    if code is None:
-        pytest.skip("no mushrooms-named product in OFF DB")
-    return code
-
-
 def agent_plan_single(
     code: str,
     *,
@@ -124,6 +88,7 @@ def agent_plan_single(
                 ),
             ),
         ],
+        rationale=LONG_RATIONALE,
     )
 
 

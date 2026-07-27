@@ -17,11 +17,13 @@ from rich.table import Table
 
 from dietary_advisor.cli.rendering import format_extra_nutrients
 from dietary_advisor.config import get_settings
-from dietary_advisor.food_db import FoodDb, LookupQuery, LookupResult, OffFoodDb, OFFItem, UsdaFoodDb, USDAItem
+from dietary_advisor.food_db import BatchLookupResult, FoodDb, LookupQuery, OffFoodDb, OFFItem, UsdaFoodDb, USDAItem
 from dietary_advisor.food_db.models import Row
 from dietary_advisor.food_db.nutrients import nutrients_from_row
-from dietary_advisor.food_db.off_food_db import _row_to_off_item, get_off_item_name
-from dietary_advisor.food_db.usda_food_db import _fdc_id, _row_to_usda_item, get_usda_item_name, to_code
+from dietary_advisor.food_db.off_food_db import _barcode, _row_to_off_item, get_off_item_name
+from dietary_advisor.food_db.off_food_db import to_code as to_off_code
+from dietary_advisor.food_db.usda_food_db import _fdc_id, _row_to_usda_item, get_usda_item_name
+from dietary_advisor.food_db.usda_food_db import to_code as to_usda_code
 from dietary_advisor.totaller.nutrition import canonical_unit, NutrientName
 from repl.manual import console, print_manual
 from setup.settings import get_setup_settings
@@ -34,6 +36,7 @@ __all__ = [
     "get_usda_record",
     "lookup",
     "lookup_csv",
+    "lookup_json",
     "pdict",
     "pfi",
     "search_off",
@@ -114,10 +117,10 @@ def get_off_item(code: str) -> OFFItem:
 
 
 def get_off_record(code: str) -> Row:
-    """Return the full, unprocessed OFF record for `code` from the slimmed `.duckdb`."""
+    """Return the full, unprocessed OFF record for `code` (bare barcode or `off:<barcode>`)."""
     con = duckdb.connect(str(get_settings().off_db), read_only=True)
     try:
-        return _fetch_record(con, "SELECT * FROM products WHERE code = ? LIMIT 1", [code], code)
+        return _fetch_record(con, "SELECT * FROM products WHERE code = ? LIMIT 1", [_barcode(code)], code)
     finally:
         con.close()
 
@@ -165,27 +168,32 @@ def sql_usda(sql: str) -> list[Row]:
         con.close()
 
 
-def lookup(query: str, off_limit: int = 5, usda_limit: int = 5) -> LookupResult:
-    """Run the whole `FoodDb.lookup` facade path for one query, grouped by source."""
+def lookup(query: str, off_limit: int = 5, usda_limit: int = 5) -> BatchLookupResult:
+    """Run the whole `FoodDb.lookup` facade path for one query, grouped per query and source."""
     with FoodDb.open() as food_db:
         query_obj = LookupQuery(query=query, max_results_off=off_limit, max_results_usda=usda_limit)
         return asyncio.run(food_db.lookup([query_obj]))
 
 
+def lookup_json(query: str, off_limit: int = 5, usda_limit: int = 5) -> str:
+    """Same as `lookup`, but return the JSON text the nutrition agent tools see."""
+    return lookup(query, off_limit=off_limit, usda_limit=usda_limit).render_json()
+
+
 def lookup_csv(query: str, off_limit: int = 5, usda_limit: int = 5) -> str:
-    """Same as `lookup`, but return the CSV text the nutrition agent tools see."""
+    """Same as `lookup`, but return a CSV rendering (repl-only; the agent uses JSON)."""
     return lookup(query, off_limit=off_limit, usda_limit=usda_limit).render_csv()
 
 
 def get_parquet_record(code: str) -> Row:
-    """Return the full, unprocessed OFF record for `code` from the raw Parquet export."""
+    """Return the full raw OFF Parquet row for `code` (bare barcode or `off:<barcode>`)."""
     parquet = get_setup_settings().off_raw_parquet
     con = duckdb.connect()
     try:
         return _fetch_record(
             con,
             f"SELECT * FROM read_parquet('{parquet}') WHERE code = ? LIMIT 1",  # noqa: S608
-            [code],
+            [_barcode(code)],
             code,
         )
     finally:
@@ -216,7 +224,7 @@ def _item_name(item: ReadModel) -> str:
 
 
 def _item_code(item: ReadModel) -> str:
-    return item.code if isinstance(item, OFFItem) else to_code(item.fdc_id)
+    return to_off_code(item.code) if isinstance(item, OFFItem) else to_usda_code(item.fdc_id)
 
 
 def _food_items_table(food_items: list[ReadModel]) -> Table:
@@ -276,18 +284,19 @@ _MANUAL: tuple[tuple[str, str], ...] = (
     ("search_off(query, limit=5)", "Search OFF (hybrid BM25 + semantic) -> list[OFFItem]."),
     ("search_off_bm25(query, limit=5)", "Search OFF, lexical (BM25) channel only."),
     ("search_off_semantic(query, limit=5)", "Search OFF, embedding (semantic) channel only."),
-    ("get_off_item(code)", "Get one product as an OFFItem."),
-    ("get_off_record(code)", "Get the full raw row (dict) from the OFF duckdb."),
+    ("get_off_item(code)", "Get one product as an OFFItem (bare barcode or `off:<barcode>`)."),
+    ("get_off_record(code)", "Get the full raw row (dict) from the OFF duckdb (bare or `off:`)."),
     ("sql_off(sql)", "Run raw SQL against the OFF duckdb -> list[Row]."),
-    ("get_parquet_record(code)", "Get the full raw row (dict) from the OFF parquet export."),
+    ("get_parquet_record(code)", "Get the full raw row (dict) from the OFF parquet export (bare or `off:`)."),
     ("search_usda(query, limit=5)", "Search USDA (hybrid BM25 + semantic) -> list[USDAItem]."),
     ("search_usda_bm25(query, limit=5)", "Search USDA, lexical (BM25) channel only."),
     ("search_usda_semantic(query, limit=5)", "Search USDA, embedding (semantic) channel only."),
-    ("get_usda_item(code)", "Get one food as a USDAItem."),
-    ("get_usda_record(code)", "Get the full raw row (dict) from the USDA duckdb."),
+    ("get_usda_item(code)", "Get one food as a USDAItem (bare fdc_id or `usda:<fdc_id>`)."),
+    ("get_usda_record(code)", "Get the full raw row (dict) from the USDA duckdb (bare or `usda:`)."),
     ("sql_usda(sql)", "Run raw SQL against the USDA duckdb -> list[Row]."),
-    ("lookup(query, off_limit=5, usda_limit=5)", "Run the full dual-source FoodDb.lookup -> LookupResult."),
-    ("lookup_csv(query, off_limit=5, usda_limit=5)", "Same as lookup, but as the CSV the agent tools return."),
+    ("lookup(query, off_limit=5, usda_limit=5)", "Run the full dual-source FoodDb.lookup -> BatchLookupResult."),
+    ("lookup_json(query, off_limit=5, usda_limit=5)", "Same as lookup, but as the JSON the agent tools return."),
+    ("lookup_csv(query, off_limit=5, usda_limit=5)", "Same as lookup, but as a CSV rendering (repl-only)."),
     ("pfi(items)", "Rich-print an OFFItem/USDAItem or a list of them."),
     ("pdict(record)", "Rich pretty-print a raw record dict."),
 )

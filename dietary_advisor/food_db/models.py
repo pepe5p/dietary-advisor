@@ -21,7 +21,11 @@ type Row = dict[str, Any]
 
 
 class OFFItem(BaseModel):
-    """A product row as stored in the Open Food Facts DuckDB."""
+    """A product row as stored in the Open Food Facts DuckDB.
+
+    `code` is the raw barcode; runtime codes are `off:<barcode>` (see
+    `off_food_db.to_code`) so they never collide with USDA FDC ids.
+    """
 
     model_config = ConfigDict(extra="ignore")
 

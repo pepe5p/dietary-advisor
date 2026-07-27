@@ -2,7 +2,7 @@
 
 `PortionRef` deliberately carries no nutrients - the agent has no ability to
 invent or estimate them. It can only reference a `code` (and matching `name`)
-copied verbatim from a `lookup_food`/`lookup_foods` result; an output
+copied verbatim from a `lookup_foods` result; an output
 validator on the agent rejects any other code. `dietary_advisor.planning.hydration`
 is the one place a reference resolves back to a real, DB-verified
 `FoodItem`, both in production (`Pipeline.run`) and in the evaluation
@@ -23,7 +23,7 @@ class PortionRef(BaseModel):
 
     code: str = Field(
         min_length=1,
-        description=("Code copied verbatim from a lookup result: an Open Food Facts barcode or a `usda:<fdc_id>` id."),
+        description=("Code copied verbatim from a lookup result: an `off:<barcode>` or `usda:<fdc_id>` id."),
     )
     name: str = Field(
         min_length=1,
@@ -60,5 +60,11 @@ class AgentMealPlan(BaseModel):
 
     user_id: str
     meals: list[AgentMeal] = Field(min_length=1)
-    rationale: str = Field(default="")
+    rationale: str = Field(
+        min_length=200,
+        description=(
+            "Patient-facing explanation of the day's plan, plus any supplementation "
+            "the profile warrants (nutrient, reason, form and dose range)."
+        ),
+    )
     citations: list[Citation] = Field(default_factory=list)

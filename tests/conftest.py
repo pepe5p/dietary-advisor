@@ -20,6 +20,11 @@ LONG_INSTRUCTIONS = (
     "2. Cook each component using the appropriate method and time. "
     "3. Combine and plate before serving."
 )
+LONG_RATIONALE = (
+    "This day balances lean protein across meals to hit the macro targets while keeping saturated "
+    "fat moderate. Wholegrains and vegetables at lunch and dinner support fibre and potassium. "
+    "No supplementation is needed for this profile beyond what food provides."
+)
 
 
 @pytest.fixture(autouse=True)

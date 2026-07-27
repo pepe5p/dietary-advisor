@@ -13,16 +13,15 @@ from pathlib import Path
 from dietary_advisor.food_db import FoodDb
 from dietary_advisor.planning.pipeline import Pipeline, PipelineResult, VariantConfig
 from dietary_advisor.profile import UserProfile
+from dietary_advisor.profiles import get_profile
 from evaluation.case_runner.grid import planned_runs, RunSpec
-from evaluation.case_runner.store import DEFAULT_OUTPUT_DIR, is_done, record_from_result, save
-from evaluation.profiles.cases import get_case
+from evaluation.case_runner.store import is_done, record_from_result, save
 from evaluation.scenarios import SCENARIOS
+from evaluation.settings import get_evaluation_settings
 
 log = logging.getLogger(__name__)
 
 RunFn = Callable[[UserProfile, str], Awaitable[PipelineResult]]
-
-_SCENARIO_BY_ID = {s.case_id: s for s in SCENARIOS}
 
 
 @dataclass(frozen=True)
@@ -37,7 +36,7 @@ class CollectSummary:
 async def collect_runs(
     specs: list[RunSpec] | None = None,
     *,
-    output_dir: Path = DEFAULT_OUTPUT_DIR,
+    output_dir: Path | None = None,
     run_fn: RunFn | None = None,
     lookup: FoodDb | None = None,
 ) -> CollectSummary:
@@ -47,8 +46,9 @@ async def collect_runs(
     injected only by tests; production always builds a `Pipeline` per
     (model, variant) group.
     """
+    dest = output_dir if output_dir is not None else get_evaluation_settings().output_dir
     all_specs = list(specs) if specs is not None else planned_runs()
-    remaining = [s for s in all_specs if not is_done(s, output_dir=output_dir)]
+    remaining = [s for s in all_specs if not is_done(s, output_dir=dest)]
     already_done = len(all_specs) - len(remaining)
     succeeded = 0
     failed = 0
@@ -64,7 +64,7 @@ async def collect_runs(
 
     if run_fn is not None:
         for spec in remaining:
-            ok = await _run_and_save(spec, run=run_fn, output_dir=output_dir)
+            ok = await _run_and_save(spec, run=run_fn, output_dir=dest)
             if ok:
                 succeeded += 1
             else:
@@ -96,7 +96,7 @@ async def collect_runs(
                     return await _pipeline.run(profile, query)
 
                 for spec in group:
-                    ok = await _run_and_save(spec, run=_default_run, output_dir=output_dir)
+                    ok = await _run_and_save(spec, run=_default_run, output_dir=dest)
                     if ok:
                         succeeded += 1
                     else:
@@ -120,11 +120,11 @@ async def _run_and_save(
     run: RunFn,
     output_dir: Path,
 ) -> bool:
-    scenario = _SCENARIO_BY_ID[spec.scenario_id]
-    eval_profile = get_case(spec.scenario_id)
+    scenario = SCENARIOS[spec.scenario_id]
+    profile = get_profile(scenario.profile_id)
     t0 = time.perf_counter()
     try:
-        result = await run(eval_profile.profile, scenario.query)
+        result = await run(profile, scenario.query)
     except Exception as exc:  # noqa: BLE001 - LLM/pipeline failures must not abort the grid
         log.warning(
             "Run failed for %s / %s / %s: %s\n%s",

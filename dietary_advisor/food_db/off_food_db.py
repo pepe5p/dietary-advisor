@@ -1,14 +1,13 @@
-"""Local Open Food Facts product database (DuckDB), the food source of truth.
+"""Local Open Food Facts product database (DuckDB), the branded-food source.
 
-Replaces the former USDA REST client: instead of hitting a remote API, we
-query the local `.data/off/off_pl.duckdb` built by the `setup` command. There is
-deliberately no lookup abstraction - this one concrete class is the only food
-source in the system.
+The branded complement to `UsdaFoodDb`: Polish packaged products. Same hybrid
+retrieval (BM25 + embedding, fused with RRF) so the two databases can be
+searched identically and their results blended by the agent tools.
 
-The agent searches by product name (`search`) and gets the best-matching
-records; evaluation resolves a plan's barcodes back to their canonical
-nutrients (`get_food`). Rows are returned as 1:1 `OFFItem`s; nutrient units
-are already canonicalized at build time.
+Codes are the barcode prefixed with `off:` so they never collide with USDA
+FDC ids and eval hydration can route each code back to the DB that owns it.
+Rows are returned as 1:1 `OFFItem`s; nutrient units are already canonicalized
+at build time.
 """
 
 from __future__ import annotations
@@ -28,6 +27,8 @@ from dietary_advisor.food_db.models import OFFItem, Row
 
 log = logging.getLogger(__name__)
 
+_CODE_PREFIX = "off:"
+
 # Every stored column except the embedding vector (never needed at read time).
 _SELECT_COLUMNS = (
     "code, product_name, product_name_pl, ingredients_text, "
@@ -41,6 +42,19 @@ _SELECT_COLUMNS = (
     "sodium_mg_in_100g, potassium_mg_in_100g, calcium_mg_in_100g, iron_mg_in_100g, "
     "vitamin_c_mg_in_100g, vitamin_d_ug_in_100g, cholesterol_mg_in_100g"
 )
+
+
+def to_code(barcode: str) -> str:
+    """Render a barcode as a runtime `off:<barcode>` code."""
+    return f"{_CODE_PREFIX}{barcode}"
+
+
+def is_off_code(code: str) -> bool:
+    return code.startswith(_CODE_PREFIX)
+
+
+def _barcode(code: str) -> str:
+    return code[len(_CODE_PREFIX) :] if is_off_code(code) else code
 
 
 def get_off_item_name(item: OFFItem | Mapping[str, Any]) -> str:
@@ -148,10 +162,10 @@ class OffFoodDb:
         return [_row_to_off_item(r) for r in rows]
 
     def get_food(self, code: str) -> OFFItem:
-        """Return the product with barcode `code`, or raise `OFFUnknownFoodCodeError` if absent."""
+        """Return the product with `off:<barcode>` `code`, or raise `OFFUnknownFoodCodeError` if absent."""
         rows = self._rows(
             f"SELECT {_SELECT_COLUMNS} FROM products WHERE code = ? LIMIT 1",  # noqa: S608 (static columns)
-            [code],
+            [_barcode(code)],
         )
         if not rows:
             raise OFFUnknownFoodCodeError(f"unknown product code: {code!r}")

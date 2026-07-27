@@ -10,22 +10,22 @@ from dietary_advisor.food_db import FoodDb
 from dietary_advisor.planning.hydration import to_food_item
 from dietary_advisor.planning.meal_plan import Meal, MealPlan, Portion
 from dietary_advisor.planning.pipeline import PipelineResult, VariantConfig
+from dietary_advisor.profiles import get_profile
 from dietary_advisor.totaller.nutrition import MacroTargets
 from evaluation.case_runner.collect import collect_runs
 from evaluation.case_runner.grid import RunSpec
 from evaluation.case_runner.store import is_done, load
-from evaluation.profiles.cases import get_case
 from tests.conftest import LONG_INSTRUCTIONS
 from tests.evaluation.conftest import agent_plan_single
 
 
 @pytest.mark.asyncio()
 async def test_collect_runs_skips_existing_and_saves_new(tmp_path: Path, food_db: FoodDb, any_code: str) -> None:
-    eval_profile = get_case("L1_01")
-    targets = eval_profile.profile.targets
+    profile = get_profile("regular")
+    targets = profile.targets
     food = to_food_item(food_db.get_food(any_code))
     meal_plan = MealPlan(
-        user_id="L1_01",
+        user_id="regular",
         meals=[
             Meal(
                 kind="lunch",
@@ -35,11 +35,11 @@ async def test_collect_runs_skips_existing_and_saves_new(tmp_path: Path, food_db
             ),
         ],
     )
-    agent_plan = agent_plan_single(any_code, grams=200.0, user_id="L1_01", food_name=food.name)
+    agent_plan = agent_plan_single(any_code, grams=200.0, user_id="regular", food_name=food.name)
     variant = VariantConfig(totaller_enabled=False, rag_enabled=False, reflection_enabled=False)
     specs = [
-        RunSpec(llm_model="test-model", variant=variant, scenario_id="L1_01"),
-        RunSpec(llm_model="test-model", variant=variant, scenario_id="L1_02"),
+        RunSpec(llm_model="test-model", variant=variant, scenario_id="regular"),
+        RunSpec(llm_model="test-model", variant=variant, scenario_id="preferences"),
     ]
 
     calls: list[str] = []
@@ -54,7 +54,7 @@ async def test_collect_runs_skips_existing_and_saves_new(tmp_path: Path, food_db
             variant=variant.label,
         )
 
-    # Pre-seed L1_01 so it is skipped.
+    # Pre-seed regular so it is skipped.
     first = await collect_runs([specs[0]], output_dir=tmp_path, run_fn=fake_run)
     assert first.succeeded == 1
     assert is_done(specs[0], output_dir=tmp_path)
@@ -69,7 +69,7 @@ async def test_collect_runs_skips_existing_and_saves_new(tmp_path: Path, food_db
     assert len(calls) == 2
     assert is_done(specs[1], output_dir=tmp_path)
     loaded = load(specs[1], output_dir=tmp_path)
-    assert loaded.scenario_id == "L1_02"
+    assert loaded.scenario_id == "preferences"
     assert loaded.targets == MacroTargets(
         energy_kcal=targets.energy_kcal,
         protein_g=targets.protein_g,
@@ -82,7 +82,7 @@ async def test_collect_runs_skips_existing_and_saves_new(tmp_path: Path, food_db
 @pytest.mark.asyncio()
 async def test_collect_runs_failure_leaves_no_file(tmp_path: Path) -> None:
     variant = VariantConfig()
-    spec = RunSpec(llm_model="test-model", variant=variant, scenario_id="L1_01")
+    spec = RunSpec(llm_model="test-model", variant=variant, scenario_id="regular")
 
     async def boom(profile: object, query: str) -> PipelineResult:  # noqa: ARG001
         raise RuntimeError("llm down")

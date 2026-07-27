@@ -45,13 +45,13 @@ class RunTelemetry:
         return self.input_tokens + self.output_tokens
 
     @property
-    def reasoning_tokens(self) -> int:
+    def reasoning_tokens(self) -> int | None:
         """Reasoning/thinking tokens, already included in `output_tokens`.
 
         Gemini reports these as "thoughts_tokens"; OpenAI's o-series/GPT-5
         reasoning models report "reasoning_tokens".
         """
-        return self.details.get("thoughts_tokens", 0) or self.details.get("reasoning_tokens", 0)
+        return self.details.get("thoughts_tokens") or self.details.get("reasoning_tokens")
 
     def merge(self, other: RunTelemetry) -> RunTelemetry:
         """Return a new `RunTelemetry` combining `self` and `other`."""

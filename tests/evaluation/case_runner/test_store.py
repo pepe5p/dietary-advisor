@@ -15,15 +15,15 @@ def test_path_for_sanitizes_model_id(tmp_path: Path) -> None:
     spec = RunSpec(
         llm_model="groq:llama-3.3-70b-versatile",
         variant=VariantConfig(),
-        scenario_id="L1_01",
+        scenario_id="regular",
     )
     path = path_for(spec, output_dir=tmp_path)
-    assert path.name == "groq-llama-3.3-70b-versatile__full__L1_01.json"
+    assert path.name == "groq-llama-3.3-70b-versatile__full__regular.json"
 
 
 def test_save_load_round_trip(tmp_path: Path) -> None:
     variant = VariantConfig(rag_enabled=False)
-    spec = RunSpec(llm_model="gemini-3.1-flash-lite", variant=variant, scenario_id="L1_01")
+    spec = RunSpec(llm_model="gemini-3.1-flash-lite", variant=variant, scenario_id="regular")
     record = RunRecord(
         llm_model=spec.llm_model,
         variant=variant.label,
@@ -32,7 +32,7 @@ def test_save_load_round_trip(tmp_path: Path) -> None:
         reflection_enabled=variant.reflection_enabled,
         scenario_id=spec.scenario_id,
         query="Plan one balanced day.",
-        agent_plan=agent_plan_rice_lunch(user_id="L1_01"),
+        agent_plan=agent_plan_rice_lunch(user_id="regular"),
         targets=MacroTargets(energy_kcal=2000, protein_g=100, carbs_g=200, fat_g=70),
         iterations=1,
         telemetry={"requests": 2, "total_tokens": 100},
@@ -45,7 +45,7 @@ def test_save_load_round_trip(tmp_path: Path) -> None:
     loaded = load(spec, output_dir=tmp_path)
     assert loaded.llm_model == record.llm_model
     assert loaded.variant == "no-rag"
-    assert loaded.scenario_id == "L1_01"
-    assert loaded.agent_plan.user_id == "L1_01"
+    assert loaded.scenario_id == "regular"
+    assert loaded.agent_plan.user_id == "regular"
     assert loaded.targets.energy_kcal == 2000
     assert loaded.iterations == 1

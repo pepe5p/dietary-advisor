@@ -8,10 +8,10 @@ baseline that always includes the Open Food Facts food lookup and the
 patient's fixed profile (allergens, conditions, goals) - see AGENTS.md for why
 the food DB can't be an ablation variant (the agent cannot invent a food).
 
-Production never derives or checks hard constraints - that is an
-evaluation-only concept (see `evaluation.constraints`/`evaluation.validation`);
-the agent must infer restrictions from the profile itself, the same way a
-human nutritionist would.
+Production never checks hard nutrient/allergen constraints against incomplete
+food-DB micros; the agent must infer restrictions from the profile itself, the
+same way a human nutritionist would. Evaluation scores macro-target error and
+soft preferences (LLM judge) only - see `evaluation.validation`.
 
 The three toggleable modules (desc.md):
     Totaller   - deterministic nutrient summation, exposed to the agent as a
@@ -43,11 +43,13 @@ from pydantic_ai.models import Model
 
 from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.agents.deps import AgentDeps
-from dietary_advisor.agents.meal_idea import MealConcept
-from dietary_advisor.agents.meal_idea_agent import build_meal_idea_agent
-from dietary_advisor.agents.nutrition_agent import build_nutrition_agent
-from dietary_advisor.agents.prompts import format_guideline_excerpts
-from dietary_advisor.agents.rag_query_agent import build_rag_query_agent
+from dietary_advisor.agents.meal_idea import build_meal_idea_agent, MealConcept
+from dietary_advisor.agents.meal_idea.prompts import meal_idea_user_prompt
+from dietary_advisor.agents.nutrition import build_nutrition_agent
+from dietary_advisor.agents.nutrition.prompts import nutrition_user_prompt
+from dietary_advisor.agents.prompt_blocks import has_user_request
+from dietary_advisor.agents.rag_query import build_rag_query_agent
+from dietary_advisor.agents.rag_query.prompts import rag_query_user_prompt
 from dietary_advisor.agents.runner import run_agent_logged
 from dietary_advisor.config import get_settings
 from dietary_advisor.dietary_rag.retriever import HybridRetriever, RetrievedChunk
@@ -190,18 +192,30 @@ class Pipeline:
     def __exit__(self, *exc: object) -> None:
         self.close()
 
-    async def _retrieve_context(self, deps: AgentDeps, user_query: str) -> tuple[list[Citation], RunTelemetry]:
+    async def _retrieve_context(
+        self,
+        deps: AgentDeps,
+        user_query: str,
+        *,
+        has_request: bool,
+    ) -> tuple[list[Citation], RunTelemetry]:
         if not self.variant.rag_enabled:
             log.debug("RAG disabled for variant %s; skipping retrieval.", self.variant.label)
             return [], RunTelemetry()
         retriever = self._ensure_retriever()
-        queries, telemetry = await self._generate_rag_queries(deps, user_query)
+        queries, telemetry = await self._generate_rag_queries(deps, user_query, has_request=has_request)
         log.debug("Retrieving clinical guidelines for %d query/queries: %r", len(queries), queries)
         citations = self._retrieve_for_queries(retriever, queries)
         log.info("RAG retrieved %d citation(s) across %d query/queries.", len(citations), len(queries))
         return citations, telemetry
 
-    async def _generate_rag_queries(self, deps: AgentDeps, user_query: str) -> tuple[list[str], RunTelemetry]:
+    async def _generate_rag_queries(
+        self,
+        deps: AgentDeps,
+        user_query: str,
+        *,
+        has_request: bool,
+    ) -> tuple[list[str], RunTelemetry]:
         """Ask the query agent for guideline searches, degrading to a heuristic query on failure.
 
         A deliberate empty result is honoured, not overridden: the query agent
@@ -210,9 +224,9 @@ class Pipeline:
         baseline prompt already covers. Only an agent *failure* falls back to
         the pre-agent heuristic, so a broken brainstorm never sinks the request.
         """
-        prompt = self._compose_rag_query_prompt(deps.profile, user_query)
+        prompt = rag_query_user_prompt(deps, user_query)
         try:
-            agent = build_rag_query_agent(model=self._model)
+            agent = build_rag_query_agent(model=self._model, has_user_request=has_request)
             result = await run_agent_logged(agent, prompt, deps=deps, label="rag_query")
         except Exception as exc:  # noqa: BLE001 - LLMs raise many things; never sink the request for this
             log.warning("RAG query agent failed, falling back to heuristic query: %s", exc)
@@ -257,7 +271,7 @@ class Pipeline:
         agent simply falls back to choosing its own ingredients, so a broken
         brainstorm never sinks the whole request.
         """
-        prompt = self._compose_meal_idea_prompt(deps.profile, deps.targets, user_query, rag_citations)
+        prompt = meal_idea_user_prompt(deps, user_query, rag_citations=rag_citations)
         try:
             agent = build_meal_idea_agent(model=self._model)
             result = await run_agent_logged(agent, prompt, deps=deps, label="meal_idea")
@@ -267,15 +281,8 @@ class Pipeline:
         log.info("Meal-idea agent produced %d meal concept(s).", len(result.output))
         return result.output, collect_from_result(result)
 
-    async def run(
-        self,
-        profile: UserProfile,
-        user_query: str,
-        *,
-        targets: MacroTargets | None = None,
-        available_ingredients: list[str] | None = None,
-    ) -> PipelineResult:
-        targets = targets or profile.targets
+    async def run(self, profile: UserProfile, user_query: str) -> PipelineResult:
+        has_request = has_user_request(user_query)
         log.info(
             "Running pipeline variant=%s query=%r",
             self.variant.label,
@@ -283,7 +290,7 @@ class Pipeline:
         )
         deps = AgentDeps(
             profile=profile,
-            targets=targets,
+            targets=profile.targets,
             food_db=self._ensure_food_db(),
             retriever=self._ensure_retriever() if self.variant.rag_enabled else None,
         )
@@ -291,22 +298,21 @@ class Pipeline:
         # Retrieval is the first step: the guideline excerpts it produces are
         # fed into every downstream agent (meal-idea, nutrition, reflection),
         # so the meal-idea brainstorm can no longer run concurrently with it.
-        rag_citations, rag_telemetry = await self._retrieve_context(deps, user_query)
+        rag_citations, rag_telemetry = await self._retrieve_context(deps, user_query, has_request=has_request)
 
         meal_concepts, meal_idea_telemetry = await self._generate_meal_ideas(deps, user_query, rag_citations)
 
         agent = build_nutrition_agent(
             totaller_enabled=self.variant.totaller_enabled,
             rag_enabled=self.variant.rag_enabled,
+            has_user_request=has_request,
             model=self._model,
         )
-        prompt = self._compose_prompt(
-            profile,
+        prompt = nutrition_user_prompt(
+            deps,
             user_query,
-            targets,
-            rag_citations,
-            meal_concepts,
-            available_ingredients=available_ingredients,
+            rag_citations=rag_citations,
+            meal_concepts=meal_concepts,
         )
         log.info(
             "Invoking nutrition agent (model=%s, totaller=%s)...",
@@ -340,6 +346,7 @@ class Pipeline:
                 totaller_enabled=self.variant.totaller_enabled,
                 rag_citations=rag_citations,
                 model=self._model,
+                has_user_request=has_request,
             )
             agent_plan = refl.plan
             iterations = refl.iterations
@@ -359,7 +366,7 @@ class Pipeline:
             (
                 "Pipeline complete: variant=%s meals=%d citations=%d iterations=%d requests=%d "
                 "tool_calls=%d input_tokens=%d output_tokens=%d total_tokens=%d "
-                "cache_read_tokens=%d reasoning_tokens=%d"
+                "cache_read_tokens=%d reasoning_tokens=%s"
             ),
             self.variant.label,
             len(plan.meals),
@@ -371,80 +378,15 @@ class Pipeline:
             telemetry.output_tokens,
             telemetry.total_tokens,
             telemetry.cache_read_tokens,
-            telemetry.reasoning_tokens,
+            telemetry.reasoning_tokens or "None",
         )
         return PipelineResult(
             plan=plan,
             agent_plan=agent_plan,
-            targets=targets,
+            targets=profile.targets,
             citations=rag_citations,
             iterations=iterations,
             variant=self.variant.label,
             shopping_list=build_shopping_list(plan),
             telemetry=telemetry,
         )
-
-    def _compose_prompt(
-        self,
-        profile: UserProfile,
-        user_query: str,
-        targets: MacroTargets,
-        rag_citations: list[Citation],
-        meal_concepts: list[MealConcept],
-        *,
-        available_ingredients: list[str] | None = None,
-    ) -> str:
-        sections = [
-            f"User query: {user_query}",
-            "Profile:",
-            profile.model_dump_json(indent=2),
-            "Macro targets (single day):",
-            targets.model_dump_json(indent=2),
-        ]
-        if meal_concepts:
-            sections.append("Meal concepts (creative starting points):")
-            sections.append("\n".join(f"- {c.kind}: {c.dish_name}" for c in meal_concepts))
-        if available_ingredients:
-            sections.append("Available ingredients to use first (the user has these on hand):")
-            sections.append("\n".join(f"- {name}" for name in available_ingredients))
-        excerpts = format_guideline_excerpts(
-            rag_citations,
-            header="Clinical-guideline excerpts (use these to ground your rationale):",
-        )
-        if excerpts:
-            sections.append(excerpts)
-        sections.append("Return ONLY a valid AgentMealPlan object.")
-        return "\n\n".join(sections)
-
-    def _compose_rag_query_prompt(self, profile: UserProfile, user_query: str) -> str:
-        return "\n\n".join(
-            [
-                f"User query: {user_query}",
-                "Profile:",
-                profile.model_dump_json(indent=2),
-                "Produce the clinical-guideline search queries for this request.",
-            ],
-        )
-
-    def _compose_meal_idea_prompt(
-        self,
-        profile: UserProfile,
-        targets: MacroTargets,
-        user_query: str,
-        rag_citations: list[Citation],
-    ) -> str:
-        sections = [
-            f"User query: {user_query}",
-            "Profile:",
-            profile.model_dump_json(indent=2),
-            "Macro targets (single day):",
-            targets.model_dump_json(indent=2),
-        ]
-        excerpts = format_guideline_excerpts(
-            rag_citations,
-            header="Clinical-guideline excerpts (keep the dish concepts consistent with these):",
-        )
-        if excerpts:
-            sections.append(excerpts)
-        sections.append("Propose three dishes concepts per meal slot.")
-        return "\n\n".join(sections)

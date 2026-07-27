@@ -28,11 +28,11 @@ Allowed imports: `setup`, `evaluation`, and `repl` may import from
 
 ## Agent contract: no invented foods
 
-The nutrition agent (`dietary_advisor/agents/nutrition_agent.py`) never emits
+The nutrition agent (`dietary_advisor/agents/nutrition/agent.py`) never emits
 nutrient values and cannot invent a food. Its structured output
 (`AgentMealPlan`, `dietary_advisor/agents/agent_output.py`) references foods
 only by `PortionRef(code, name, grams)`, where `code` must come from a
-`lookup_food`/`lookup_foods` hit. An output validator (`_validate_codes`)
+`lookup_foods` hit. An output validator (`_validate_codes`)
 resolves every code against the real `FoodDb` before accepting the run,
 raising `ModelRetry` on anything that doesn't exist. `dietary_advisor.planning.hydration`
 is the only place a reference resolves into a real, DB-verified `FoodItem`

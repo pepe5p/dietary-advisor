@@ -1,81 +1,59 @@
-"""Hardcoded example user profiles for the CLI.
-
-There is no profile store: the CLI (`recommend`) resolves a profile
-from this fixed list by `user_id` when invoked with `--profile-id` (the
-`--profile` option instead accepts a full `UserProfile` as inline JSON).
-This module is CLI-only - the evaluation harness owns its own, independent
-profile data in `evaluation/profiles/cases.py`.
-"""
-
-from __future__ import annotations
-
 from dietary_advisor.profile import ActivityLevel, UserProfile
 from dietary_advisor.totaller.nutrition import MacroTargets
 
 PROFILES: dict[str, UserProfile] = {
-    "karas": UserProfile(
-        user_id="karas",
+    "regular": UserProfile(
+        user_id="regular",
+        age=30,
+        sex="male",
+        height_cm=180.0,
+        weight_kg=78.0,
+        activity_level=ActivityLevel.LIGHT,
+        targets=MacroTargets(energy_kcal=2728.0, protein_g=124.8, carbs_g=386.7, fat_g=75.8, fiber_g=25.0),
+    ),
+    "preferences": UserProfile(
+        user_id="preferences",
+        age=30,
+        sex="male",
+        height_cm=180.0,
+        weight_kg=78.0,
+        activity_level=ActivityLevel.LIGHT,
+        preferred_foods=["chicken", "rice"],
+        disliked_foods=["liver", "sausage", "broccoli", "greek yogurt"],
+        targets=MacroTargets(energy_kcal=2728.0, protein_g=124.8, carbs_g=386.7, fat_g=75.8, fiber_g=25.0),
+        notes="I prefer 3 meals a day + 1 sweet snack. Snack should be some ready shop bought product.",
+    ),
+    "cut": UserProfile(
+        user_id="cut",
         age=23,
         sex="male",
         height_cm=170.0,
         weight_kg=69.0,
         activity_level=ActivityLevel.MODERATE,
-        preferred_foods=[],
-        disliked_foods=["raw tomato"],
-        targets=MacroTargets(energy_kcal=2000.0, protein_g=150.0, carbs_g=200.0, fat_g=65.0, fiber_g=25.0),
-        notes="I prefer 5 meals a day.",
+        preferred_foods=["natural skyr", "wholegrain pinsa", "all type of berries", "apricots"],
+        disliked_foods=["raw tomato", "kefir"],
+        targets=MacroTargets(energy_kcal=2000.0, protein_g=150.0, carbs_g=200.0, fat_g=65.0, fiber_g=30.0),
+        notes=(
+            "I am currently on a cut, so meals should have high volume and low calories density. "
+            "I prefer 3 meals a day + 1 snack."
+        ),
     ),
-    "L1_01": UserProfile(
-        user_id="L1_01",
-        age=30,
-        sex="male",
-        height_cm=180.0,
-        weight_kg=78.0,
-        activity_level=ActivityLevel.MODERATE,
-        preferred_foods=["chicken", "rice"],
-        targets=MacroTargets(energy_kcal=2728.0, protein_g=124.8, carbs_g=386.7, fat_g=75.8, fiber_g=25.0),
-    ),
-    "L1_02": UserProfile(
-        user_id="L1_02",
-        age=28,
-        sex="female",
-        height_cm=165.0,
-        weight_kg=60.0,
-        activity_level=ActivityLevel.MODERATE,
-        targets=MacroTargets(energy_kcal=2061.9, protein_g=96.0, carbs_g=290.6, fat_g=57.3, fiber_g=25.0),
-    ),
-    "L1_03": UserProfile(
-        user_id="L1_03",
-        age=45,
+    "lactose-intolerant-athlete": UserProfile(
+        user_id="lactose-intolerant-athlete",
+        age=33,
         sex="male",
         height_cm=178.0,
-        weight_kg=90.0,
-        activity_level=ActivityLevel.LIGHT,
-        disliked_foods=["liver"],
-        targets=MacroTargets(energy_kcal=1914.7, protein_g=144.0, carbs_g=215.0, fat_g=53.2, fiber_g=25.0),
-    ),
-    "L1_04": UserProfile(
-        user_id="L1_04",
-        age=22,
-        sex="female",
-        height_cm=170.0,
-        weight_kg=58.0,
-        activity_level=ActivityLevel.ACTIVE,
-        preferred_foods=["fish", "vegetables"],
-        targets=MacroTargets(energy_kcal=2640.8, protein_g=92.8, carbs_g=402.4, fat_g=73.4, fiber_g=25.0),
-    ),
-    "L1_05": UserProfile(
-        user_id="L1_05",
-        age=35,
-        sex="male",
-        height_cm=185.0,
-        weight_kg=82.0,
+        weight_kg=72.0,
+        conditions=["lactose intolerance"],
         activity_level=ActivityLevel.VERY_ACTIVE,
-        preferred_foods=["oats", "salmon", "eggs"],
-        targets=MacroTargets(energy_kcal=3431.9, protein_g=131.2, carbs_g=512.3, fat_g=95.3, fiber_g=25.0),
+        targets=MacroTargets(energy_kcal=4000.0, protein_g=180.0, carbs_g=550.0, fat_g=120.0, fiber_g=35.0),
+        notes=(
+            "I am a professional triathlon athlete. "
+            "Meals should be creative and interesting to make eating 4k calories easier."
+        ),
     ),
-    "L2_01": UserProfile(
-        user_id="L2_01",
+    "vegetarian-allergic": UserProfile(
+        user_id="vegetarian-allergic",
         age=27,
         sex="female",
         height_cm=168.0,
@@ -87,56 +65,8 @@ PROFILES: dict[str, UserProfile] = {
         preferred_foods=["lentils", "tofu"],
         targets=MacroTargets(energy_kcal=2129.7, protein_g=99.2, carbs_g=300.1, fat_g=59.2, fiber_g=25.0),
     ),
-    "L2_02": UserProfile(
-        user_id="L2_02",
-        age=33,
-        sex="male",
-        height_cm=178.0,
-        weight_kg=72.0,
-        activity_level=ActivityLevel.MODERATE,
-        diet_pattern="vegan",
-        preferred_foods=["tofu", "tempeh", "lentils"],
-        targets=MacroTargets(energy_kcal=2592.4, protein_g=115.2, carbs_g=370.9, fat_g=72.0, fiber_g=25.0),
-    ),
-    "L2_03": UserProfile(
-        user_id="L2_03",
-        age=41,
-        sex="female",
-        height_cm=162.0,
-        weight_kg=64.0,
-        activity_level=ActivityLevel.LIGHT,
-        allergens=["milk"],
-        conditions=["lactose intolerance"],
-        diet_pattern="pescatarian",
-        preferred_foods=["salmon", "rice"],
-        targets=MacroTargets(energy_kcal=1768.9, protein_g=102.4, carbs_g=229.3, fat_g=49.1, fiber_g=25.0),
-    ),
-    "L2_04": UserProfile(
-        user_id="L2_04",
-        age=35,
-        sex="female",
-        height_cm=170.0,
-        weight_kg=65.0,
-        activity_level=ActivityLevel.MODERATE,
-        allergens=["gluten"],
-        conditions=["celiac"],
-        preferred_foods=["rice", "potato"],
-        targets=MacroTargets(energy_kcal=2133.6, protein_g=104.0, carbs_g=296.0, fat_g=59.3, fiber_g=25.0),
-    ),
-    "L2_05": UserProfile(
-        user_id="L2_05",
-        age=26,
-        sex="female",
-        height_cm=167.0,
-        weight_kg=55.0,
-        activity_level=ActivityLevel.MODERATE,
-        allergens=["eggs", "soybeans"],
-        diet_pattern="vegan",
-        preferred_foods=["lentils", "quinoa"],
-        targets=MacroTargets(energy_kcal=2019.3, protein_g=88.0, carbs_g=290.6, fat_g=56.1, fiber_g=25.0),
-    ),
-    "L3_01": UserProfile(
-        user_id="L3_01",
+    "diabetes-hypertension": UserProfile(
+        user_id="diabetes-hypertension",
         age=58,
         sex="male",
         height_cm=174.0,
@@ -148,20 +78,8 @@ PROFILES: dict[str, UserProfile] = {
         targets=MacroTargets(energy_kcal=1859.7, protein_g=152.0, carbs_g=196.7, fat_g=51.7, fiber_g=25.0),
         notes="Recently diagnosed; HbA1c 7.4%, BP 145/92.",
     ),
-    "L3_02": UserProfile(
-        user_id="L3_02",
-        age=67,
-        sex="female",
-        height_cm=160.0,
-        weight_kg=70.0,
-        activity_level=ActivityLevel.SEDENTARY,
-        conditions=["ckd stage 3", "hypertension"],
-        preferred_foods=["white rice", "apple"],
-        targets=MacroTargets(energy_kcal=1444.8, protein_g=112.0, carbs_g=158.9, fat_g=40.1, fiber_g=25.0),
-        notes="eGFR 42; potassium and sodium restriction needed.",
-    ),
-    "L3_03": UserProfile(
-        user_id="L3_03",
+    "dyslipidemia-obesity": UserProfile(
+        user_id="dyslipidemia-obesity",
         age=52,
         sex="male",
         height_cm=175.0,
@@ -173,31 +91,6 @@ PROFILES: dict[str, UserProfile] = {
         preferred_foods=["olive oil", "fish", "vegetables"],
         targets=MacroTargets(energy_kcal=2047.0, protein_g=168.0, carbs_g=215.8, fat_g=56.9, fiber_g=25.0),
         notes="LDL 4.2 mmol/L; statin-naive.",
-    ),
-    "L3_04": UserProfile(
-        user_id="L3_04",
-        age=47,
-        sex="female",
-        height_cm=165.0,
-        weight_kg=78.0,
-        activity_level=ActivityLevel.MODERATE,
-        allergens=["gluten"],
-        conditions=["type 2 diabetes", "celiac"],
-        preferred_foods=["quinoa", "berries"],
-        targets=MacroTargets(energy_kcal=1645.2, protein_g=124.8, carbs_g=183.7, fat_g=45.7, fiber_g=25.0),
-    ),
-    "L3_05": UserProfile(
-        user_id="L3_05",
-        age=60,
-        sex="male",
-        height_cm=172.0,
-        weight_kg=88.0,
-        activity_level=ActivityLevel.LIGHT,
-        allergens=["milk"],
-        conditions=["hypertension", "lactose intolerance"],
-        diet_pattern="dash",
-        preferred_foods=["banana", "oats"],
-        targets=MacroTargets(energy_kcal=1842.5, protein_g=140.8, carbs_g=204.7, fat_g=51.2, fiber_g=25.0),
     ),
 }
 

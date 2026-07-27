@@ -76,3 +76,88 @@ def test_totaller_handles_many_small_portions() -> None:
     )
     totals = total_meal_plan(plan).totals
     assert totals[NutrientName.PROTEIN_G] == pytest.approx(100.0)
+
+
+def test_coverage_warnings_empty_when_full_coverage() -> None:
+    food = FoodItem(name="complete", nutrients_per_100g=dict.fromkeys(NutrientName, 0.0))
+    plan = MealPlan(
+        user_id="x",
+        meals=[Meal(kind="lunch", name="r", portions=[Portion(food=food, grams=100)], recipe=LONG_INSTRUCTIONS)],
+    )
+    assert total_meal_plan(plan).warnings == []
+
+
+def test_coverage_warnings_skip_explicit_zero(chicken_food: FoodItem) -> None:
+    meal = Meal(
+        kind="lunch",
+        name="r",
+        portions=[Portion(food=chicken_food, grams=150)],
+        recipe=LONG_INSTRUCTIONS,
+    )
+    plan = MealPlan(user_id="x", meals=[meal])
+    warnings = total_meal_plan(plan).warnings
+    assert not any("carbs" in warning for warning in warnings)
+
+
+def test_coverage_warnings_partial_gap(chicken_food: FoodItem, rice_food: FoodItem) -> None:
+    plan = MealPlan(
+        user_id="x",
+        meals=[
+            Meal(
+                kind="lunch",
+                name="r",
+                portions=[
+                    Portion(food=chicken_food, grams=150),
+                    Portion(food=rice_food, grams=200),
+                ],
+                recipe=LONG_INSTRUCTIONS,
+            ),
+        ],
+    )
+    warnings = total_meal_plan(plan).warnings
+    fiber_warnings = [warning for warning in warnings if warning.startswith("fiber:")]
+    assert len(fiber_warnings) == 1
+    fiber = fiber_warnings[0]
+    assert "1 of 2 foods have no fiber data" in fiber
+    assert "150 g of 350 g (43% of plan mass)" in fiber
+    assert "understated (Chicken breast)" in fiber
+
+
+def test_coverage_warnings_total_gap(chicken_food: FoodItem) -> None:
+    meal = Meal(
+        kind="lunch",
+        name="r",
+        portions=[Portion(food=chicken_food, grams=150)],
+        recipe=LONG_INSTRUCTIONS,
+    )
+    plan = MealPlan(user_id="x", meals=[meal])
+    warnings = total_meal_plan(plan).warnings
+    vitamin_d = next(w for w in warnings if w.startswith("vitamin d:"))
+    assert "none of the 1 foods has vitamin d data" in vitamin_d
+    assert "150 g of 150 g (100% of plan mass)" in vitamin_d
+    assert "unknown, not a real zero" in vitamin_d
+
+
+def test_coverage_warnings_sorted_by_missing_mass_share(
+    chicken_food: FoodItem,
+    rice_food: FoodItem,
+    salty_food: FoodItem,
+) -> None:
+    plan = MealPlan(
+        user_id="x",
+        meals=[
+            Meal(
+                kind="lunch",
+                name="r",
+                portions=[
+                    Portion(food=chicken_food, grams=100),
+                    Portion(food=rice_food, grams=100),
+                    Portion(food=salty_food, grams=300),
+                ],
+                recipe=LONG_INSTRUCTIONS,
+            ),
+        ],
+    )
+    warnings = total_meal_plan(plan).warnings
+    shares = [int(w.split("(")[1].split("%")[0]) for w in warnings]
+    assert shares == sorted(shares, reverse=True)

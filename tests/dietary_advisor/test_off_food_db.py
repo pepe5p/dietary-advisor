@@ -14,8 +14,9 @@ import pytest
 
 from dietary_advisor.config import FoodDbUsage, get_settings
 from dietary_advisor.food_db import off_food_db as off_mod
+from dietary_advisor.food_db.errors import OFFUnknownFoodCodeError
 from dietary_advisor.food_db.nutrients import COLUMN_TO_NUTRIENT
-from dietary_advisor.food_db.off_food_db import _reciprocal_rank_fusion, OffFoodDb
+from dietary_advisor.food_db.off_food_db import _reciprocal_rank_fusion, OffFoodDb, to_code
 
 # Toy 3-d embedding space: mozzarella-like products point along axis 0, yogurt
 # along axis 1. The stubbed query embedder (below) maps queries into the same
@@ -134,3 +135,17 @@ def test_reciprocal_rank_fusion_rewards_agreement() -> None:
     # "y" is high in both lists, so it wins despite not topping either alone.
     assert fused[0]["code"] == "y"
     assert {r["code"] for r in fused} == {"x", "y", "z", "w"}
+
+
+def test_get_food_accepts_prefixed_and_bare_code(off_db_path: Path) -> None:
+    with OffFoodDb(off_db_path) as db:
+        prefixed = db.get_food("off:222")
+        bare = db.get_food("222")
+    assert prefixed.code == "222"
+    assert bare.code == "222"
+    assert to_code(prefixed.code) == "off:222"
+
+
+def test_get_food_unknown_code_raises(off_db_path: Path) -> None:
+    with OffFoodDb(off_db_path) as db, pytest.raises(OFFUnknownFoodCodeError):
+        db.get_food("off:999999")

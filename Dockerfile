@@ -60,8 +60,4 @@ ENV DA_DATA_DIR=/code/.data \
 
 ENTRYPOINT ["/code/docker-entrypoint.sh"]
 
-# Default to printing CLI help. Override via:
-#   docker compose run --rm dietary_advisor just run <cmd>
-#   just cli <cmd>
-#   just dc bash   (then `just run <cmd>` interactively)
 CMD ["just", "run", "--help"]

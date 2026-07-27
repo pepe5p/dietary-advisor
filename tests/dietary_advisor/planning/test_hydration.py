@@ -16,7 +16,7 @@ def test_off_item_maps_to_food_item() -> None:
         product_quantity=200.0,
     )
     food = to_food_item(off)
-    assert food.code == "123"
+    assert food.code == "off:123"
     assert food.name == "Mozzarella"
     assert food.nutrients_per_100g == {NutrientName.ENERGY_KCAL: 250.0}
     assert food.quantity_g == 200.0

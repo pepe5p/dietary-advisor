@@ -17,21 +17,24 @@ import csv
 import io
 import logging
 from collections.abc import Sequence
-from typing import ClassVar, Protocol, Self
+from decimal import Decimal
+from typing import Annotated, Any, ClassVar, Protocol, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field, model_serializer, PlainSerializer
 
 from dietary_advisor.config import FoodDbUsage, get_settings, Settings
-from dietary_advisor.food_db.errors import OFFUnknownFoodCodeError, USDAUnknownFoodCodeError
+from dietary_advisor.food_db.errors import OFFUnknownFoodCodeError, UnknownFoodCodeError, USDAUnknownFoodCodeError
 from dietary_advisor.food_db.models import OFFItem, USDAItem
-from dietary_advisor.food_db.off_food_db import get_off_item_name, OffFoodDb
-from dietary_advisor.food_db.usda_food_db import get_usda_item_name, is_usda_code, to_code, UsdaFoodDb
+from dietary_advisor.food_db.off_food_db import get_off_item_name, is_off_code, OffFoodDb
+from dietary_advisor.food_db.off_food_db import to_code as to_off_code
+from dietary_advisor.food_db.usda_food_db import get_usda_item_name, is_usda_code, UsdaFoodDb
+from dietary_advisor.food_db.usda_food_db import to_code as to_usda_code
 
 log = logging.getLogger(__name__)
 
 # Cap the number of distinct queries a single batch lookup will run, so one
 # tool call can't fan out into an unbounded number of DB searches.
-_MAX_BATCH_QUERIES = 20
+_MAX_BATCH_QUERIES = 50
 
 # Ingredient lists can run to hundreds of characters; cap the search-result
 # preview so a batch of hits doesn't crowd out the prompt (full text is still
@@ -61,6 +64,20 @@ _OFF_EXTRA_NUTRIENT_FIELDS: tuple[tuple[str, str], ...] = (
     ("salt_g", "salt_g_in_100g"),
 )
 
+# Hit nutrients are display-only (Totaller re-reads the DB row at hydration).
+# Round float32 artifacts on validation and keep JSON numeric (bare Decimal
+# would serialize as a string).
+SafeDecimal = Annotated[Decimal, PlainSerializer(lambda x: float(x), return_type=float, when_used="json")]
+
+
+def _round_to(places: int) -> BeforeValidator:
+    return BeforeValidator(lambda v: round(Decimal(str(v)), places))
+
+
+_Tenths = Annotated[SafeDecimal, _round_to(1)]
+_Ones = Annotated[SafeDecimal, _round_to(0)]
+_Thousandths = Annotated[SafeDecimal, _round_to(3)]
+
 
 class LookupQuery(BaseModel):
     """One ingredient search with its own per-source result cap."""
@@ -71,25 +88,30 @@ class LookupQuery(BaseModel):
 
 
 class _NutrientHit(BaseModel):
-    """Per-100g nutrients every hit carries (canonical units, already in the DB)."""
+    """Per-100g nutrients every hit carries (canonical DB units, rounded for display)."""
 
-    energy_kcal: float | None = None
-    protein_g: float | None = None
-    carbs_g: float | None = None
-    fat_g: float | None = None
-    saturated_fat_g: float | None = None
-    fiber_g: float | None = None
-    sugar_g: float | None = None
-    sodium_mg: float | None = None
-    potassium_mg: float | None = None
-    calcium_mg: float | None = None
-    iron_mg: float | None = None
-    vitamin_c_mg: float | None = None
-    vitamin_d_ug: float | None = None
-    cholesterol_mg: float | None = None
+    energy_kcal: _Tenths | None = None
+    protein_g: _Tenths | None = None
+    carbs_g: _Tenths | None = None
+    fat_g: _Tenths | None = None
+    saturated_fat_g: _Tenths | None = None
+    fiber_g: _Tenths | None = None
+    sugar_g: _Tenths | None = None
+    sodium_mg: _Ones | None = None
+    potassium_mg: _Ones | None = None
+    calcium_mg: _Ones | None = None
+    iron_mg: _Thousandths | None = None
+    vitamin_c_mg: _Thousandths | None = None
+    vitamin_d_ug: _Thousandths | None = None
+    cholesterol_mg: _Ones | None = None
+
+    @model_serializer(mode="wrap")
+    def _drop_nones(self, handler: Any) -> dict[str, Any]:
+        data = handler(self)
+        return {k: v for k, v in data.items() if v is not None}
 
 
-def _nutrient_kwargs(item: OFFItem | USDAItem, fields: tuple[tuple[str, str], ...]) -> dict[str, float | None]:
+def _nutrient_kwargs(item: OFFItem | USDAItem, fields: tuple[tuple[str, str], ...]) -> dict[str, Any]:
     return {hit_key: getattr(item, col) for hit_key, col in fields}
 
 
@@ -99,10 +121,10 @@ def _truncate(text: str | None) -> str | None:
     return text[:_INGREDIENTS_SUMMARY_MAX_CHARS].rstrip() + "..."
 
 
-def _fmt(value: float | None) -> str:
+def _fmt(value: Decimal | None) -> str:
     if value is None:
         return ""
-    return f"{value:g}"
+    return str(value)
 
 
 class OFFHit(_NutrientHit):
@@ -118,13 +140,13 @@ class OFFHit(_NutrientHit):
     brands: str | None = None
     categories: str | None = None
     ingredients_text: str | None = None
-    energy_kj: float | None = None
-    salt_g: float | None = None
+    energy_kj: _Tenths | None = None
+    salt_g: _Tenths | None = None
 
     @classmethod
     def create_from_off_item(cls, item: OFFItem) -> Self:
         return cls(
-            code=item.code,
+            code=to_off_code(item.code),
             name=get_off_item_name(item),
             brands=item.brands,
             categories=item.categories,
@@ -151,7 +173,7 @@ class USDAHit(_NutrientHit):
     @classmethod
     def create_from_usda_item(cls, item: USDAItem) -> Self:
         return cls(
-            code=to_code(item.fdc_id),
+            code=to_usda_code(item.fdc_id),
             name=get_usda_item_name(item),
             category=item.category,
             **_nutrient_kwargs(item, _SHARED_NUTRIENT_FIELDS),
@@ -163,11 +185,12 @@ class USDAHit(_NutrientHit):
         return context + nutrients
 
 
-def _csv_block(title: str, header: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
+def _csv_block(title: str, header: Sequence[str], rows: Sequence[Sequence[str]], *, level: int = 1) -> str:
+    prefix = "#" * level
     if not rows:
-        return f"# {title}\n(no hits)"
+        return f"{prefix} {title}\n(no hits)"
     buf = io.StringIO()
-    buf.write(f"# {title}\n")
+    buf.write(f"{prefix} {title}\n")
     writer = csv.writer(buf, lineterminator="\n")
     writer.writerow(header)
     writer.writerows(rows)
@@ -175,26 +198,48 @@ def _csv_block(title: str, header: Sequence[str], rows: Sequence[Sequence[str]])
 
 
 class LookupResult(BaseModel):
-    """Search hits grouped by source; render to CSV for the LLM tool result."""
-
     open_food_facts: list[OFFHit] = Field(default_factory=list)
     usda: list[USDAHit] = Field(default_factory=list)
 
     def render_csv(self) -> str:
-        """Compact CSV (one block per source) for the nutrition-agent tool result."""
         off_header = list(OFFHit._CSV_CONTEXT) + list(OFFHit._CSV_NUTRIENTS)
         usda_header = list(USDAHit._CSV_CONTEXT) + list(USDAHit._CSV_NUTRIENTS)
         off_block = _csv_block(
             "open_food_facts",
             off_header,
             [h.csv_row() for h in self.open_food_facts],
+            level=2,
         )
         usda_block = _csv_block(
             "usda",
             usda_header,
             [h.csv_row() for h in self.usda],
+            level=2,
         )
         return f"{off_block}\n\n{usda_block}"
+
+
+class QueryLookupResult(BaseModel):
+    query: str
+    results: LookupResult = Field(default_factory=LookupResult)
+
+    def render_csv(self) -> str:
+        return f"# query: {self.query}\n{self.results.render_csv()}"
+
+
+class BatchLookupResult(BaseModel):
+    """Batch lookup: one `QueryLookupResult` per input query, in input order."""
+
+    queries: list[QueryLookupResult] = Field(default_factory=list)
+
+    def render_csv(self) -> str:
+        if not self.queries:
+            return "(no queries)"
+        return "\n\n".join(q.render_csv() for q in self.queries)
+
+    def render_json(self) -> str:
+        """Compact JSON, one entry per input query - what the agent's lookup tool returns."""
+        return self.model_dump_json()
 
 
 class _Searchable[ItemT](Protocol):
@@ -262,23 +307,25 @@ class FoodDb:
         usda = UsdaFoodDb(settings.usda_db) if settings.usda_usage is not FoodDbUsage.DISABLED else None
         return cls(off, usda)
 
-    async def lookup(self, queries: Sequence[LookupQuery]) -> LookupResult:
-        """Search both sources concurrently, returning hits grouped by source.
+    async def lookup(self, queries: Sequence[LookupQuery]) -> BatchLookupResult:
+        """Search both sources concurrently, returning hits grouped per query and per source.
 
         Each `LookupQuery` caps hits per source independently, so the caller
         (the LLM) can weight a query towards OFF, towards USDA, or skip a
         source entirely (limit 0) rather than searching both identically.
 
         The two sources run in parallel (each is a synchronous DuckDB reader
-        driven off the event loop) and their results stay separated under
-        distinct keys so the caller can tell a branded Polish product from a
-        generic USDA food. A disabled source contributes an empty list.
+        driven off the event loop). Results stay separated under distinct keys
+        per query so the caller can tell which ingredient search found what,
+        and which source a branded Polish product came from vs a generic USDA
+        food. A disabled source contributes an empty list for that channel.
         """
         queries = list(queries)[:_MAX_BATCH_QUERIES]
         off_per_query, usda_per_query = await asyncio.gather(
             _search_source(self._off, [(q.query, q.max_results_off) for q in queries]),
             _search_source(self._usda, [(q.query, q.max_results_usda) for q in queries]),
         )
+        per_query: list[QueryLookupResult] = []
         for q, off_hits, usda_hits in zip(queries, off_per_query, usda_per_query, strict=True):
             log.debug(
                 "lookup query %r (off_limit=%d, usda_limit=%d): %d combined hit(s), %d from USDA, %d from OFF",
@@ -289,12 +336,16 @@ class FoodDb:
                 len(usda_hits),
                 len(off_hits),
             )
-        off_flat = [hit for query_hits in off_per_query for hit in query_hits]
-        usda_flat = [hit for query_hits in usda_per_query for hit in query_hits]
-        return LookupResult(
-            open_food_facts=_off_hits_summary(off_flat),
-            usda=_usda_hits_summary(usda_flat),
-        )
+            per_query.append(
+                QueryLookupResult(
+                    query=q.query,
+                    results=LookupResult(
+                        open_food_facts=_off_hits_summary(off_hits),
+                        usda=_usda_hits_summary(usda_hits),
+                    ),
+                )
+            )
+        return BatchLookupResult(queries=per_query)
 
     def get_food(self, code: str) -> OFFItem | USDAItem:
         """Resolve `code` to its read model, routing by prefix to the owning source."""
@@ -302,9 +353,11 @@ class FoodDb:
             if self._usda is None:
                 raise USDAUnknownFoodCodeError(f"USDA food DB unavailable for code: {code!r}")
             return self._usda.get_food(code)
-        if self._off is None:
-            raise OFFUnknownFoodCodeError(f"OFF food DB unavailable for code: {code!r}")
-        return self._off.get_food(code)
+        if is_off_code(code):
+            if self._off is None:
+                raise OFFUnknownFoodCodeError(f"OFF food DB unavailable for code: {code!r}")
+            return self._off.get_food(code)
+        raise UnknownFoodCodeError(f"food code must be `off:`- or `usda:`-prefixed: {code!r}")
 
     def close(self) -> None:
         for db in (self._off, self._usda):

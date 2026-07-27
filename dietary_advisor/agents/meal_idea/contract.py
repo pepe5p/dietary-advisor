@@ -1,7 +1,7 @@
 """Meal-idea schema: creative dish concepts, not DB-verified facts.
 
 `MealConcept` is the output of the meal-idea agent (see
-`dietary_advisor.agents.meal_idea_agent`), a brainstorming pass that runs
+`dietary_advisor.agents.meal_idea`), a brainstorming pass that runs
 before the nutrition agent ever touches the food DB. It intentionally carries
 no nutrients or product codes - it exists purely to give the nutrition agent
 a concrete, varied creative starting point instead of an abstract macro gap
@@ -14,7 +14,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class MealConcept(BaseModel):
-    """A brainstormed dish concept for one meal slot."""
+    """One brainstormed dish concept.
+
+    Several concepts share a `kind`: the agent proposes a few alternatives per
+    meal slot and the nutrition agent builds one meal from each slot's options.
+    """
 
     model_config = ConfigDict(extra="forbid")
 

@@ -15,7 +15,9 @@ from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.food_db import FoodDb, OFFItem, USDAItem
 from dietary_advisor.food_db.nutrients import nutrients_from_row
 from dietary_advisor.food_db.off_food_db import get_off_item_name
-from dietary_advisor.food_db.usda_food_db import get_usda_item_name, to_code
+from dietary_advisor.food_db.off_food_db import to_code as to_off_code
+from dietary_advisor.food_db.usda_food_db import get_usda_item_name
+from dietary_advisor.food_db.usda_food_db import to_code as to_usda_code
 from dietary_advisor.planning.meal_plan import Meal, MealPlan, NutrientTotals, Portion
 from dietary_advisor.totaller.aggregate import total_meal_plan
 from dietary_advisor.totaller.nutrition import FoodItem
@@ -26,11 +28,11 @@ log = logging.getLogger(__name__)
 def to_food_item(item: OFFItem | USDAItem) -> FoodItem:
     """Map a food_db read model to the domain `FoodItem` (Totaller/shopping-list currency)."""
     if isinstance(item, OFFItem):
-        code = item.code
+        code = to_off_code(item.code)
         name = get_off_item_name(item)
         quantity_g = item.product_quantity
     else:
-        code = to_code(item.fdc_id)
+        code = to_usda_code(item.fdc_id)
         name = get_usda_item_name(item)
         quantity_g = None
     return FoodItem(

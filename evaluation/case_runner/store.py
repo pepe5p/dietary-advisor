@@ -1,4 +1,4 @@
-"""JSON persistence for successful case-runner results under `outputs/`."""
+"""JSON persistence for successful case-runner results under the configured output dir."""
 
 from __future__ import annotations
 
@@ -11,8 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.totaller.nutrition import MacroTargets
 from evaluation.case_runner.grid import RunSpec
-
-DEFAULT_OUTPUT_DIR = Path("outputs")
+from evaluation.settings import get_evaluation_settings
 
 
 class RunRecord(BaseModel):
@@ -43,22 +42,27 @@ def filename_for(llm_model: str, variant_label: str, scenario_id: str) -> str:
     return f"{_sanitize_model(llm_model)}__{variant_label}__{scenario_id}.json"
 
 
-def path_for(spec: RunSpec, *, output_dir: Path = DEFAULT_OUTPUT_DIR) -> Path:
-    return output_dir / filename_for(spec.llm_model, spec.variant.label, spec.scenario_id)
+def _resolve_output_dir(output_dir: Path | None) -> Path:
+    return output_dir if output_dir is not None else get_evaluation_settings().output_dir
 
 
-def is_done(spec: RunSpec, *, output_dir: Path = DEFAULT_OUTPUT_DIR) -> bool:
+def path_for(spec: RunSpec, *, output_dir: Path | None = None) -> Path:
+    return _resolve_output_dir(output_dir) / filename_for(spec.llm_model, spec.variant.label, spec.scenario_id)
+
+
+def is_done(spec: RunSpec, *, output_dir: Path | None = None) -> bool:
     return path_for(spec, output_dir=output_dir).is_file()
 
 
-def save(record: RunRecord, *, output_dir: Path = DEFAULT_OUTPUT_DIR) -> Path:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    dest = output_dir / filename_for(record.llm_model, record.variant, record.scenario_id)
+def save(record: RunRecord, *, output_dir: Path | None = None) -> Path:
+    dest_dir = _resolve_output_dir(output_dir)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / filename_for(record.llm_model, record.variant, record.scenario_id)
     dest.write_text(record.model_dump_json(indent=2), encoding="utf-8")
     return dest
 
 
-def load(spec: RunSpec, *, output_dir: Path = DEFAULT_OUTPUT_DIR) -> RunRecord:
+def load(spec: RunSpec, *, output_dir: Path | None = None) -> RunRecord:
     return RunRecord.model_validate_json(path_for(spec, output_dir=output_dir).read_text(encoding="utf-8"))
 
 

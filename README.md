@@ -44,23 +44,19 @@ offline.
 
 ## Run the tool
 
-`recommend` generates one plan. It takes exactly one of `--profile-id <id>`
-(a built-in profile from
-[`dietary_advisor/profiles.py`](dietary_advisor/profiles.py), `L1_01`…`L3_05`) or
-`--profile '{...}'` (a full `UserProfile` JSON string).
+It takes exactly one of profile id 
+(a built-in profile from [`dietary_advisor/profiles.py`](dietary_advisor/profiles.py))
 
 ```bash
-just run recommend --profile-id L2_01 \
+just run vegetarian-allergic \
     --query "Plan a 1-day, ~1700 kcal vegetarian menu I can cook in 30 min." \
     --json-out out/plan.json
 
-just run info                 # sanity-check resolved settings (model, data dir, .env)
-just run recommend --help     # every command and option is self-documented
+just run --help               # every command and option is self-documented
 ```
 
 Results (macro targets, meal plan, shopping list, actual-vs-target macros, citation
 count) print to the terminal; add `--json-out <path>` to also persist the full result.
-Build a plan around what you have with `--available "salmon, spinach, lemon"`.
 
 Each ablatable module can be toggled off to feel its effect:
 `--no-totaller`, `--no-rag`, `--no-reflective-loop`.
@@ -69,19 +65,20 @@ Each ablatable module can be toggled off to feel its effect:
 
 Case collection runs the full system plus one leave-one-out config per disabled
 module against the scenarios in
-[`evaluation/scenarios.py`](evaluation/scenarios.py) (profiles frozen in
-[`evaluation/profiles/cases.py`](evaluation/profiles/cases.py), independent from
-the CLI profiles above). The (model, variant, scenario) grid is hardcoded in
+[`evaluation/scenarios.py`](evaluation/scenarios.py) (profiles from
+[`dietary_advisor/profiles.py`](dietary_advisor/profiles.py), the same list the
+CLI uses). The (model, variant, scenario) grid is hardcoded in
 [`evaluation/case_runner/grid.py`](evaluation/case_runner/grid.py); re-running
-skips any result file already present under `outputs/`.
+skips any result file already present under the configured output directory
+(project-top-level `outputs/` by default, overridable via `DA_OUTPUT_DIR`).
 
 ```bash
 just run-cases
 ```
 
-Successful runs land as JSON under `outputs/` (visible on the host via the bind
-mount). Scoring of those stored results (`just evaluate`) is pending a later
-rework.
+Successful runs land as JSON under that directory (visible on the host via the
+bind mount). Scoring of those stored results (`just evaluate`) is pending a
+later rework.
 
 Full reproduction from a clean host:
 

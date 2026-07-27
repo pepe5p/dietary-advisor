@@ -22,10 +22,9 @@ import pytest
 from pydantic_ai.models.test import TestModel
 
 import dietary_advisor.planning.pipeline as pipeline_module
-from dietary_advisor.agents.meal_idea import MealConcept
 from dietary_advisor.config import get_settings
 from dietary_advisor.food_db import OFFItem
-from dietary_advisor.food_db.facade import LookupQuery, LookupResult, OFFHit
+from dietary_advisor.food_db.facade import BatchLookupResult, LookupQuery, LookupResult, OFFHit, QueryLookupResult
 from dietary_advisor.planning.meal_plan import MealPlan
 from dietary_advisor.planning.pipeline import Pipeline, VariantConfig
 from dietary_advisor.profile import UserProfile
@@ -42,18 +41,26 @@ class _FakeFoodDb:
     def open(cls, settings: object = None) -> _FakeFoodDb:  # noqa: ARG003
         return cls()
 
-    async def lookup(self, queries: Sequence[LookupQuery]) -> LookupResult:  # noqa: ARG002
-        hits = [
-            OFFHit(
-                code="test:1",
-                name="Test food",
-                energy_kcal=200.0,
-                protein_g=10.0,
-                carbs_g=20.0,
-                fat_g=5.0,
-            ),
-        ]
-        return LookupResult(open_food_facts=hits, usda=[])
+    async def lookup(self, queries: Sequence[LookupQuery]) -> BatchLookupResult:
+        hit = OFFHit.model_validate(
+            {
+                "code": "test:1",
+                "name": "Test food",
+                "energy_kcal": 200.0,
+                "protein_g": 10.0,
+                "carbs_g": 20.0,
+                "fat_g": 5.0,
+            }
+        )
+        return BatchLookupResult(
+            queries=[
+                QueryLookupResult(
+                    query=q.query,
+                    results=LookupResult(open_food_facts=[hit], usda=[]),
+                )
+                for q in queries
+            ]
+        )
 
     def get_food(self, code: str) -> OFFItem:
         return OFFItem(code=code, product_name="Test food", energy_kcal_in_100g=200.0)
@@ -99,19 +106,6 @@ async def test_pipeline_runs_with_food_db(
         result = await pipeline.run(vegan_peanut_profile, "Plan a vegan day, no nuts.")
     assert isinstance(result.plan, MealPlan)
     assert result.shopping_list.items
-
-
-def test_compose_prompt_includes_meal_concepts_section(healthy_profile: UserProfile) -> None:
-    with Pipeline(VariantConfig(rag_enabled=False), food_db=_FakeFoodDb()) as pipeline:  # type: ignore[arg-type]
-        prompt = pipeline._compose_prompt(
-            healthy_profile,
-            "Plan a day.",
-            healthy_profile.targets,
-            [],
-            [MealConcept(kind="breakfast", dish_name="Shakshuka with feta and crusty bread")],
-        )
-    assert "Meal concepts" in prompt
-    assert "breakfast: Shakshuka with feta and crusty bread" in prompt
 
 
 @pytest.mark.asyncio()

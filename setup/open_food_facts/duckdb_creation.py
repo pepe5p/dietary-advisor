@@ -432,7 +432,7 @@ def _build_select_sql(source_sql: str) -> str:
 def _column_comment_sql(table: str) -> list[str]:
     """`COMMENT ON COLUMN` statements documenting canonical units."""
     statements = [
-        f"COMMENT ON COLUMN {table}.code IS 'Open Food Facts barcode (primary key).'",
+        f"COMMENT ON COLUMN {table}.code IS 'Open Food Facts barcode (primary key). Exposed at runtime as off:<code>.'",
         f"COMMENT ON COLUMN {table}.nutrition_data_per IS "
         "'OFF provenance flag: were nutrients reported per 100g directly, or derived from a serving size?'",
     ]

@@ -24,7 +24,7 @@ def _configure_logging(verbose: bool) -> None:
 def run_cases(
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
-    """Execute remaining (model, variant, scenario) runs into `outputs/`."""
+    """Execute remaining (model, variant, scenario) runs into the configured output dir."""
     _configure_logging(verbose)
     from evaluation.case_runner import collect_runs, is_done, planned_runs
 
@@ -54,7 +54,7 @@ def run_cases(
 def evaluate(
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
-    """Score existing `outputs/` records (pending the scoring-stage rework)."""
+    """Score existing case-run records (pending the scoring-stage rework)."""
     _configure_logging(verbose)
     console.print(
         "[yellow]Scoring stage is pending rework.[/yellow] "
