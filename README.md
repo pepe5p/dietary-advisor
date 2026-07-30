@@ -59,7 +59,7 @@ Results (macro targets, meal plan, shopping list, actual-vs-target macros, citat
 count) print to the terminal; add `--json-out <path>` to also persist the full result.
 
 Each ablatable module can be toggled off to feel its effect:
-`--no-totaller`, `--no-rag`, `--no-reflective-loop`.
+`--no-totaller`, `--no-reflective-loop`. Add `--rag` to enable clinical-guideline retrieval.
 
 ## Collect case runs (and evaluate later)
 

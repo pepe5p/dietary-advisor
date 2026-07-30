@@ -2,9 +2,9 @@
 
 The pipeline is intentionally a *deterministic Python flow* rather than an
 LLM-driven Meta-Agent: that keeps module comparisons clean (no second hidden
-LLM behaviour to worry about). By default all three modules are enabled (the
-full system); each can be individually disabled for ablation, on top of a
-baseline that always includes the Open Food Facts food lookup and the
+LLM behaviour to worry about). Totaller and reflection default on; RAG is
+opt-in. Each module can be toggled for ablation, on top of a baseline that
+always includes the Open Food Facts food lookup and the
 patient's fixed profile (allergens, conditions, goals) - see AGENTS.md for why
 the food DB can't be an ablation variant (the agent cannot invent a food).
 
@@ -75,31 +75,31 @@ _MAX_EXCERPTS = 12
 class VariantConfig:
     """Feature flags controlling which supporting modules are active.
 
-    Each flag maps 1:1 to one of the three ablatable modules in `desc.md`. All
-    default to enabled (the full system). The patient profile and the Open
-    Food Facts food lookup are always active (part of the baseline task), so
-    neither is a flag - see AGENTS.md.
+    Each flag maps 1:1 to one of the three ablatable modules in `desc.md`.
+    Totaller and reflection default on; RAG defaults off. The patient profile
+    and the Open Food Facts food lookup are always active (part of the baseline
+    task), so neither is a flag - see AGENTS.md.
     """
 
     totaller_enabled: bool = True
-    rag_enabled: bool = True
+    rag_enabled: bool = False
     reflection_enabled: bool = True
 
     @property
     def label(self) -> str:
         """Short identifier for this config, used in reports and logs."""
-        disabled = []
-        if not self.totaller_enabled:
-            disabled.append("no-totaller")
-        if not self.rag_enabled:
-            disabled.append("no-rag")
-        if not self.reflection_enabled:
-            disabled.append("no-reflective-loop")
-        if not disabled:
-            return "full"
-        if len(disabled) == 3:
+        enabled = []
+        if self.totaller_enabled:
+            enabled.append("totaller")
+        if self.rag_enabled:
+            enabled.append("rag")
+        if self.reflection_enabled:
+            enabled.append("reflective-loop")
+        if not enabled:
             return "baseline"
-        return "+".join(disabled)
+        if len(enabled) == 3:
+            return "full"
+        return "+".join(enabled)
 
     @property
     def description(self) -> str:

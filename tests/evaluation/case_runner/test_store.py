@@ -18,7 +18,7 @@ def test_path_for_sanitizes_model_id(tmp_path: Path) -> None:
         scenario_id="regular",
     )
     path = path_for(spec, output_dir=tmp_path)
-    assert path.name == "groq-llama-3.3-70b-versatile__full__regular.json"
+    assert path.name == "groq-llama-3.3-70b-versatile__totaller+reflective-loop__regular.json"
 
 
 def test_save_load_round_trip(tmp_path: Path) -> None:
@@ -44,7 +44,7 @@ def test_save_load_round_trip(tmp_path: Path) -> None:
 
     loaded = load(spec, output_dir=tmp_path)
     assert loaded.llm_model == record.llm_model
-    assert loaded.variant == "no-rag"
+    assert loaded.variant == "totaller+reflective-loop"
     assert loaded.scenario_id == "regular"
     assert loaded.agent_plan.user_id == "regular"
     assert loaded.targets.energy_kcal == 2000

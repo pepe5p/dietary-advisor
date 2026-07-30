@@ -55,7 +55,7 @@ def main(
         help="The user-facing prompt forwarded to the LLM.",
     ),
     no_totaller: bool = typer.Option(False, "--no-totaller", help="Disable the deterministic totaller tool."),
-    no_rag: bool = typer.Option(False, "--no-rag", help="Disable clinical-guideline retrieval (RAG)."),
+    rag: bool = typer.Option(False, "--rag", help="Enable clinical-guideline retrieval (RAG)."),
     no_reflective_loop: bool = typer.Option(
         False,
         "--no-reflective-loop",
@@ -75,7 +75,7 @@ def main(
 
     variant = VariantConfig(
         totaller_enabled=not no_totaller,
-        rag_enabled=not no_rag,
+        rag_enabled=rag,
         reflection_enabled=not no_reflective_loop,
     )
     with Pipeline(variant) as pipeline:
