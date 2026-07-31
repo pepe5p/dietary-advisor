@@ -179,3 +179,5 @@ notes/
 .cursor/
 
 .DS_Store
+
+*.code-workspace
