@@ -6,11 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class PlanCritique(BaseModel):
-    """Structured verdict from the critic agent on a proposed `AgentMealPlan`.
-
-    An empty `issues` list is the expected outcome for an acceptable plan and
-    is what stops the reflection loop.
-    """
+    """Structured verdict from the critic agent on a proposed `AgentMealPlan`."""
 
     model_config = ConfigDict(extra="forbid")
 

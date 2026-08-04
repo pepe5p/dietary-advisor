@@ -17,8 +17,4 @@ class RetrievalQueries(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    queries: list[str] = Field(
-        min_length=1,
-        max_length=10,
-        description=("Short, targeted guideline search queries in English."),
-    )
+    queries: list[str] = Field(min_length=1, max_length=10)

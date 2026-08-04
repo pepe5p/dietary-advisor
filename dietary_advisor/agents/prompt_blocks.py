@@ -17,6 +17,21 @@ if TYPE_CHECKING:
     from dietary_advisor.totaller.nutrition import MacroTargets
 
 
+# Baseline numeric guardrails distilled from WHO / DGA 2025-2030. Stated in the
+# prompt (rather than retrieved) because they apply to every healthy adult, so
+# spending RAG excerpts on them would starve the condition-specific retrieval.
+# Kept out on purpose (they arrive via RAG when the profile warrants): DASH's
+# 1500 mg sodium target, diabetes 15 g carbohydrate exchanges, the DGA
+# dairy-snack sugar rule.
+# Shared by the planner (which must respect them) and the critic (which checks
+# them), so the two can never drift to different numbers.
+BASELINE_GUARDRAIL_BULLETS = """- Fat: < 30% of energy; saturated fat < 10% of energy; trans fat < 1% of energy.
+- Free sugars: < 10% of energy (~50 g at 2000 kcal); added sugars max 10 g per meal.
+- Sodium: < 2000 mg/day (~5 g salt); never exceed 2300 mg/day.
+- Potassium: >= 3.5 g/day.
+- Fruit + vegetables: >= 400 g/day (~5 portions; potatoes/starchy roots do not count)."""
+
+
 def format_guideline_excerpts(citations: list[Citation], *, header: str) -> str | None:
     """Render RAG citations as one prompt block, or `None` when there are none.
 

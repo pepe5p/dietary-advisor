@@ -56,7 +56,7 @@ class _FakeFoodDb:
 
     def get_food(self, code: str) -> OFFItem:
         if code != self._known_code:
-            raise OFFUnknownFoodCodeError(f"unknown code: {code!r}")
+            raise OFFUnknownFoodCodeError(code, f"unknown code: {code!r}")
         return OFFItem(code=code, product_name="Known food", energy_kcal_in_100g=100.0)
 
 

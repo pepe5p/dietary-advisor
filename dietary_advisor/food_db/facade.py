@@ -80,11 +80,9 @@ _Thousandths = Annotated[SafeDecimal, _round_to(3)]
 
 
 class LookupQuery(BaseModel):
-    """One ingredient search with its own per-source result cap."""
-
-    query: str
-    max_results_off: int = Field(default=2, ge=0, le=15)
-    max_results_usda: int = Field(default=2, ge=0, le=10)
+    query: str = Field(description="Search text, sent verbatim to both sources.")
+    max_results_off: int = Field(default=2, ge=0, le=15, description="Max Open Food Facts hits; 0 skips that source.")
+    max_results_usda: int = Field(default=2, ge=0, le=10, description="Max USDA hits; 0 skips that source.")
 
 
 class _NutrientHit(BaseModel):
@@ -351,13 +349,13 @@ class FoodDb:
         """Resolve `code` to its read model, routing by prefix to the owning source."""
         if is_usda_code(code):
             if self._usda is None:
-                raise USDAUnknownFoodCodeError(f"USDA food DB unavailable for code: {code!r}")
+                raise USDAUnknownFoodCodeError(code, f"USDA food DB unavailable for code: {code!r}")
             return self._usda.get_food(code)
         if is_off_code(code):
             if self._off is None:
-                raise OFFUnknownFoodCodeError(f"OFF food DB unavailable for code: {code!r}")
+                raise OFFUnknownFoodCodeError(code, f"OFF food DB unavailable for code: {code!r}")
             return self._off.get_food(code)
-        raise UnknownFoodCodeError(f"food code must be `off:`- or `usda:`-prefixed: {code!r}")
+        raise UnknownFoodCodeError(code, f"food code must be `off:`- or `usda:`-prefixed: {code!r}")
 
     def close(self) -> None:
         for db in (self._off, self._usda):

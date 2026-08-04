@@ -22,9 +22,9 @@ from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.nutrition.prompts import nutrition_agent_system, REFLECTION_REFINER_AGENT_SYSTEM
 from dietary_advisor.config import get_settings
-from dietary_advisor.food_db.errors import UnknownFoodCodeError
+from dietary_advisor.food_db.errors import MultipleUnknownFoodCodesError
 from dietary_advisor.food_db.facade import BatchLookupResult, LookupQuery
-from dietary_advisor.planning.hydration import total_agent_meal_plan
+from dietary_advisor.planning.hydration import hydrate_meal_plan, total_agent_meal_plan
 from dietary_advisor.planning.meal_plan import NutrientTotals
 
 log = logging.getLogger(__name__)
@@ -37,19 +37,15 @@ async def _validate_codes(ctx: RunContext[AgentDeps], output: AgentMealPlan) -> 
     isn't a genuine lookup result is caught here and sent back as a retry,
     rather than silently reaching hydration.
     """
-    unknown: list[str] = []
-    for meal in output.meals:
-        for ref in meal.recipe.portions:
-            try:
-                ctx.deps.food_db.get_food(ref.code)
-            except UnknownFoodCodeError:
-                unknown.append(ref.code)
-    if unknown:
+    try:
+        hydrate_meal_plan(output, ctx.deps.food_db)
+    except MultipleUnknownFoodCodesError as exc:
+        log.error("Unknown food codes: %s", exc.codes)
         raise ModelRetry(
-            f"These codes do not exist in the food database: {sorted(set(unknown))}. "
+            f"These codes do not exist in the food database: {exc.codes}. "
             "Every `code` must be copied verbatim from a `lookup_foods` result - "
             "search again and use a code you actually received."
-        )
+        ) from exc
     return output
 
 
@@ -57,23 +53,19 @@ async def lookup_foods(
     ctx: RunContext[AgentDeps],
     queries: list[LookupQuery],
 ) -> str:
-    """Batch search of both food databases: one tool call for several ingredient queries.
+    """Search both food databases for several ingredient queries in one call.
 
-    Returns compact JSON with one entry per input query in input order.
-    Each entry has `query`, then `results.open_food_facts` (branded/packaged
-    products, often Polish) and `results.usda` (generic whole foods and
-    reference ingredients like raw carrot or plain chicken breast). Each hit
-    object carries a verified `code`, a `name`, context fields, and per-100g
-    nutrients in canonical units (`energy_kcal`, `protein_g`, `sodium_mg`, …);
-    unknown nutrients are omitted. Copy `code` and `name` verbatim into the
-    `PortionRef` for that ingredient - `code` holds the identifier alone, never
-    the name or grams appended to it. You cannot use any food that isn't a hit
-    from this tool.
+    Each query runs against both sources. `open_food_facts` holds branded,
+    packaged products sold in Poland and stores their names in Polish; `usda`
+    holds generic whole foods and reference ingredients (raw carrot, plain
+    chicken breast, olive oil) and contains no Polish text. Up to 50 queries
+    per call; any beyond that are dropped.
 
-    Each query sets its own `max_results_usda`/`max_results_off`, so you can
-    weight some ingredients towards USDA, others towards OFF, or skip a source
-    entirely (0 skips that source). Pass a single-element list for a one-off
-    follow-up search.
+    Returns JSON with one entry per input query, in input order: `query`, then
+    `results.open_food_facts` and `results.usda`. Every hit carries `code`,
+    `name`, per-100g nutrients in canonical units (`energy_kcal`, `protein_g`,
+    `sodium_mg`, ...; unknown ones omitted), plus `brands`, `categories` and
+    `ingredients_text` on Open Food Facts hits and `category` on USDA hits.
     """
     log.info("lookup_foods(%d query/queries)", len(queries))
     if not queries:
@@ -83,16 +75,19 @@ async def lookup_foods(
 
 
 async def total_meal_plan(ctx: RunContext[AgentDeps], plan: AgentMealPlan) -> NutrientTotals:
-    """Deterministically hydrate `plan`'s codes and total nutrients, overall and per meal.
+    """Sum a draft plan's nutrients from the database rows behind its codes.
 
-    Check ``warnings`` for nutrients where some foods had no DB value: those totals
-    are a floor, not a complete measurement.
+    Returns day `totals`, a `per_meal` breakdown in plan order, and `warnings`
+    naming nutrients whose totals are understated because some foods carry no
+    value for them in the source DB. The plan itself is not modified.
     """
     try:
         return total_agent_meal_plan(plan, ctx.deps.food_db)
-    except UnknownFoodCodeError as exc:
+    except MultipleUnknownFoodCodesError as exc:
+        log.error("Unknown food codes: %s", exc.codes)
         raise ModelRetry(
-            f"Cannot total the plan: {exc}. Every `code` must be copied verbatim from a lookup result.",
+            f"Cannot total the plan: unknown food code(s) {exc.codes}. "
+            "Every `code` must be copied verbatim from a lookup result.",
         ) from exc
 
 

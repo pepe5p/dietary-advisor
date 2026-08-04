@@ -14,16 +14,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class MealConcept(BaseModel):
-    """One brainstormed dish concept.
-
-    Several concepts share a `kind`: the agent proposes a few alternatives per
-    meal slot and the nutrition agent builds one meal from each slot's options.
-    """
+    """One brainstormed dish concept."""
 
     model_config = ConfigDict(extra="forbid")
 
     kind: str = Field(description="Meal slot, e.g. breakfast, lunch, dinner, snack.")
-    dish_name: str = Field(
-        min_length=1,
-        description="A concrete, specific dish name - not a generic nutrient-role label.",
-    )
+    dish_name: str = Field(min_length=1, description="A concrete, specific dish name.")

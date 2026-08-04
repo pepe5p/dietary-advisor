@@ -1,6 +1,11 @@
 """Food DB: local Open Food Facts + USDA product databases, the food sources of truth."""
 
-from dietary_advisor.food_db.errors import OFFUnknownFoodCodeError, UnknownFoodCodeError, USDAUnknownFoodCodeError
+from dietary_advisor.food_db.errors import (
+    MultipleUnknownFoodCodesError,
+    OFFUnknownFoodCodeError,
+    UnknownFoodCodeError,
+    USDAUnknownFoodCodeError,
+)
 from dietary_advisor.food_db.facade import (
     BatchLookupResult,
     FoodDb,
@@ -22,6 +27,7 @@ __all__ = [
     "OFFHit",
     "OFFItem",
     "OFFUnknownFoodCodeError",
+    "MultipleUnknownFoodCodesError",
     "OffFoodDb",
     "QueryLookupResult",
     "USDAHit",

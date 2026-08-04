@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from textwrap import indent
 from typing import TYPE_CHECKING
 
 from dietary_advisor.agents.prompt_blocks import (
+    BASELINE_GUARDRAIL_BULLETS,
     format_guideline_excerpts,
     join_sections,
     request_sections,
@@ -20,7 +22,7 @@ _CRITIC_INTRO = """You are a meal-plan reviewer. You receive a proposed one-day 
 the user's profile, macro targets{request_clause}. Your only job is to
 find genuine problems - you never rewrite the plan yourself.
 
-Check the plan against, in order of severity:"""
+Examples of problems to check for:"""
 
 _CHECK_ALLERGENS = """Allergens: any ingredient that conflicts with an allergen declared in the
    profile."""
@@ -34,19 +36,12 @@ _CHECK_USER_REQUEST = """The user's original request: does the plan actually del
 
 _CHECK_MACROS = "Macro totals vs targets."
 
-_CHECK_GUARDRAILS_WITH_REQUEST = """Baseline daily guardrails (WHO / DGA 2025-2030), unless a profile condition
-   or a cited clinical-guideline excerpt overrides them: fat < 30% of energy,
-   saturated fat < 10%, trans fat < 1%; free sugars < 10% of energy and added
-   sugars <= 10 g per meal; sodium < 2000 mg/day (hard ceiling 2300 mg);
-   potassium >= 3.5 g/day; >= 400 g fruit + vegetables/day. Do NOT flag a
-   deviation the user explicitly requested (e.g. crisps with lunch) - instead
-   check the rest of the day compensates towards the daily targets."""
+_CHECK_GUARDRAILS_HEAD = """Baseline daily guardrails (WHO / DGA 2025-2030), unless a profile condition
+   or a cited clinical-guideline excerpt overrides them:"""
 
-_CHECK_GUARDRAILS_NO_REQUEST = """Baseline daily guardrails (WHO / DGA 2025-2030), unless a profile condition
-   or a cited clinical-guideline excerpt overrides them: fat < 30% of energy,
-   saturated fat < 10%, trans fat < 1%; free sugars < 10% of energy and added
-   sugars <= 10 g per meal; sodium < 2000 mg/day (hard ceiling 2300 mg);
-   potassium >= 3.5 g/day; >= 400 g fruit + vegetables/day."""
+_CHECK_GUARDRAILS_REQUEST_CLAUSE = """Do NOT flag a deviation the user explicitly requested (e.g. crisps with
+   lunch) - instead check the rest of the day compensates towards the daily
+   targets."""
 
 _CHECK_RECIPES = """Recipes: every meal needs full, followable step-by-step instructions that
    match its actual portions."""
@@ -65,6 +60,13 @@ list - that is the expected outcome for a good plan.
 _CRITIC_TASK = "Review the plan and return a `PlanCritique`."
 
 
+def _guardrails_check(*, has_user_request: bool) -> str:
+    lines = [_CHECK_GUARDRAILS_HEAD, indent(BASELINE_GUARDRAIL_BULLETS, "   ")]
+    if has_user_request:
+        lines.append(f"   {_CHECK_GUARDRAILS_REQUEST_CLAUSE}")
+    return "\n".join(lines)
+
+
 def critic_agent_system(*, has_user_request: bool = True) -> str:
     request_clause = ", and original request" if has_user_request else ""
     checks = [
@@ -77,7 +79,7 @@ def critic_agent_system(*, has_user_request: bool = True) -> str:
     checks.extend(
         [
             _CHECK_MACROS,
-            _CHECK_GUARDRAILS_WITH_REQUEST if has_user_request else _CHECK_GUARDRAILS_NO_REQUEST,
+            _guardrails_check(has_user_request=has_user_request),
             _CHECK_RECIPES,
             _CHECK_RATIONALE,
         ],

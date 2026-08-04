@@ -29,7 +29,7 @@ from dietary_advisor.agents.prompt_blocks import format_totals_feedback
 from dietary_advisor.agents.prompt_blocks import has_user_request as user_has_request
 from dietary_advisor.agents.runner import run_agent_logged
 from dietary_advisor.config import get_settings
-from dietary_advisor.food_db.errors import UnknownFoodCodeError
+from dietary_advisor.food_db.errors import MultipleUnknownFoodCodesError
 from dietary_advisor.planning.hydration import total_agent_meal_plan
 from dietary_advisor.planning.meal_plan import Citation
 from dietary_advisor.telemetry import collect_from_result, RunTelemetry
@@ -53,8 +53,12 @@ def _totals_feedback_for(plan: AgentMealPlan, deps: AgentDeps, *, iteration: int
     """Deterministically total `plan`, or `None` if it can't be hydrated (logged, never fatal)."""
     try:
         totals = total_agent_meal_plan(plan, deps.food_db)
-    except UnknownFoodCodeError as exc:
-        log.warning("Could not compute deterministic totals at iteration %d: %s", iteration, exc)
+    except MultipleUnknownFoodCodesError as exc:
+        log.error(
+            "Could not compute deterministic totals at iteration %d; unknown food codes: %s",
+            iteration,
+            exc.codes,
+        )
         return None
     return format_totals_feedback(totals, deps.targets)
 

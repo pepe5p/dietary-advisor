@@ -168,5 +168,5 @@ class OffFoodDb:
             [_barcode(code)],
         )
         if not rows:
-            raise OFFUnknownFoodCodeError(f"unknown product code: {code!r}")
+            raise OFFUnknownFoodCodeError(code, f"unknown product code: {code!r}")
         return _row_to_off_item(rows[0])

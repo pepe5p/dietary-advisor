@@ -13,6 +13,7 @@ import logging
 
 from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.food_db import FoodDb, OFFItem, USDAItem
+from dietary_advisor.food_db.errors import MultipleUnknownFoodCodesError, UnknownFoodCodeError
 from dietary_advisor.food_db.nutrients import nutrients_from_row
 from dietary_advisor.food_db.off_food_db import get_off_item_name
 from dietary_advisor.food_db.off_food_db import to_code as to_off_code
@@ -44,21 +45,33 @@ def to_food_item(item: OFFItem | USDAItem) -> FoodItem:
 
 
 def hydrate_meal_plan(plan: AgentMealPlan, food_db: FoodDb) -> MealPlan:
-    """Resolve every `PortionRef` to a full `FoodItem` and build a `MealPlan`."""
+    """Resolve every `PortionRef` to a full `FoodItem` and build a `MealPlan`.
+
+    Continues past individual misses so one `MultipleUnknownFoodCodesError` carries every
+    unresolved code for logging / ModelRetry.
+    """
     meals: list[Meal] = []
+    unknown: list[str] = []
     for agent_meal in plan.meals:
         portions: list[Portion] = []
         for ref in agent_meal.recipe.portions:
-            item = food_db.get_food(ref.code)
+            try:
+                item = food_db.get_food(ref.code)
+            except UnknownFoodCodeError as exc:
+                unknown.append(exc.code)
+                continue
             portions.append(Portion(food=to_food_item(item), grams=ref.grams))
-        meals.append(
-            Meal(
-                kind=agent_meal.kind,
-                name=agent_meal.recipe.name,
-                portions=portions,
-                recipe=agent_meal.recipe.instructions,
-            ),
-        )
+        if portions:
+            meals.append(
+                Meal(
+                    kind=agent_meal.kind,
+                    name=agent_meal.recipe.name,
+                    portions=portions,
+                    recipe=agent_meal.recipe.instructions,
+                ),
+            )
+    if unknown:
+        raise MultipleUnknownFoodCodesError(unknown)
     log.debug("hydration.hydrate_meal_plan(%d meal(s))", len(meals))
     return MealPlan(
         user_id=plan.user_id,

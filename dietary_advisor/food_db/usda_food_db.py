@@ -53,7 +53,7 @@ def _fdc_id(code: str) -> int:
     try:
         return int(raw)
     except ValueError as exc:
-        raise USDAUnknownFoodCodeError(f"not a USDA code: {code!r}") from exc
+        raise USDAUnknownFoodCodeError(code, f"not a USDA code: {code!r}") from exc
 
 
 def get_usda_item_name(item: USDAItem | Mapping[str, Any]) -> str:
@@ -163,5 +163,5 @@ class UsdaFoodDb:
             [_fdc_id(code)],
         )
         if not rows:
-            raise USDAUnknownFoodCodeError(f"unknown USDA food code: {code!r}")
+            raise USDAUnknownFoodCodeError(code, f"unknown USDA food code: {code!r}")
         return _row_to_usda_item(rows[0])
