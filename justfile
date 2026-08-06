@@ -26,7 +26,7 @@ default: help
 	uv run python -m evaluation run-cases "$@"
 
 [group("cli")]
-[doc("Score stored case-run results (pending scoring-stage rework)")]
+[doc("Score stored case-run results and print a per-variant summary")]
 @evaluate *args:
 	uv run python -m evaluation evaluate "$@"
 

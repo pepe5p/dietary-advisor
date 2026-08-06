@@ -1,4 +1,4 @@
-"""`evaluation` Typer CLI: collect case runs, then (later) score them."""
+"""`evaluation` Typer CLI: collect case runs, then score stored results."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import logging
 
 import typer
 from rich.console import Console
+from rich.table import Table
 
 app = typer.Typer(help="Collect dietary-advisor case runs and evaluate stored results.")
 
@@ -52,16 +53,69 @@ def run_cases(
 
 @app.command()
 def evaluate(
+    force: bool = typer.Option(False, "--force", "-f", help="Rescore runs that already have a score file."),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
-    """Score existing case-run records (pending the scoring-stage rework)."""
+    """Score stored case-run records and print a per-variant summary."""
     _configure_logging(verbose)
+    from evaluation.case_runner import is_done, planned_runs
+    from evaluation.scoring import is_scored, load, score_runs, summarize
+
+    specs = planned_runs()
+    stored = sum(1 for s in specs if is_done(s))
+    missing = len(specs) - stored
+    already_scored = sum(1 for s in specs if is_done(s) and is_scored(s))
+    to_score = stored - already_scored if not force else stored
+
     console.print(
-        "[yellow]Scoring stage is pending rework.[/yellow] "
-        "Collect runs with `run-cases` first; evaluation against stored "
-        "results will land in a later change."
+        f"Planned [bold]{len(specs)}[/bold] runs "
+        f"([green]{stored}[/green] stored, "
+        f"[yellow]{missing}[/yellow] missing, "
+        f"[cyan]{already_scored}[/cyan] already scored)."
     )
-    raise typer.Exit(code=1)
+    if missing:
+        console.print("[yellow]Some planned runs have no stored record.[/yellow] Collect them with `run-cases` first.")
+    if to_score == 0 and not force:
+        console.print("[green]Nothing to score.[/green]")
+    else:
+        summary = asyncio.run(score_runs(specs, force=force))
+        console.print(
+            f"[green]Succeeded[/green] {summary.succeeded} / "
+            f"[red]failed[/red] {summary.failed} "
+            f"(of {summary.attempted} attempted; {summary.already_scored} were already scored)."
+        )
+        if summary.failed:
+            raise typer.Exit(code=1)
+
+    scored_records = [load(s) for s in specs if is_scored(s)]
+    if not scored_records:
+        console.print("[yellow]No score records available yet.[/yellow]")
+        return
+
+    table = Table(title="Variant summary")
+    table.add_column("Model")
+    table.add_column("Variant")
+    table.add_column("No. Runs", justify="right")
+    table.add_column("Avg. MAE %", justify="right")
+    table.add_column("Avg. Soft", justify="right")
+    table.add_column("Avg. Safety", justify="right")
+    table.add_column("Avg. Iterations", justify="right")
+    table.add_column("Avg. Elapsed s", justify="right")
+    table.add_column("No. Violations", justify="right")
+
+    for row in summarize(scored_records):
+        table.add_row(
+            row.llm_model,
+            row.variant,
+            str(row.n_runs),
+            f"{row.mae_pct:.2f}",
+            f"{row.soft_aggregate:.4f}",
+            f"{row.safety_adherence:.4f}",
+            f"{row.iterations:.2f}",
+            f"{row.elapsed_s:.2f}",
+            str(row.n_safety_violations),
+        )
+    console.print(table)
 
 
 if __name__ == "__main__":  # pragma: no cover

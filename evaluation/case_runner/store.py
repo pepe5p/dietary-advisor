@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.totaller.nutrition import MacroTargets
 from evaluation.case_runner.grid import RunSpec
-from evaluation.settings import get_evaluation_settings
+from evaluation.persistence import artifact_path, is_present, load_json, save_json
 
 
 class RunRecord(BaseModel):
@@ -34,32 +34,20 @@ class RunRecord(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-def filename_for(spec: RunSpec) -> str:
-    return f"{spec.spec_key}.json"
-
-
-def _resolve_output_dir(output_dir: Path | None) -> Path:
-    return output_dir if output_dir is not None else get_evaluation_settings().output_dir
-
-
 def path_for(spec: RunSpec, *, output_dir: Path | None = None) -> Path:
-    return _resolve_output_dir(output_dir) / filename_for(spec=spec)
+    return artifact_path(spec, output_dir=output_dir)
 
 
 def is_done(spec: RunSpec, *, output_dir: Path | None = None) -> bool:
-    return path_for(spec, output_dir=output_dir).is_file()
+    return is_present(path_for(spec, output_dir=output_dir))
 
 
 def save(spec: RunSpec, record: RunRecord, *, output_dir: Path | None = None) -> Path:
-    dest_dir = _resolve_output_dir(output_dir)
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / filename_for(spec=spec)
-    dest.write_text(record.model_dump_json(indent=2), encoding="utf-8")
-    return dest
+    return save_json(path_for(spec, output_dir=output_dir), record)
 
 
 def load(spec: RunSpec, *, output_dir: Path | None = None) -> RunRecord:
-    return RunRecord.model_validate_json(path_for(spec, output_dir=output_dir).read_text(encoding="utf-8"))
+    return load_json(path_for(spec, output_dir=output_dir), RunRecord)
 
 
 def record_from_result(

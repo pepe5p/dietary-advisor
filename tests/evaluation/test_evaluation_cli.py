@@ -23,7 +23,8 @@ def test_run_cases_help() -> None:
     assert "--repeats" not in result.stdout
 
 
-def test_evaluate_pending() -> None:
-    result = runner.invoke(app, ["evaluate"])
-    assert result.exit_code == 1
-    assert "pending rework" in result.stdout
+def test_evaluate_help() -> None:
+    result = runner.invoke(app, ["evaluate", "--help"])
+    assert result.exit_code == 0
+    assert "--verbose" in result.stdout
+    assert "--force" in result.stdout
