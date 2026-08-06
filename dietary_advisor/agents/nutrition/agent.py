@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 
-from pydantic_ai import Agent, ModelRetry, ModelSettings, RunContext
+from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.models import Model
 
 from dietary_advisor.agents.agent_output import AgentMealPlan
@@ -103,7 +103,6 @@ def _build_agent(
         deps_type=AgentDeps,
         output_type=AgentMealPlan,
         system_prompt=system_prompt,
-        model_settings=ModelSettings(temperature=settings.llm_temperature),
         retries=2,
     )
     agent.output_validator(_validate_codes)

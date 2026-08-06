@@ -22,7 +22,7 @@ default: help
 
 [group("cli")]
 [doc("Collect remaining (model, variant, scenario) case runs into the output dir")]
-@run-cases *args:
+@run_cases *args:
 	uv run python -m evaluation run-cases "$@"
 
 [group("cli")]

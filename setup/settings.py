@@ -23,7 +23,7 @@ class SetupSettings(Settings):
     corpus_dir: Path = Field(default=Path(".data/rag/corpus"))
     rag_chunk_size: int = Field(default=900, ge=200, le=4000)
     rag_chunk_overlap: int = Field(default=120, ge=0, le=500)
-    # Timeout for downloading corpus source PDFs (distinct from `llm_request_timeout_s`).
+    # Timeout for downloading corpus source PDFs.
     request_timeout_s: float = Field(default=60.0, gt=0)
 
     # --- Open Food Facts export ---

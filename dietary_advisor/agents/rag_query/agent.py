@@ -9,7 +9,7 @@ retriever simply runs whatever queries it returns.
 
 from __future__ import annotations
 
-from pydantic_ai import Agent, ModelSettings
+from pydantic_ai import Agent
 from pydantic_ai.models import Model
 
 from dietary_advisor.agents.deps import AgentDeps
@@ -29,6 +29,5 @@ def build_rag_query_agent(
         deps_type=AgentDeps,
         output_type=RetrievalQueries,
         system_prompt=rag_query_agent_system(has_user_request=has_user_request),
-        model_settings=ModelSettings(temperature=settings.llm_temperature),
         retries=1,
     )

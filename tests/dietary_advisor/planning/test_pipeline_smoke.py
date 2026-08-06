@@ -1,9 +1,9 @@
 """End-to-end pipeline smoke test using pydantic-ai's `TestModel`.
 
-`Settings.resolved_llm_model` is a cached property, so pre-seeding its cache
-with a `TestModel` makes every agent factory (which all read from settings)
-pick it up. This makes the run fully offline (no LLM API key required) yet
-still exercises the full structured-output pipeline (profile is never
+`Settings.resolved_llm_model` and `resolved_meal_idea_llm_model` are cached
+properties, so pre-seeding their caches with a `TestModel` makes every agent
+factory pick it up. This makes the run fully offline (no LLM API key required)
+yet still exercises the full structured-output pipeline (profile is never
 validated against constraints - that is an evaluation-only concept, see
 `evaluation.validation`).
 
@@ -76,8 +76,11 @@ class _FakeFoodDb:
 
 
 def _use_test_model(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Pre-seed `resolved_llm_model`'s cache so its real (API-backed) resolution never runs."""
-    monkeypatch.setitem(get_settings().__dict__, "resolved_llm_model", TestModel())
+    """Pre-seed resolved model caches so real (API-backed) resolution never runs."""
+    test_model = TestModel()
+    settings = get_settings().__dict__
+    monkeypatch.setitem(settings, "resolved_llm_model", test_model)
+    monkeypatch.setitem(settings, "resolved_meal_idea_llm_model", test_model)
 
 
 @pytest.mark.asyncio()

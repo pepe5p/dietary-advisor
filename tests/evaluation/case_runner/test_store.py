@@ -38,11 +38,11 @@ def test_save_load_round_trip(tmp_path: Path) -> None:
         telemetry={"requests": 2, "total_tokens": 100},
         elapsed_s=1.5,
     )
-    dest = save(record, output_dir=tmp_path)
+    dest = save(spec=spec, record=record, output_dir=tmp_path)
     assert dest.is_file()
-    assert is_done(spec, output_dir=tmp_path)
+    assert is_done(spec=spec, output_dir=tmp_path)
 
-    loaded = load(spec, output_dir=tmp_path)
+    loaded = load(spec=spec, output_dir=tmp_path)
     assert loaded.llm_model == record.llm_model
     assert loaded.variant == "totaller+reflective-loop"
     assert loaded.scenario_id == "regular"

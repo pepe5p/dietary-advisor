@@ -146,7 +146,7 @@ async def _run_and_save(
         telemetry=result.telemetry.as_dict(),
         elapsed_s=round(elapsed, 2),
     )
-    dest = save(record, output_dir=output_dir)
+    dest = save(spec=spec, record=record, output_dir=output_dir)
     log.info(
         "Saved %s / %s / %s -> %s (%.1fs)",
         spec.llm_model,

@@ -7,7 +7,7 @@ handed in the prompt, so its critique cannot recurse into its own tool calls.
 
 from __future__ import annotations
 
-from pydantic_ai import Agent, ModelSettings
+from pydantic_ai import Agent
 from pydantic_ai.models import Model
 
 from dietary_advisor.agents.critic.contract import PlanCritique
@@ -24,6 +24,5 @@ def build_critic_agent(*, model: Model | None = None, has_user_request: bool = T
         deps_type=AgentDeps,
         output_type=PlanCritique,
         system_prompt=critic_agent_system(has_user_request=has_user_request),
-        model_settings=ModelSettings(temperature=settings.llm_temperature),
         retries=2,
     )

@@ -34,12 +34,8 @@ class RunRecord(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-def _sanitize_model(model_id: str) -> str:
-    return model_id.replace(":", "-").replace("/", "-")
-
-
-def filename_for(llm_model: str, variant_label: str, scenario_id: str) -> str:
-    return f"{_sanitize_model(llm_model)}__{variant_label}__{scenario_id}.json"
+def filename_for(spec: RunSpec) -> str:
+    return f"{spec.spec_key}.json"
 
 
 def _resolve_output_dir(output_dir: Path | None) -> Path:
@@ -47,17 +43,17 @@ def _resolve_output_dir(output_dir: Path | None) -> Path:
 
 
 def path_for(spec: RunSpec, *, output_dir: Path | None = None) -> Path:
-    return _resolve_output_dir(output_dir) / filename_for(spec.llm_model, spec.variant.label, spec.scenario_id)
+    return _resolve_output_dir(output_dir) / filename_for(spec=spec)
 
 
 def is_done(spec: RunSpec, *, output_dir: Path | None = None) -> bool:
     return path_for(spec, output_dir=output_dir).is_file()
 
 
-def save(record: RunRecord, *, output_dir: Path | None = None) -> Path:
+def save(spec: RunSpec, record: RunRecord, *, output_dir: Path | None = None) -> Path:
     dest_dir = _resolve_output_dir(output_dir)
     dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / filename_for(record.llm_model, record.variant, record.scenario_id)
+    dest = dest_dir / filename_for(spec=spec)
     dest.write_text(record.model_dump_json(indent=2), encoding="utf-8")
     return dest
 

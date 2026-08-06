@@ -73,7 +73,7 @@ skips any result file already present under the configured output directory
 (project-top-level `outputs/` by default, overridable via `DA_OUTPUT_DIR`).
 
 ```bash
-just run-cases
+just run_cases
 ```
 
 Successful runs land as JSON under that directory (visible on the host via the
@@ -83,7 +83,7 @@ later rework.
 Full reproduction from a clean host:
 
 ```bash
-just build && just dc setup && just dc run-cases
+just build && just dc setup && just dc run_cases
 ```
 
 ## Configuration
@@ -94,9 +94,10 @@ caches, RAG chunking) in `setup.settings.SetupSettings` and the evaluation
 judge model in `evaluation.settings.EvaluationSettings` - both extend the
 shared `Settings`.
 
-`DA_LLM_MODEL`/`DA_JUDGE_MODEL` are `pydantic-ai` model identifiers
+`DA_LLM_MODEL`/`DA_JUDGE_MODEL`/`DA_MEAL_IDEA_LLM_MODEL` are `pydantic-ai` model identifiers
 (`openai:gpt-4o-mini`, `anthropic:claude-3-5-sonnet-latest`, `groq:llama-3.3-70b-versatile`,
-...). Local models served through an OpenAI-compatible endpoint (e.g.
+...). The meal-idea brainstorm runs on `DA_MEAL_IDEA_LLM_MODEL` independently of
+`DA_LLM_MODEL` (and of the model the ablation harness sweeps). Local models served through an OpenAI-compatible endpoint (e.g.
 [Ollama](https://ollama.com/)) work the same way via `ollama:<tag>` plus
 `OLLAMA_BASE_URL` - see the commented-out block in
 [`.env.example`](.env.example). From inside the container, point

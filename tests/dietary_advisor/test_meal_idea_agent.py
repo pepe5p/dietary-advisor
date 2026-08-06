@@ -14,7 +14,7 @@ def _tool_names(agent: object) -> set[str]:
 
 
 def test_meal_idea_agent_registers_no_tools(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setitem(get_settings().__dict__, "resolved_llm_model", TestModel())
+    monkeypatch.setitem(get_settings().__dict__, "resolved_meal_idea_llm_model", TestModel())
 
     agent = build_meal_idea_agent()
 

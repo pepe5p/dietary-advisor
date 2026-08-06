@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from dietary_advisor.config import get_api_keys, get_settings
+from dietary_advisor.config import get_settings
 from dietary_advisor.profile import UserProfile
 from dietary_advisor.totaller.nutrition import FoodItem, MacroTargets, NutrientName
 from evaluation.settings import get_evaluation_settings
@@ -55,7 +55,6 @@ def _isolate_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # network call is attempted.
     monkeypatch.setenv("OPENAI_API_KEY", os.environ.get("OPENAI_API_KEY", "test-dummy"))
     get_settings.cache_clear()
-    get_api_keys.cache_clear()
     get_setup_settings.cache_clear()
     get_evaluation_settings.cache_clear()
 

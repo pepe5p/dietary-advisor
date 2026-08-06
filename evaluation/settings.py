@@ -6,7 +6,7 @@ from functools import cached_property, lru_cache
 from pathlib import Path
 
 from pydantic import Field
-from pydantic_ai.models import Model
+from pydantic_ai.models import infer_model, Model
 
 from dietary_advisor.config.settings import Settings
 
@@ -23,7 +23,7 @@ class EvaluationSettings(Settings):
 
     @cached_property
     def resolved_judge_model(self) -> Model:
-        return self.resolve_model(self.judge_model)
+        return infer_model(self.judge_model)
 
     def ensure_dirs(self) -> None:
         super().ensure_dirs()

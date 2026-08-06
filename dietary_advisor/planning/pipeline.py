@@ -32,6 +32,8 @@ A further, always-on step (not a toggleable module - see AGENTS.md/the
 meal-idea agent) runs a lightweight brainstorming agent after retrieval and
 ahead of the nutrition agent, so the nutrition agent's ingredient choices
 start from a concrete, varied dish concept instead of an abstract macro gap.
+That step uses `meal_idea_llm_model` from settings, not the pipeline's main
+model override, so ablation sweeps do not change the brainstorm model.
 """
 
 from __future__ import annotations
@@ -39,7 +41,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from pydantic_ai.models import Model
+from pydantic_ai.models import infer_model, Model
 
 from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.agents.deps import AgentDeps
@@ -157,9 +159,7 @@ class Pipeline:
         self._owns_food_db = False  # Only close DBs we created ourselves.
         self._retriever = retriever
         # Resolve once so every agent in this pipeline shares the same Model.
-        self._model: Model = (
-            self._settings.resolve_model(model) if model is not None else self._settings.resolved_llm_model
-        )
+        self._model: Model = infer_model(model) if model is not None else self._settings.resolved_llm_model
         self._model_id = model if model is not None else self._settings.llm_model
 
     def _ensure_food_db(self) -> FoodDb:
@@ -273,7 +273,7 @@ class Pipeline:
         """
         prompt = meal_idea_user_prompt(deps, user_query, rag_citations=rag_citations)
         try:
-            agent = build_meal_idea_agent(model=self._model)
+            agent = build_meal_idea_agent()
             result = await run_agent_logged(agent, prompt, deps=deps, label="meal_idea")
         except Exception as exc:  # noqa: BLE001 - LLMs raise many things; never sink the request for this
             log.warning("Meal-idea agent failed, continuing without meal concepts: %s", exc)
