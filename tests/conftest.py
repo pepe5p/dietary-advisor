@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,7 @@ from dietary_advisor.profile import UserProfile
 from dietary_advisor.totaller.nutrition import FoodItem, MacroTargets, NutrientName
 from evaluation.settings import get_evaluation_settings
 from setup.settings import get_setup_settings
+from tests.food_db_fixtures import build_off_db, build_usda_db, TEST_EMBEDDING_DIM
 
 # Realistic placeholder meal `recipe` text for tests that don't care about the
 # specific recipe content.
@@ -25,6 +27,22 @@ LONG_RATIONALE = (
     "fat moderate. Wholegrains and vegetables at lunch and dinner support fibre and potassium. "
     "No supplementation is needed for this profile beyond what food provides."
 )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _test_food_dbs(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
+    """Build the tiny OFF/USDA DuckDBs once and point Settings at them for the session.
+
+    Overrides the unreachable sentinel paths from ``[tool.pytest_env]``. The
+    embedding dim must match the FLOAT[n] columns the builders create.
+    """
+    db_dir = tmp_path_factory.mktemp("food_db")
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("DA_OFF_EMBEDDING_DIM", str(TEST_EMBEDDING_DIM))
+        mp.setenv("DA_OFF_DB", str(build_off_db(db_dir / "off.duckdb")))
+        mp.setenv("DA_USDA_DB", str(build_usda_db(db_dir / "usda.duckdb")))
+        get_settings.cache_clear()
+        yield
 
 
 @pytest.fixture(autouse=True)

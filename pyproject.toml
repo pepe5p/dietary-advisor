@@ -138,3 +138,8 @@ DEBUG = "True"
 SERVICE_NAME = "dietary-advisor"
 DA_LLM_MODEL = "test"
 DA_JUDGE_MODEL = "test"
+# Overridden by the session fixture in tests/conftest.py with a real built DB.
+# The sentinel only surfaces if that fixture is bypassed, so a gap fails loudly
+# instead of silently falling back to the real .data/ artifacts.
+DA_OFF_DB = "/nonexistent/use-the-food-db-fixture/off.duckdb"
+DA_USDA_DB = "/nonexistent/use-the-food-db-fixture/usda.duckdb"

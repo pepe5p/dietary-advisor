@@ -1,66 +1,30 @@
-"""Hybrid (BM25 + semantic) food search over a synthetic USDA DuckDB.
+"""Hybrid (BM25 + semantic) food search over the session-scoped USDA DuckDB.
 
-Builds a tiny 3-dimensional-embedding DB in a tmp file and stubs the query
-embedder, so fusion, degradation and fallback behaviour are exercised without
-downloading the real ONNX model (mirrors tests/dietary_advisor/test_off_food_db).
+Mirrors ``test_off_food_db``: the DB is built once in ``tests.conftest`` and
+the query embedder is stubbed so fusion / degradation stay deterministic
+without the real ONNX model.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-import duckdb
 import pytest
 
 from dietary_advisor.config import FoodDbUsage, get_settings
 from dietary_advisor.food_db import usda_food_db as usda_mod
 from dietary_advisor.food_db.errors import USDAUnknownFoodCodeError
-from dietary_advisor.food_db.nutrients import COLUMN_TO_NUTRIENT
 from dietary_advisor.food_db.usda_food_db import to_code, UsdaFoodDb
-
-# fdc_id, description, category, embedding vector.
-_FOODS = [
-    (111, "Cheddar cheese", "Dairy and Egg Products", [1.0, 0.0, 0.0]),
-    (222, "Cheese, mozzarella", "Dairy and Egg Products", [0.9, 0.1, 0.0]),
-    (333, "Yogurt, plain", "Dairy and Egg Products", [0.0, 1.0, 0.0]),
-]
-
-_QUERY_VECTORS = {
-    "cheese": [1.0, 0.0, 0.0],
-    "yogurt": [0.0, 1.0, 0.0],
-    "creamy dairy": [0.95, 0.05, 0.0],
-}
+from tests.food_db_fixtures import stub_embedders
 
 
 @pytest.fixture()
-def usda_db_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    monkeypatch.setenv("DA_OFF_EMBEDDING_DIM", "3")
-    get_settings.cache_clear()
-
-    db_path = tmp_path / "usda_test.duckdb"
-    con = duckdb.connect(str(db_path))
-    nutrient_cols = ", ".join(f"{col} DOUBLE" for col in COLUMN_TO_NUTRIENT)
-    con.execute(
-        "CREATE TABLE foods ("
-        "fdc_id BIGINT, description VARCHAR, category VARCHAR, "
-        f"embedding FLOAT[3], {nutrient_cols})"
-    )
-    for fdc_id, description, category, vec in _FOODS:
-        con.execute(
-            "INSERT INTO foods (fdc_id, description, category, embedding, energy_kcal_in_100g) VALUES (?, ?, ?, ?, ?)",
-            [fdc_id, description, category, vec, 100.0],
-        )
-    con.execute("PRAGMA create_fts_index('foods', 'fdc_id', 'description')")
-    con.close()
-    return db_path
-
-
-def _stub_embedder(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(usda_mod, "embed_query", lambda text: _QUERY_VECTORS[text])
+def usda_db_path() -> Path:
+    return get_settings().usda_db
 
 
 def test_hybrid_ranks_exact_and_semantic_match_first(usda_db_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _stub_embedder(monkeypatch)
+    stub_embedders(monkeypatch)
     with UsdaFoodDb(usda_db_path) as db:
         results = db.search("cheese", limit=3)
     codes = [to_code(r.fdc_id) for r in results]
@@ -70,7 +34,7 @@ def test_hybrid_ranks_exact_and_semantic_match_first(usda_db_path: Path, monkeyp
 
 
 def test_codes_are_usda_prefixed_and_nutrients_mapped(usda_db_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _stub_embedder(monkeypatch)
+    stub_embedders(monkeypatch)
     with UsdaFoodDb(usda_db_path) as db:
         [top] = db.search("yogurt", limit=1)
     assert to_code(top.fdc_id) == "usda:333"
@@ -78,7 +42,7 @@ def test_codes_are_usda_prefixed_and_nutrients_mapped(usda_db_path: Path, monkey
 
 
 def test_semantic_finds_foods_without_lexical_overlap(usda_db_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _stub_embedder(monkeypatch)
+    stub_embedders(monkeypatch)
     with UsdaFoodDb(usda_db_path) as db:
         results = db.search("creamy dairy", limit=2)
     # No shared tokens with any indexed description, yet the embedding pulls cheese.
@@ -103,7 +67,7 @@ def test_only_bm25_ignores_semantic_only_query(usda_db_path: Path) -> None:
 
 
 def test_only_semantic_uses_embedding_ranking(usda_db_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _stub_embedder(monkeypatch)
+    stub_embedders(monkeypatch)
     with UsdaFoodDb(usda_db_path, usage=FoodDbUsage.ONLY_SEMANTIC) as db:
         results = db.search("creamy dairy", limit=2)
     assert [to_code(r.fdc_id) for r in results] == ["usda:111", "usda:222"]
@@ -115,7 +79,7 @@ def test_disabled_usage_returns_nothing(usda_db_path: Path) -> None:
 
 
 def test_empty_query_returns_nothing(usda_db_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _stub_embedder(monkeypatch)
+    stub_embedders(monkeypatch)
     with UsdaFoodDb(usda_db_path) as db:
         assert db.search("   ") == []
 
