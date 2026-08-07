@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from pydantic import BaseModel, ConfigDict
 
 from evaluation.scoring.store import ScoreRecord
 
 
-@dataclass(frozen=True)
-class VariantSummary:
+class VariantSummary(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
     llm_model: str
     variant: str
     n_runs: int

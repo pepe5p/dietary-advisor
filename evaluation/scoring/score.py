@@ -109,10 +109,8 @@ async def _score_one(
         )
     except Exception as exc:  # noqa: BLE001 - judge/DB failures must not abort the grid
         log.warning(
-            "Scoring failed for %s / %s / %s: %s\n%s",
-            spec.llm_model,
-            spec.variant.label,
-            spec.scenario_id,
+            "Scoring failed for %s: %s\n%s",
+            spec.spec_key,
             exc,
             traceback.format_exc(limit=4),
         )
@@ -132,10 +130,8 @@ async def _score_one(
     )
     dest = save(spec=spec, record=score_record, output_dir=output_dir)
     log.info(
-        "Scored %s / %s / %s -> %s (MAE %.1f%%, soft %.2f)",
-        spec.llm_model,
-        spec.variant.label,
-        spec.scenario_id,
+        "Scored %s -> %s (MAE %.1f%%, soft %.2f)",
+        spec.spec_key,
         dest,
         errors.mae,
         qualitative.aggregate,

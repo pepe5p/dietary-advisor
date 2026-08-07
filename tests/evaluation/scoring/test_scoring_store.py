@@ -18,7 +18,7 @@ def test_path_for_uses_scores_subdir(tmp_path: Path) -> None:
     )
     path = path_for(spec, output_dir=tmp_path)
     assert path.parent == tmp_path / "scores"
-    assert path.name == "groq-llama-3.3-70b-versatile__totaller+reflective-loop__regular.json"
+    assert path.name == "groq-llama-3.3-70b-versatile__totaller+reflective-loop__regular__rep0.json"
 
 
 def test_save_load_round_trip(tmp_path: Path) -> None:

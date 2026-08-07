@@ -118,5 +118,50 @@ def evaluate(
     console.print(table)
 
 
+def _plot_experiment(experiment: str) -> bool:
+    from evaluation.case_runner.grid import experiment_runs
+    from evaluation.plotting import render_experiment
+    from evaluation.reporting import write_experiment_metrics
+    from evaluation.scoring import is_scored, load
+
+    specs = experiment_runs(experiment)
+    scored_specs = [spec for spec in specs if is_scored(spec)]
+    missing = len(specs) - len(scored_specs)
+
+    console.print(
+        f"Experiment [bold]{experiment}[/bold]: [green]{len(scored_specs)}[/green] / {len(specs)} runs scored."
+    )
+    if missing:
+        console.print("[yellow]Some runs are not scored yet.[/yellow] Run `evaluate` first.")
+    if not scored_specs:
+        console.print("[red]No score records available.[/red]")
+        return False
+
+    records = [load(spec) for spec in scored_specs]
+    paths = render_experiment(experiment, records)
+    for path in paths:
+        console.print(f"Wrote {path}")
+    metrics_path = write_experiment_metrics(experiment, records)
+    console.print(f"Wrote {metrics_path}")
+    return True
+
+
+@app.command()
+def plot(
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Render per-metric bar charts and metrics JSON for all experiments' scored runs."""
+    _configure_logging(verbose)
+    from evaluation.case_runner.grid import EXPERIMENTS
+
+    wrote_any = False
+    for experiment in sorted(EXPERIMENTS):
+        if _plot_experiment(experiment):
+            wrote_any = True
+
+    if not wrote_any:
+        raise typer.Exit(code=1)
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()

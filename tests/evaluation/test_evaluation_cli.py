@@ -14,6 +14,7 @@ def test_cli_help() -> None:
     assert result.exit_code == 0
     assert "run-cases" in result.stdout
     assert "evaluate" in result.stdout
+    assert "plot" in result.stdout
 
 
 def test_run_cases_help() -> None:
@@ -28,3 +29,16 @@ def test_evaluate_help() -> None:
     assert result.exit_code == 0
     assert "--verbose" in result.stdout
     assert "--force" in result.stdout
+
+
+def test_plot_help() -> None:
+    result = runner.invoke(app, ["plot", "--help"])
+    assert result.exit_code == 0
+    assert "--verbose" in result.stdout
+    assert "ablation" in result.stdout
+
+
+def test_plot_unknown_experiment() -> None:
+    result = runner.invoke(app, ["plot", "not-an-experiment"])
+    assert result.exit_code == 1
+    assert "Unknown experiment" in result.stdout

@@ -31,6 +31,11 @@ default: help
 	uv run python -m evaluation evaluate "$@"
 
 [group("cli")]
+[doc("Render per-metric bar charts and metrics JSON for all experiments' scored runs")]
+@plot *args:
+	uv run python -m evaluation plot "$@"
+
+[group("cli")]
 [doc("Run local data setup (Open Food Facts product DB, RAG corpus ingest)")]
 @setup *args:
 	uv run python -m setup "$@"

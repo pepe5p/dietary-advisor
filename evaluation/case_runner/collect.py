@@ -127,10 +127,8 @@ async def _run_and_save(
         result = await run(profile, scenario.query)
     except Exception as exc:  # noqa: BLE001 - LLM/pipeline failures must not abort the grid
         log.warning(
-            "Run failed for %s / %s / %s: %s\n%s",
-            spec.llm_model,
-            spec.variant.label,
-            spec.scenario_id,
+            "Run failed for %s: %s\n%s",
+            spec.spec_key,
             exc,
             traceback.format_exc(limit=4),
         )
@@ -148,10 +146,8 @@ async def _run_and_save(
     )
     dest = save(spec=spec, record=record, output_dir=output_dir)
     log.info(
-        "Saved %s / %s / %s -> %s (%.1fs)",
-        spec.llm_model,
-        spec.variant.label,
-        spec.scenario_id,
+        "Saved %s -> %s (%.1fs)",
+        spec.spec_key,
         dest,
         elapsed,
     )

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 from pydantic import BaseModel
 
-from evaluation.case_runner.grid import RunSpec
 from evaluation.settings import get_evaluation_settings
+
+if TYPE_CHECKING:
+    from evaluation.case_runner.grid import RunSpec
 
 T = TypeVar("T", bound=BaseModel)
 
