@@ -54,6 +54,7 @@ from dietary_advisor.agents.rag_query import build_rag_query_agent
 from dietary_advisor.agents.rag_query.prompts import rag_query_user_prompt
 from dietary_advisor.agents.runner import run_agent_logged
 from dietary_advisor.config import get_settings
+from dietary_advisor.config.llm import LlmSpec
 from dietary_advisor.dietary_rag.retriever import HybridRetriever, RetrievedChunk
 from dietary_advisor.food_db import FoodDb
 from dietary_advisor.planning.hydration import hydrate_meal_plan
@@ -150,7 +151,7 @@ class Pipeline:
         *,
         food_db: FoodDb | None = None,
         retriever: HybridRetriever | None = None,
-        model: str | None = None,
+        llm: LlmSpec | None = None,
     ) -> None:
         self.variant = variant if variant is not None else VariantConfig()
         self._settings = get_settings()
@@ -159,8 +160,10 @@ class Pipeline:
         self._owns_food_db = False  # Only close DBs we created ourselves.
         self._retriever = retriever
         # Resolve once so every agent in this pipeline shares the same Model.
-        self._model: Model = infer_model(model) if model is not None else self._settings.resolved_llm_model
-        self._model_id = model if model is not None else self._settings.llm_model
+        spec = llm if llm is not None else self._settings.llm_spec
+        self._model: Model = infer_model(spec.model)
+        self._model_settings = spec.model_settings
+        self._model_id = str(spec)
 
     def _ensure_food_db(self) -> FoodDb:
         """Open the food DB facade (both sources, per their usage settings)."""
@@ -226,7 +229,9 @@ class Pipeline:
         """
         prompt = rag_query_user_prompt(deps, user_query)
         try:
-            agent = build_rag_query_agent(model=self._model, has_user_request=has_request)
+            agent = build_rag_query_agent(
+                model=self._model, model_settings=self._model_settings, has_user_request=has_request
+            )
             result = await run_agent_logged(agent, prompt, deps=deps, label="rag_query")
         except Exception as exc:  # noqa: BLE001 - LLMs raise many things; never sink the request for this
             log.warning("RAG query agent failed, falling back to heuristic query: %s", exc)
@@ -307,6 +312,7 @@ class Pipeline:
             rag_enabled=self.variant.rag_enabled,
             has_user_request=has_request,
             model=self._model,
+            model_settings=self._model_settings,
         )
         prompt = nutrition_user_prompt(
             deps,
@@ -346,6 +352,7 @@ class Pipeline:
                 totaller_enabled=self.variant.totaller_enabled,
                 rag_citations=rag_citations,
                 model=self._model,
+                model_settings=self._model_settings,
                 has_user_request=has_request,
             )
             agent_plan = refl.plan

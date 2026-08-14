@@ -1,4 +1,4 @@
-"""JSON persistence for successful case-runner results under the configured output dir."""
+"""JSON persistence for successful case-runner results under ``output_dir/runs/``."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ class RunRecord(BaseModel):
 
 
 def path_for(spec: RunSpec, *, output_dir: Path | None = None) -> Path:
-    return artifact_path(spec, output_dir=output_dir)
+    return artifact_path(spec, output_dir=output_dir, subdir="runs")
 
 
 def is_done(spec: RunSpec, *, output_dir: Path | None = None) -> bool:
@@ -62,7 +62,7 @@ def record_from_result(
 ) -> RunRecord:
     v = spec.variant
     return RunRecord(
-        llm_model=spec.llm_model,
+        llm_model=str(spec.llm),
         variant=v.label,
         totaller_enabled=v.totaller_enabled,
         rag_enabled=v.rag_enabled,

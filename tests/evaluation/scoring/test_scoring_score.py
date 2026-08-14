@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from pydantic_ai.models.test import TestModel
 
+from dietary_advisor.config.llm import LlmSpec
 from dietary_advisor.food_db import FoodDb
 from dietary_advisor.planning.pipeline import VariantConfig
 from dietary_advisor.totaller.nutrition import MacroTargets
@@ -22,7 +23,7 @@ from tests.evaluation.conftest import agent_plan_single
 
 def _run_spec(*, scenario_id: str = "regular") -> RunSpec:
     return RunSpec(
-        llm_model="test-model",
+        llm=LlmSpec(model="test-model"),
         variant=VariantConfig(totaller_enabled=False, rag_enabled=False, reflection_enabled=False),
         scenario_id=scenario_id,
     )
@@ -33,7 +34,7 @@ def _seed_run(tmp_path: Path, spec: RunSpec, *, any_code: str) -> None:
     save_run(
         spec=spec,
         record=RunRecord(
-            llm_model=spec.llm_model,
+            llm_model=str(spec.llm),
             variant=variant.label,
             totaller_enabled=variant.totaller_enabled,
             rag_enabled=variant.rag_enabled,

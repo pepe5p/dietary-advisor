@@ -13,23 +13,25 @@ from pathlib import Path
 from evaluation.case_runner.grid import experiment_runs, EXPERIMENTS
 from evaluation.case_runner.store import load as load_run
 from evaluation.case_runner.store import RunRecord
-from evaluation.plotting.stats import _short_model_name, _variant_order
+from evaluation.plotting.stats import _bare_short_model_name, _short_model_name, _variant_order
 from evaluation.scoring.store import is_scored, ScoreRecord
 from evaluation.scoring.store import load as load_score
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _TABLES_DIR = _REPO_ROOT / "thesis" / "tables"
 
-# USD per 1M tokens (input, output), published provider pricing at evaluation time.
-_MODEL_PRICING_USD_PER_1M: dict[str, tuple[float, float]] = {
-    "gpt-5.6-luna": (0.10, 0.60),
-    "gemini-3.6-flash": (1.50, 7.50),
-    "gemini-3.5-flash-lite": (0.30, 2.50),
+# USD per 1M tokens (input, output, cached input), published provider pricing at evaluation time.
+_MODEL_PRICING_USD_PER_1M: dict[str, tuple[float, float, float]] = {
+    "gemini-3.5-flash-lite": (0.30, 2.50, 0.03),
+    "gemini-3.6-flash": (0.75, 3.75, 0.075),
+    "gemini-3.7-flash": (0.375, 1.875, 0.0375),
+    "gpt-5.6-luna": (0.10, 0.60, 0.01),
+    "gpt-5.6-terra": (1.00, 6.00, 0.10),
 }
 
 
 def _escape(text: str) -> str:
-    return text.replace("_", r"\_").replace("%", r"\%").replace("&", r"\&")
+    return text.replace("_", r"\_").replace("%", r"\%").replace("&", r"\&").replace("#", r"\#")
 
 
 def _scored_records(experiment: str) -> list[ScoreRecord]:
@@ -172,10 +174,15 @@ def model_token_cost_table(run_records: list[RunRecord]) -> str:
     for model in sorted(groups):
         group = groups[model]
         input_tok = statistics.fmean(r.telemetry.get("input_tokens", 0) for r in group)
+        cache_tok = statistics.fmean(r.telemetry.get("cache_read_tokens", 0) for r in group)
         output_tok = statistics.fmean(r.telemetry.get("output_tokens", 0) for r in group)
         requests = statistics.fmean(r.telemetry.get("requests", 0) for r in group)
-        price_in, price_out = _MODEL_PRICING_USD_PER_1M.get(model, (0.0, 0.0))
-        cost = input_tok / 1e6 * price_in + output_tok / 1e6 * price_out
+        price_in, price_out, price_cached = _MODEL_PRICING_USD_PER_1M.get(
+            _bare_short_model_name(group[0].llm_model),
+            (0.0, 0.0, 0.0),
+        )
+        uncached_tok = max(input_tok - cache_tok, 0.0)
+        cost = uncached_tok / 1e6 * price_in + cache_tok / 1e6 * price_cached + output_tok / 1e6 * price_out
         lines.append(
             f"{_escape(model)} & {input_tok:,.0f} & {output_tok:,.0f} & {requests:.1f} & {cost:.4f} \\\\".replace(
                 ",", r"\,"

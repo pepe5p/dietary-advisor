@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from pydantic_ai import Agent
 from pydantic_ai.models import Model
+from pydantic_ai.settings import ModelSettings
 
 from dietary_advisor.agents.deps import AgentDeps
 from dietary_advisor.agents.rag_query.contract import RetrievalQueries
@@ -21,6 +22,7 @@ from dietary_advisor.config import get_settings
 def build_rag_query_agent(
     *,
     model: Model | None = None,
+    model_settings: ModelSettings | None = None,
     has_user_request: bool = True,
 ) -> Agent[AgentDeps, RetrievalQueries]:
     settings = get_settings()
@@ -29,5 +31,6 @@ def build_rag_query_agent(
         deps_type=AgentDeps,
         output_type=RetrievalQueries,
         system_prompt=rag_query_agent_system(has_user_request=has_user_request),
+        model_settings=model_settings if model_settings is not None else settings.llm_spec.model_settings,
         retries=1,
     )

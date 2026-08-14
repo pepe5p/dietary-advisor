@@ -146,6 +146,57 @@ def _plot_experiment(experiment: str) -> bool:
     return True
 
 
+def _plot_run_variability() -> bool:
+    from evaluation.case_runner import planned_runs
+    from evaluation.plotting import (
+        complete_spec_groups,
+        METRICS,
+        render_run_variability,
+        scenario_spread_stats,
+        sem_for_reps,
+    )
+    from evaluation.scoring import is_scored, load
+
+    pairs = [(spec, load(spec)) for spec in planned_runs() if is_scored(spec)]
+    groups = complete_spec_groups(pairs)
+
+    if not groups:
+        console.print("[yellow]No run specs with all three repetitions scored.[/yellow]")
+        return False
+
+    mae_stats = scenario_spread_stats(groups, METRICS[0])
+    soft_stats = scenario_spread_stats(groups, METRICS[1])
+
+    console.print(f"Run variability: [bold]{len(groups)}[/bold] complete specs.")
+    table = Table(title="Run variability by scenario")
+    table.add_column("Scenario")
+    table.add_column("Specs", justify="right")
+    table.add_column("MAE mean", justify="right")
+    table.add_column("MAE pooled std", justify="right")
+    table.add_column("MAE SEM@3", justify="right")
+    table.add_column("Soft mean", justify="right")
+    table.add_column("Soft pooled std", justify="right")
+    table.add_column("Soft SEM@3", justify="right")
+
+    for mae, soft in zip(mae_stats, soft_stats, strict=True):
+        table.add_row(
+            mae.label,
+            str(mae.n_specs),
+            f"{mae.grand_mean:.2f}",
+            f"{mae.pooled_std:.2f}",
+            f"{sem_for_reps(mae.pooled_std, 3):.2f}",
+            f"{soft.grand_mean:.3f}",
+            f"{soft.pooled_std:.3f}",
+            f"{sem_for_reps(soft.pooled_std, 3):.3f}",
+        )
+    console.print(table)
+
+    paths = render_run_variability(groups)
+    for path in paths:
+        console.print(f"Wrote {path}")
+    return True
+
+
 @app.command()
 def plot(
     verbose: bool = typer.Option(False, "--verbose", "-v"),
@@ -158,6 +209,8 @@ def plot(
     for experiment in sorted(EXPERIMENTS):
         if _plot_experiment(experiment):
             wrote_any = True
+    if _plot_run_variability():
+        wrote_any = True
 
     if not wrote_any:
         raise typer.Exit(code=1)

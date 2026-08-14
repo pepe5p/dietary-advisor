@@ -6,8 +6,19 @@ from pathlib import Path
 
 import pytest
 
+from dietary_advisor.config.llm import LlmSpec
 from dietary_advisor.planning.pipeline import VariantConfig
-from evaluation.plotting.figures import group_metric_stats, METRICS, render_experiment
+from evaluation.case_runner.grid import RunSpec
+from evaluation.plotting.figures import render_experiment, render_run_variability
+from evaluation.plotting.stats import (
+    _short_model_name,
+    complete_spec_groups,
+    group_metric_stats,
+    METRICS,
+    rep_spread_stats,
+    scenario_spread_stats,
+    sem_for_reps,
+)
 from evaluation.scoring.store import ScoreRecord
 from evaluation.validation.qualitative import QualitativeResult
 
@@ -38,6 +49,11 @@ def _score_record(
         iterations=iterations,
         elapsed_s=elapsed_s,
     )
+
+
+def test_short_model_name_renders_effort_suffix() -> None:
+    assert _short_model_name("openrouter:openai/gpt-5.6-luna") == "gpt-5.6-luna"
+    assert _short_model_name("openrouter:openai/gpt-5.6-luna#xhigh") == "gpt-5.6-luna (xhigh)"
 
 
 def test_group_metric_stats_computes_mean_and_std_for_reps() -> None:
@@ -79,8 +95,84 @@ def test_render_experiment_writes_one_png_per_metric(tmp_path: Path) -> None:
     ]
     paths = render_experiment("ablation", records, output_dir=tmp_path)
 
-    assert len(paths) == len(METRICS)
-    for path in paths:
+    png_paths = [path for path in paths if path.suffix == ".png"]
+    assert len(png_paths) == len(METRICS)
+    for path in png_paths:
         assert path.parent == tmp_path / "figures" / "ablation"
-        assert path.suffix == ".png"
         assert path.stat().st_size > 0
+        assert path.with_suffix(".pdf").is_file()
+
+
+def _run_spec(*, scenario_id: str = "regular", rep: int = 0) -> RunSpec:
+    return RunSpec(
+        llm=LlmSpec(model="openrouter:openai/gpt-5.6-luna"),
+        variant=VariantConfig(totaller_enabled=False, reflection_enabled=False),
+        scenario_id=scenario_id,
+        rep=rep,
+    )
+
+
+def test_complete_spec_groups_drops_incomplete_specs() -> None:
+    complete = [
+        (_run_spec(scenario_id="regular", rep=rep), _score_record(scenario_id="regular", mae_pct=10.0 + rep))
+        for rep in range(3)
+    ]
+    incomplete = [
+        (_run_spec(scenario_id="vegetarian-allergic", rep=0), _score_record(scenario_id="vegetarian-allergic")),
+        (_run_spec(scenario_id="vegetarian-allergic", rep=2), _score_record(scenario_id="vegetarian-allergic")),
+    ]
+    groups = complete_spec_groups(complete + incomplete)
+
+    assert len(groups) == 1
+    assert len(groups[0]) == 3
+
+
+def test_rep_spread_stats_centers_runs_on_spec_mean() -> None:
+    group = [
+        _score_record(mae_pct=8.0),
+        _score_record(mae_pct=10.0),
+        _score_record(mae_pct=12.0),
+    ]
+    stats = rep_spread_stats([group], METRICS[0], label="regular")
+
+    assert stats.grand_mean == pytest.approx(10.0)
+    assert stats.per_spec_std == [pytest.approx(2.0)]
+    assert stats.pooled_std == pytest.approx(2.0)
+    assert stats.deviations == [pytest.approx(-2.0), pytest.approx(0.0), pytest.approx(2.0)]
+
+
+def test_scenario_spread_stats_orders_scenarios_and_separates_noise() -> None:
+    regular_group = [
+        _score_record(scenario_id="regular", mae_pct=8.0),
+        _score_record(scenario_id="regular", mae_pct=10.0),
+        _score_record(scenario_id="regular", mae_pct=12.0),
+    ]
+    diabetes_group = [
+        _score_record(scenario_id="diabetes-hypertension", mae_pct=4.0),
+        _score_record(scenario_id="diabetes-hypertension", mae_pct=4.0),
+        _score_record(scenario_id="diabetes-hypertension", mae_pct=4.0),
+    ]
+    stats = scenario_spread_stats([regular_group, diabetes_group], METRICS[0])
+
+    assert [entry.label for entry in stats] == ["regular", "diabetes-hypertension", "all"]
+    assert stats[0].pooled_std == pytest.approx(2.0)
+    assert stats[1].pooled_std == pytest.approx(0.0)
+    assert stats[2].pooled_std == pytest.approx(2.0**0.5)
+
+
+def test_sem_for_reps_shrinks_with_sqrt_n() -> None:
+    assert sem_for_reps(2.0, 1) == pytest.approx(2.0)
+    assert sem_for_reps(2.0, 2) == pytest.approx(2.0 / 2**0.5)
+
+
+def test_render_run_variability_writes_png_and_pdf(tmp_path: Path) -> None:
+    groups = [
+        [_score_record(scenario_id="regular", mae_pct=5.0 + rep, soft=0.7 + 0.1 * rep) for rep in range(3)],
+        [_score_record(scenario_id="diabetes-hypertension", mae_pct=3.0 + rep, soft=0.8) for rep in range(3)],
+    ]
+    paths = render_run_variability(groups, output_dir=tmp_path)
+
+    png_path = tmp_path / "figures" / "stability" / "run_variability.png"
+    assert paths[0] == png_path
+    assert png_path.stat().st_size > 0
+    assert png_path.with_suffix(".pdf").is_file()

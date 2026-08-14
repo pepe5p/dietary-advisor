@@ -14,6 +14,8 @@ from pydantic import Field
 from pydantic_ai.models import infer_model, Model
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from dietary_advisor.config.llm import LlmSpec
+
 
 class FoodDbUsage(str, Enum):
     """How a food DB participates in search (per source, `off`/`usda`).
@@ -40,7 +42,9 @@ class Settings(BaseSettings):
 
     # --- LLM ---
     # pydantic-ai model identifier, e.g. "openai:gpt-4o-mini",
-    # "anthropic:claude-3-5-sonnet-latest", "ollama:llama3.1".
+    # "anthropic:claude-3-5-sonnet-latest", "ollama:llama3.1", optionally
+    # suffixed with "#<effort>" (minimal|low|medium|high|xhigh) to request a
+    # non-default reasoning effort - see `LlmSpec`.
     llm_model: str = Field(...)
     # The meal-idea brainstorm is a cheap, tool-less creative pass whose output is
     # never DB-verified, so it runs on its own small model independent of the
@@ -98,6 +102,11 @@ class Settings(BaseSettings):
         for f in (self.off_db, self.usda_db):
             f.parent.mkdir(parents=True, exist_ok=True)
 
+    @property
+    def llm_spec(self) -> LlmSpec:
+        """`llm_model` parsed into a model id and an optional reasoning effort."""
+        return LlmSpec.parse(self.llm_model)
+
     @cached_property
     def resolved_llm_model(self) -> Model:
         """`llm_model` resolved to a concrete `Model`, cached for the process lifetime.
@@ -105,7 +114,7 @@ class Settings(BaseSettings):
         Resolved lazily (on first access) rather than in `get_settings()` so that
         LLM-free commands (`setup`) don't fail on a missing API key.
         """
-        return infer_model(self.llm_model)
+        return infer_model(self.llm_spec.model)
 
     @cached_property
     def resolved_meal_idea_llm_model(self) -> Model:

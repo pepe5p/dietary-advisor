@@ -6,7 +6,8 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, ConfigDict
 
-from evaluation.case_runner.grid import MODEL_COMPARISON_MODELS, VARIANTS
+from dietary_advisor.config.llm import LlmSpec
+from evaluation.case_runner.grid import MINIMAL_SCENARIOS, MODEL_COMPARISON_MODELS, RunSpec, VARIANTS
 from evaluation.scoring.store import ScoreRecord
 
 
@@ -31,6 +32,17 @@ class GroupStats(BaseModel):
     n: int
 
 
+class SpreadStats(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    label: str
+    n_specs: int
+    grand_mean: float
+    deviations: list[float]
+    per_spec_std: list[float]
+    pooled_std: float
+
+
 METRICS: tuple[Metric, ...] = (
     Metric("mae_pct", "Macro MAE %", "MAE %", lambda record: record.mae_pct),
     Metric(
@@ -51,9 +63,15 @@ METRICS: tuple[Metric, ...] = (
 
 
 def _short_model_name(model: str) -> str:
-    if "/" in model:
-        return model.rsplit("/", 1)[-1]
-    return model
+    spec = LlmSpec.parse(model)
+    short = spec.model.rsplit("/", 1)[-1]
+    if spec.reasoning is None:
+        return short
+    return f"{short} ({spec.reasoning})"
+
+
+def _bare_short_model_name(model: str) -> str:
+    return LlmSpec.parse(model).model.rsplit("/", 1)[-1]
 
 
 def _variant_order(variants: set[str]) -> list[str]:
@@ -63,7 +81,7 @@ def _variant_order(variants: set[str]) -> list[str]:
 
 
 def _model_order(models: set[str]) -> list[str]:
-    ordered = [model for model in MODEL_COMPARISON_MODELS if model in models]
+    ordered = [str(spec) for spec in MODEL_COMPARISON_MODELS if str(spec) in models]
     return ordered + sorted(models - set(ordered))
 
 
@@ -106,3 +124,81 @@ def group_metric_stats(records: list[ScoreRecord], metric: Metric) -> list[Group
             ),
         )
     return stats
+
+
+def _short_scenario_name(scenario_id: str) -> str:
+    parts = scenario_id.split("-")
+    return "-".join(parts[:2])
+
+
+def _scenario_order(scenarios: set[str]) -> list[str]:
+    ordered = [scenario for scenario in MINIMAL_SCENARIOS if scenario in scenarios]
+    return ordered + sorted(scenarios - set(ordered))
+
+
+def complete_spec_groups(
+    pairs: list[tuple[RunSpec, ScoreRecord]],
+    *,
+    reps: int = 3,
+) -> list[list[ScoreRecord]]:
+    groups: dict[tuple[str, str, str], dict[int, ScoreRecord]] = {}
+    for spec, record in pairs:
+        key = (spec.llm.name, spec.variant.label, spec.scenario_id)
+        groups.setdefault(key, {})[spec.rep] = record
+
+    result: list[list[ScoreRecord]] = []
+    for by_rep in groups.values():
+        if set(by_rep) != set(range(reps)):
+            continue
+        result.append([by_rep[rep] for rep in range(reps)])
+    return result
+
+
+def rep_spread_stats(
+    groups: list[list[ScoreRecord]],
+    metric: Metric,
+    *,
+    label: str,
+) -> SpreadStats:
+    per_spec_std: list[float] = []
+    deviations: list[float] = []
+    spec_means: list[float] = []
+
+    for group in groups:
+        values = [metric.value(record) for record in group]
+        mean = statistics.fmean(values)
+        spec_means.append(mean)
+        std = statistics.stdev(values) if len(values) > 1 else 0.0
+        per_spec_std.append(std)
+        deviations.extend(value - mean for value in values)
+
+    pooled_std = statistics.fmean([std**2 for std in per_spec_std]) ** 0.5 if per_spec_std else 0.0
+    return SpreadStats(
+        label=label,
+        n_specs=len(groups),
+        grand_mean=statistics.fmean(spec_means) if spec_means else 0.0,
+        deviations=deviations,
+        per_spec_std=per_spec_std,
+        pooled_std=pooled_std,
+    )
+
+
+def scenario_spread_stats(
+    groups: list[list[ScoreRecord]],
+    metric: Metric,
+) -> list[SpreadStats]:
+    by_scenario: dict[str, list[list[ScoreRecord]]] = {}
+    for group in groups:
+        scenario_id = group[0].scenario_id
+        by_scenario.setdefault(scenario_id, []).append(group)
+
+    stats = [
+        rep_spread_stats(by_scenario[scenario_id], metric, label=_short_scenario_name(scenario_id))
+        for scenario_id in _scenario_order(set(by_scenario))
+    ]
+    stats.append(rep_spread_stats(groups, metric, label="all"))
+    return stats
+
+
+def sem_for_reps(pooled_std: float, n: int) -> float:
+    return pooled_std / (n**0.5)

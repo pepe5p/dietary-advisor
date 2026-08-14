@@ -70,7 +70,7 @@ module against the scenarios in
 CLI uses). The (model, variant, scenario) grid is hardcoded in
 [`evaluation/case_runner/grid.py`](evaluation/case_runner/grid.py); re-running
 skips any result file already present under the configured output directory
-(project-top-level `outputs/` by default, overridable via `DA_OUTPUT_DIR`).
+(project-top-level `outputs/runs/` by default, overridable via `DA_OUTPUT_DIR`).
 
 ```bash
 just run_cases
@@ -97,7 +97,12 @@ shared `Settings`.
 `DA_LLM_MODEL`/`DA_JUDGE_MODEL`/`DA_MEAL_IDEA_LLM_MODEL` are `pydantic-ai` model identifiers
 (`openai:gpt-4o-mini`, `anthropic:claude-3-5-sonnet-latest`, `groq:llama-3.3-70b-versatile`,
 ...). The meal-idea brainstorm runs on `DA_MEAL_IDEA_LLM_MODEL` independently of
-`DA_LLM_MODEL` (and of the model the ablation harness sweeps). Local models served through an OpenAI-compatible endpoint (e.g.
+`DA_LLM_MODEL` (and of the model the ablation harness sweeps).
+
+`DA_LLM_MODEL` may carry a `#<effort>` suffix (`minimal`/`low`/`medium`/`high`/`xhigh`,
+e.g. `openrouter:openai/gpt-5.6-luna#high`) to request a non-default reasoning
+effort - see `dietary_advisor.config.LlmSpec`. Without a suffix, the provider's
+own default applies. Local models served through an OpenAI-compatible endpoint (e.g.
 [Ollama](https://ollama.com/)) work the same way via `ollama:<tag>` plus
 `OLLAMA_BASE_URL` - see the commented-out block in
 [`.env.example`](.env.example). From inside the container, point

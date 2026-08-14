@@ -23,11 +23,8 @@ def filename_for(spec: RunSpec) -> str:
     return f"{spec.spec_key}.json"
 
 
-def artifact_path(spec: RunSpec, *, output_dir: Path | None = None, subdir: str | None = None) -> Path:
-    base = resolve_output_dir(output_dir)
-    if subdir is not None:
-        base = base / subdir
-    return base / filename_for(spec)
+def artifact_path(spec: RunSpec, *, output_dir: Path | None = None, subdir: str) -> Path:
+    return resolve_output_dir(output_dir) / subdir / filename_for(spec)
 
 
 def is_present(path: Path) -> bool:

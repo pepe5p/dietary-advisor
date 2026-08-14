@@ -17,6 +17,7 @@ import logging
 
 from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.models import Model
+from pydantic_ai.settings import ModelSettings
 
 from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.agents.deps import AgentDeps
@@ -96,6 +97,7 @@ def _build_agent(
     *,
     totaller_enabled: bool,
     model: Model | None = None,
+    model_settings: ModelSettings | None = None,
 ) -> Agent[AgentDeps, AgentMealPlan]:
     settings = get_settings()
     agent: Agent[AgentDeps, AgentMealPlan] = Agent(
@@ -103,6 +105,7 @@ def _build_agent(
         deps_type=AgentDeps,
         output_type=AgentMealPlan,
         system_prompt=system_prompt,
+        model_settings=model_settings if model_settings is not None else settings.llm_spec.model_settings,
         retries=2,
     )
     agent.output_validator(_validate_codes)
@@ -118,6 +121,7 @@ def build_nutrition_agent(
     rag_enabled: bool = True,
     has_user_request: bool = True,
     model: Model | None = None,
+    model_settings: ModelSettings | None = None,
 ) -> Agent[AgentDeps, AgentMealPlan]:
     """Construct a fresh `Agent` instance bound to AgentDeps + AgentMealPlan output.
 
@@ -129,13 +133,14 @@ def build_nutrition_agent(
         rag_enabled=rag_enabled,
         has_user_request=has_user_request,
     )
-    return _build_agent(prompt, totaller_enabled=totaller_enabled, model=model)
+    return _build_agent(prompt, totaller_enabled=totaller_enabled, model=model, model_settings=model_settings)
 
 
 def build_refiner_agent(
     *,
     totaller_enabled: bool = True,
     model: Model | None = None,
+    model_settings: ModelSettings | None = None,
 ) -> Agent[AgentDeps, AgentMealPlan]:
     """Refinement agent for the Reflection Loop.
 
@@ -144,4 +149,9 @@ def build_refiner_agent(
     prompt focused on fixing exactly the issues the critic agent reported
     (see `dietary_advisor.reflection`), not a blind self-review pass.
     """
-    return _build_agent(REFLECTION_REFINER_AGENT_SYSTEM, totaller_enabled=totaller_enabled, model=model)
+    return _build_agent(
+        REFLECTION_REFINER_AGENT_SYSTEM,
+        totaller_enabled=totaller_enabled,
+        model=model,
+        model_settings=model_settings,
+    )

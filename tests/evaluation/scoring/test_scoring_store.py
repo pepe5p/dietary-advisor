@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dietary_advisor.config.llm import LlmSpec
 from dietary_advisor.planning.pipeline import VariantConfig
 from evaluation.case_runner.grid import RunSpec
 from evaluation.scoring.store import is_scored, load, path_for, save, ScoreRecord
@@ -12,7 +13,7 @@ from evaluation.validation.qualitative import CriterionScore, QualitativeResult
 
 def test_path_for_uses_scores_subdir(tmp_path: Path) -> None:
     spec = RunSpec(
-        llm_model="groq:llama-3.3-70b-versatile",
+        llm=LlmSpec(model="groq:llama-3.3-70b-versatile"),
         variant=VariantConfig(),
         scenario_id="regular",
     )
@@ -22,9 +23,9 @@ def test_path_for_uses_scores_subdir(tmp_path: Path) -> None:
 
 
 def test_save_load_round_trip(tmp_path: Path) -> None:
-    spec = RunSpec(llm_model="test-model", variant=VariantConfig(), scenario_id="regular")
+    spec = RunSpec(llm=LlmSpec(model="test-model"), variant=VariantConfig(), scenario_id="regular")
     record = ScoreRecord(
-        llm_model=spec.llm_model,
+        llm_model=str(spec.llm),
         variant="totaller+reflective-loop",
         scenario_id="regular",
         judge_model="gemini-3.5-flash-lite",

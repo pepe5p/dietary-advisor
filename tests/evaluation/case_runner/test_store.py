@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dietary_advisor.config.llm import LlmSpec
 from dietary_advisor.planning.pipeline import VariantConfig
 from dietary_advisor.totaller.nutrition import MacroTargets
 from evaluation.case_runner.grid import RunSpec
@@ -13,19 +14,20 @@ from tests.evaluation.conftest import agent_plan_rice_lunch
 
 def test_path_for_sanitizes_model_id(tmp_path: Path) -> None:
     spec = RunSpec(
-        llm_model="groq:llama-3.3-70b-versatile",
+        llm=LlmSpec(model="groq:llama-3.3-70b-versatile"),
         variant=VariantConfig(),
         scenario_id="regular",
     )
     path = path_for(spec, output_dir=tmp_path)
+    assert path.parent == tmp_path / "runs"
     assert path.name == "groq-llama-3.3-70b-versatile__totaller+reflective-loop__regular__rep0.json"
 
 
 def test_save_load_round_trip(tmp_path: Path) -> None:
     variant = VariantConfig(rag_enabled=False)
-    spec = RunSpec(llm_model="gemini-3.1-flash-lite", variant=variant, scenario_id="regular")
+    spec = RunSpec(llm=LlmSpec(model="gemini-3.1-flash-lite"), variant=variant, scenario_id="regular")
     record = RunRecord(
-        llm_model=spec.llm_model,
+        llm_model=str(spec.llm),
         variant=variant.label,
         totaller_enabled=variant.totaller_enabled,
         rag_enabled=variant.rag_enabled,

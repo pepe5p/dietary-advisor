@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from typer.testing import CliRunner
 
 from evaluation.cli import app
@@ -35,10 +36,11 @@ def test_plot_help() -> None:
     result = runner.invoke(app, ["plot", "--help"])
     assert result.exit_code == 0
     assert "--verbose" in result.stdout
-    assert "ablation" in result.stdout
+    assert "experiments" in result.stdout.lower()
 
 
-def test_plot_unknown_experiment() -> None:
-    result = runner.invoke(app, ["plot", "not-an-experiment"])
+def test_plot_exits_one_when_no_scored_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("evaluation.cli._plot_experiment", lambda experiment: False)
+    monkeypatch.setattr("evaluation.cli._plot_run_variability", lambda: False)
+    result = runner.invoke(app, ["plot"])
     assert result.exit_code == 1
-    assert "Unknown experiment" in result.stdout

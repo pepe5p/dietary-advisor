@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from dietary_advisor.config.llm import LlmSpec
 from dietary_advisor.food_db import FoodDb
 from dietary_advisor.planning.hydration import to_food_item
 from dietary_advisor.planning.meal_plan import Meal, MealPlan, Portion
@@ -38,8 +39,8 @@ async def test_collect_runs_skips_existing_and_saves_new(tmp_path: Path, food_db
     agent_plan = agent_plan_single(any_code, grams=200.0, user_id="regular", food_name=food.name)
     variant = VariantConfig(totaller_enabled=False, rag_enabled=False, reflection_enabled=False)
     specs = [
-        RunSpec(llm_model="test-model", variant=variant, scenario_id="regular"),
-        RunSpec(llm_model="test-model", variant=variant, scenario_id="preferences"),
+        RunSpec(llm=LlmSpec(model="test-model"), variant=variant, scenario_id="regular"),
+        RunSpec(llm=LlmSpec(model="test-model"), variant=variant, scenario_id="preferences"),
     ]
 
     calls: list[str] = []
@@ -82,7 +83,7 @@ async def test_collect_runs_skips_existing_and_saves_new(tmp_path: Path, food_db
 @pytest.mark.asyncio()
 async def test_collect_runs_failure_leaves_no_file(tmp_path: Path) -> None:
     variant = VariantConfig()
-    spec = RunSpec(llm_model="test-model", variant=variant, scenario_id="regular")
+    spec = RunSpec(llm=LlmSpec(model="test-model"), variant=variant, scenario_id="regular")
 
     async def boom(profile: object, query: str) -> PipelineResult:  # noqa: ARG001
         raise RuntimeError("llm down")

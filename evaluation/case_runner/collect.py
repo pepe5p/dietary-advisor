@@ -10,6 +10,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from dietary_advisor.config.llm import LlmSpec
 from dietary_advisor.food_db import FoodDb
 from dietary_advisor.planning.pipeline import Pipeline, PipelineResult, VariantConfig
 from dietary_advisor.profile import UserProfile
@@ -77,15 +78,15 @@ async def collect_runs(
             failed=failed,
         )
 
-    groups: dict[tuple[str, VariantConfig], list[RunSpec]] = defaultdict(list)
+    groups: dict[tuple[LlmSpec, VariantConfig], list[RunSpec]] = defaultdict(list)
     for spec in remaining:
-        groups[(spec.llm_model, spec.variant)].append(spec)
+        groups[(spec.llm, spec.variant)].append(spec)
 
     owns_lookup = lookup is None
     food_db = lookup if lookup is not None else FoodDb.open()
     try:
-        for (llm_model, variant), group in groups.items():
-            with Pipeline(variant, food_db=food_db, model=llm_model) as pipeline:
+        for (llm, variant), group in groups.items():
+            with Pipeline(variant, food_db=food_db, llm=llm) as pipeline:
                 # Default-arg bind: loop rebinds `pipeline` each iteration.
                 async def _default_run(
                     profile: UserProfile,

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from dietary_advisor.config.llm import LlmSpec
 from dietary_advisor.planning.pipeline import VariantConfig
 from evaluation.scenarios import SCENARIOS
 
@@ -17,11 +18,20 @@ VARIANTS = [
     FULL_VARIANT,
 ]
 
-ABLATION_MODELS = ["openrouter:openai/gpt-5.6-luna"]
+ABLATION_MODELS = [LlmSpec(model="openrouter:openai/gpt-5.6-luna")]
 MODEL_COMPARISON_MODELS = [
-    "openrouter:google/gemini-3.5-flash-lite",
-    "openrouter:google/gemini-3.6-flash",
-    "openrouter:openai/gpt-5.6-luna",
+    LlmSpec(model="openrouter:google/gemini-3.5-flash-lite"),  # default reasoning is "minimal"
+    LlmSpec(model="openrouter:google/gemini-3.5-flash-lite", reasoning="medium"),
+    LlmSpec(model="openrouter:google/gemini-3.5-flash-lite", reasoning="high"),
+    LlmSpec(model="openrouter:google/gemini-3.6-flash", reasoning="low"),
+    LlmSpec(model="openrouter:google/gemini-3.6-flash"),  # default reasoning is "medium"
+    LlmSpec(model="openrouter:google/gemini-3.6-flash", reasoning="high"),
+    LlmSpec(model="openrouter:google/gemini-3.7-flash", reasoning="low"),
+    LlmSpec(model="openrouter:google/gemini-3.7-flash", reasoning="medium"),
+    LlmSpec(model="openrouter:google/gemini-3.7-flash", reasoning="high"),
+    LlmSpec(model="openrouter:openai/gpt-5.6-luna", reasoning="low"),
+    LlmSpec(model="openrouter:openai/gpt-5.6-luna"),  # default reasoning is "medium"
+    LlmSpec(model="openrouter:openai/gpt-5.6-luna", reasoning="xhigh"),
 ]
 
 
@@ -36,18 +46,14 @@ MINIMAL_SCENARIOS = [
 
 @dataclass(frozen=True)
 class RunSpec:
-    llm_model: str
+    llm: LlmSpec
     variant: VariantConfig
     scenario_id: str
     rep: int = 0
 
     @property
-    def sanitized_llm_model(self) -> str:
-        return self.llm_model.replace(":", "-").replace("/", "-")
-
-    @property
     def spec_id(self) -> tuple[str, str, str, str]:
-        return (self.sanitized_llm_model, self.variant.label, self.scenario_id, f"rep{self.rep}")
+        return (self.llm.name, self.variant.label, self.scenario_id, f"rep{self.rep}")
 
     @property
     def spec_key(self) -> str:
@@ -58,24 +64,24 @@ class RunSpec:
 
 
 def _specs(
-    llm_model: str,
+    llm: LlmSpec,
     variant: VariantConfig,
     scenarios: list[str],
     reps: int,
 ) -> set[RunSpec]:
     return {
-        RunSpec(llm_model=llm_model, variant=variant, scenario_id=scenario, rep=rep)
+        RunSpec(llm=llm, variant=variant, scenario_id=scenario, rep=rep)
         for scenario in scenarios
         for rep in range(reps)
     }
 
 
-def generate_minimal_scenarios_specs(llm_model: str, variant: VariantConfig, reps: int = 1) -> set[RunSpec]:
-    return _specs(llm_model, variant, MINIMAL_SCENARIOS, reps)
+def generate_minimal_scenarios_specs(llm: LlmSpec, variant: VariantConfig, reps: int = 1) -> set[RunSpec]:
+    return _specs(llm, variant, MINIMAL_SCENARIOS, reps)
 
 
-def generate_all_scenarios_specs(llm_model: str, variant: VariantConfig, reps: int = 1) -> set[RunSpec]:
-    return _specs(llm_model, variant, list(SCENARIOS), reps)
+def generate_all_scenarios_specs(llm: LlmSpec, variant: VariantConfig, reps: int = 1) -> set[RunSpec]:
+    return _specs(llm, variant, list(SCENARIOS), reps)
 
 
 def create_experiment_1_specs() -> set[RunSpec]:
@@ -85,10 +91,10 @@ def create_experiment_1_specs() -> set[RunSpec]:
     """
     result = set()
 
-    for model in ABLATION_MODELS:
+    for llm in ABLATION_MODELS:
         for variant in VARIANTS:
             specs = generate_minimal_scenarios_specs(
-                llm_model=model,
+                llm=llm,
                 variant=variant,
                 reps=3,
             )
@@ -103,9 +109,9 @@ def create_experiment_2_specs() -> set[RunSpec]:
     """
     result = set()
 
-    for model in MODEL_COMPARISON_MODELS:
+    for llm in MODEL_COMPARISON_MODELS:
         specs = generate_minimal_scenarios_specs(
-            llm_model=model,
+            llm=llm,
             variant=FULL_VARIANT,
             reps=3,
         )

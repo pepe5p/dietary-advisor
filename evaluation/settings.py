@@ -18,7 +18,7 @@ class EvaluationSettings(Settings):
 
     # "judge" model used for the G-Eval soft-preference judge
     judge_model: str = Field(...)
-    # Successful case-run JSON files land here (project-top-level `outputs/` by default).
+    # Successful case-run JSON files land here (project-top-level `outputs/runs/` by default).
     output_dir: Path = Field(default=_REPO_ROOT / "outputs")
 
     @cached_property
