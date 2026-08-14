@@ -1,0 +1,255 @@
+%% Foundational architecture: transformers, tool use, self-correction.
+
+@inproceedings{vaswani2017attention,
+    author       = {Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and Uszkoreit, Jakob and
+                     Jones, Llion and Gomez, Aidan N. and Kaiser, Łukasz and Polosukhin, Illia},
+    title        = {Attention Is All You Need},
+    booktitle    = {Advances in Neural Information Processing Systems 30 (NeurIPS 2017)},
+    year         = {2017},
+    eprint       = {1706.03762},
+    eprinttype   = {arxiv},
+    eprintclass  = {cs.CL},
+}
+
+@inproceedings{wei2022chain,
+    author       = {Wei, Jason and Wang, Xuezhi and Schuurmans, Dale and Bosma, Maarten and
+                     Ichter, Brian and Xia, Fei and Chi, Ed and Le, Quoc and Zhou, Denny},
+    title        = {Chain-of-Thought Prompting Elicits Reasoning in Large Language Models},
+    booktitle    = {Advances in Neural Information Processing Systems 35 (NeurIPS 2022)},
+    year         = {2022},
+    eprint       = {2201.11903},
+    eprinttype   = {arxiv},
+    eprintclass  = {cs.CL},
+}
+
+@inproceedings{yao2023react,
+    author       = {Yao, Shunyu and Zhao, Jeffrey and Yu, Dian and Du, Nan and Shafran, Izhak and
+                     Narasimhan, Karthik and Cao, Yuan},
+    title        = {{ReAct}: Synergizing Reasoning and Acting in Language Models},
+    booktitle    = {Proceedings of the 11th International Conference on Learning Representations
+                     (ICLR 2023)},
+    year         = {2023},
+    eprint       = {2210.03629},
+    eprinttype   = {arxiv},
+    eprintclass  = {cs.CL},
+}
+
+@inproceedings{schick2023toolformer,
+    author       = {Schick, Timo and Dwivedi-Yu, Jane and Dess{\`i}, Roberto and Raileanu, Roberta
+                     and Lomeli, Maria and Zettlemoyer, Luke and Cancedda, Nicola and Scialom,
+                     Thomas},
+    title        = {Toolformer: Language Models Can Teach Themselves to Use Tools},
+    booktitle    = {Advances in Neural Information Processing Systems 36 (NeurIPS 2023)},
+    year         = {2023},
+    eprint       = {2302.04761},
+    eprinttype   = {arxiv},
+    eprintclass  = {cs.CL},
+}
+
+@inproceedings{madaan2023selfrefine,
+    author       = {Madaan, Aman and Tandon, Niket and Gupta, Prakhar and Hallinan, Skyler and
+                     Gao, Luyu and Wiegreffe, Sarah and Alon, Uri and Dziri, Nouha and Prabhumoye,
+                     Shrimai and Yang, Yiming and Gupta, Shashank and Majumder, Bodhisattwa Prasad
+                     and Hermann, Katherine and Welleck, Sean and Yazdanbakhsh, Amir and Clark,
+                     Peter},
+    title        = {Self-Refine: Iterative Refinement with Self-Feedback},
+    booktitle    = {Advances in Neural Information Processing Systems 36 (NeurIPS 2023)},
+    year         = {2023},
+    eprint       = {2303.17651},
+    eprinttype   = {arxiv},
+    eprintclass  = {cs.CL},
+}
+
+@inproceedings{gou2024critic,
+    author       = {Gou, Zhibin and Shao, Zhihong and Gong, Yeyun and Shen, Yelong and Yang,
+                     Yujiu and Duan, Nan and Chen, Weizhu},
+    title        = {{CRITIC}: Large Language Models Can Self-Correct with Tool-Interactive
+                     Critiquing},
+    booktitle    = {Proceedings of the 12th International Conference on Learning Representations
+                     (ICLR 2024)},
+    year         = {2024},
+    eprint       = {2305.11738},
+    eprinttype   = {arxiv},
+    eprintclass  = {cs.CL},
+}
+
+@inproceedings{ji2023towards,
+    author       = {Ji, Ziwei and Yu, Tiezheng and Xu, Yan and Lee, Nayeon and Ishii, Etsuko and
+                     Fung, Pascale},
+    title        = {Towards Mitigating {LLM} Hallucination via Self Reflection},
+    booktitle    = {Findings of the Association for Computational Linguistics: EMNLP 2023},
+    year         = {2023},
+    pages        = {1827--1843},
+    address      = {Singapore},
+    publisher    = {Association for Computational Linguistics},
+    doi          = {10.18653/v1/2023.findings-emnlp.123},
+}
+
+%% Evaluation of generated text: LLM-as-a-judge and G-Eval.
+
+@inproceedings{liu2023geval,
+    author       = {Liu, Yang and Iter, Dan and Xu, Yichong and Wang, Shuohang and Xu, Ruochen and
+                     Zhu, Chenguang},
+    title        = {{G-Eval}: {NLG} Evaluation Using {GPT-4} with Better Human Alignment},
+    booktitle    = {Proceedings of the 2023 Conference on Empirical Methods in Natural Language
+                     Processing},
+    year         = {2023},
+    pages        = {2511--2522},
+    address      = {Singapore},
+    publisher    = {Association for Computational Linguistics},
+    doi          = {10.18653/v1/2023.emnlp-main.153},
+}
+
+@inproceedings{zheng2023judging,
+    author       = {Zheng, Lianmin and Chiang, Wei-Lin and Sheng, Ying and Zhuang, Siyuan and Wu,
+                     Zhanghao and Zhuang, Yonghao and Lin, Zi and Li, Zhuohan and Li, Dacheng and
+                     Xing, Eric P. and Zhang, Hao and Gonzalez, Joseph E. and Stoica, Ion},
+    title        = {Judging {LLM-as-a-Judge} with {MT-Bench} and Chatbot Arena},
+    booktitle    = {Advances in Neural Information Processing Systems 36 (NeurIPS 2023) Datasets
+                     and Benchmarks Track},
+    year         = {2023},
+    eprint       = {2306.05685},
+    eprinttype   = {arxiv},
+    eprintclass  = {cs.CL},
+}
+
+%% Retrieval: lexical, dense and fused ranking; the retrieval-side infrastructure.
+
+@article{robertson2009probabilistic,
+    author       = {Robertson, Stephen and Zaragoza, Hugo},
+    title        = {The Probabilistic Relevance Framework: {BM25} and Beyond},
+    journal      = {Foundations and Trends in Information Retrieval},
+    year         = {2009},
+    volume       = {3},
+    number       = {4},
+    pages        = {333--389},
+    doi          = {10.1561/1500000019},
+}
+
+@inproceedings{cormack2009reciprocal,
+    author       = {Cormack, Gordon V. and Clarke, Charles L. A. and B{\"u}ttcher, Stefan},
+    title        = {Reciprocal Rank Fusion Outperforms {Condorcet} and Individual Rank Learning
+                     Methods},
+    booktitle    = {Proceedings of the 32nd International ACM SIGIR Conference on Research and
+                     Development in Information Retrieval (SIGIR '09)},
+    year         = {2009},
+    pages        = {758--759},
+    publisher    = {ACM},
+    doi          = {10.1145/1571941.1572114},
+}
+
+@article{malkov2018efficient,
+    author       = {Malkov, Yu. A. and Yashunin, D. A.},
+    title        = {Efficient and Robust Approximate Nearest Neighbor Search Using Hierarchical
+                     Navigable Small World Graphs},
+    journal      = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+    year         = {2020},
+    volume       = {42},
+    number       = {4},
+    pages        = {824--836},
+    doi          = {10.1109/TPAMI.2018.2889473},
+}
+
+@inproceedings{raasveldt2019duckdb,
+    author       = {Raasveldt, Mark and M{\"u}hleisen, Hannes},
+    title        = {{DuckDB}: An Embeddable Analytical Database},
+    booktitle    = {Proceedings of the 2019 International Conference on Management of Data
+                     (SIGMOD '19)},
+    year         = {2019},
+    pages        = {1981--1984},
+    publisher    = {ACM},
+    doi          = {10.1145/3299869.3320212},
+}
+
+@misc{chen2024bgem3,
+    author       = {Chen, Jianlv and Xiao, Shitao and Zhang, Peitian and Luo, Kun and Lian, Defu
+                     and Liu, Zheng},
+    title        = {{BGE M3-Embedding}: Multi-Lingual, Multi-Functionality, Multi-Granularity Text
+                     Embeddings Through Self-Knowledge Distillation},
+    year         = {2024},
+    eprint       = {2402.03216},
+    eprinttype   = {arxiv},
+    eprintclass  = {cs.CL},
+}
+
+%% The diet problem: mathematical optimisation of nutrition.
+
+@article{stigler1945cost,
+    author       = {Stigler, George J.},
+    title        = {The Cost of Subsistence},
+    journal      = {Journal of Farm Economics},
+    year         = {1945},
+    volume       = {27},
+    number       = {2},
+    pages        = {303--314},
+    doi          = {10.2307/1231810},
+}
+
+@article{dantzig1990diet,
+    author       = {Dantzig, George B.},
+    title        = {The Diet Problem},
+    journal      = {Interfaces},
+    year         = {1990},
+    volume       = {20},
+    number       = {4},
+    pages        = {43--47},
+    doi          = {10.1287/inte.20.4.43},
+}
+
+@article{sklan1993diet,
+    author       = {Sklan, David and Dariel, Ilana},
+    title        = {Diet Planning for Humans Using Mixed-Integer Linear Programming},
+    journal      = {British Journal of Nutrition},
+    year         = {1993},
+    volume       = {70},
+    number       = {1},
+    pages        = {27--35},
+    doi          = {10.1079/BJN19930102},
+}
+
+@article{vandooren2018review,
+    author       = {van Dooren, Corn{\'e}},
+    title        = {A Review of the Use of Linear Programming to Optimize Diets, Nutritiously,
+                     Economically and Environmentally},
+    journal      = {Frontiers in Nutrition},
+    year         = {2018},
+    volume       = {5},
+    pages        = {48},
+    doi          = {10.3389/fnut.2018.00048},
+}
+
+%% Directly related LLM-based dietary and nutrition systems.
+
+@article{tsampos2025dietqa,
+    author       = {Tsampos, Ioannis and Marakakis, Emmanouil},
+    title        = {{DietQA}: A Comprehensive Framework for Personalized Multi-Diet Recipe
+                     Retrieval Using Knowledge Graphs, Retrieval-Augmented Generation, and Large
+                     Language Models},
+    journal      = {Computers},
+    year         = {2025},
+    volume       = {14},
+    number       = {10},
+    pages        = {412},
+    doi          = {10.3390/computers14100412},
+}
+
+@article{alkeyeva2026chatgpt,
+    author       = {Alkeyeva, Rozalina and Nagiyev, Ilyas and Kim, Damir and Nurmanova, Bibinur and
+                     Omarova, Zhuldyz and Varol, Huseyin Atakan and Chan, Mei-Yen},
+    title        = {{ChatGPT} with Mixed-Integer Linear Programming for Precision Nutrition
+                     Recommendations},
+    journal      = {medRxiv preprint},
+    year         = {2026},
+    doi          = {10.64898/2026.02.14.26346312},
+}
+
+@misc{khamesian2025nutrigen,
+    author       = {Khamesian, Saman and Arefeen, Asiful and Carpenter, Stephanie M. and
+                     Ghasemzadeh, Hassan},
+    title        = {{NutriGen}: Personalized Meal Plan Generator Leveraging Large Language Models
+                     to Enhance Dietary and Nutritional Adherence},
+    year         = {2025},
+    eprint       = {2502.20601},
+    eprinttype   = {arxiv},
+    eprintclass  = {cs.AI},
+}

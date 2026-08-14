@@ -1,0 +1,19 @@
+\begin{tikzpicture}[
+    node distance=8mm and 14mm,
+    box/.style={draw, rounded corners, align=center, minimum height=9mm, inner sep=2mm, font=\small},
+    arr/.style={-{Latex[length=2mm]}},
+]
+
+\node[box] (query) {Lookup query};
+\node[box, below left=12mm and 4mm of query] (bm25) {Lexical ranking\\ (BM25)};
+\node[box, below right=12mm and 4mm of query] (dense) {Dense ranking\\ (embedding + HNSW)};
+\node[box, below=22mm of query] (rrf) {Reciprocal rank fusion};
+\node[box, below=of rrf] (results) {Ranked food entries};
+
+\draw[arr] (query) -| (bm25);
+\draw[arr] (query) -| (dense);
+\draw[arr] (bm25) |- (rrf);
+\draw[arr] (dense) |- (rrf);
+\draw[arr] (rrf) -- (results);
+
+\end{tikzpicture}

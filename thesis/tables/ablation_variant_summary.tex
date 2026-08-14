@@ -1,0 +1,10 @@
+\begin{tabular}{lrrrrrrr}
+\toprule
+Variant & $N$ & MAE~[\%] & MSE~[\%] & Soft agg. & Safety & Iter. & Elapsed~[s] \\
+\midrule
+baseline & 15 & 27.41 & 2273.51 & 0.811 & 1.000 & 0.00 & 29.8 \\
+totaller & 15 & 14.13 & 814.82 & 0.793 & 1.000 & 0.00 & 39.2 \\
+reflective-loop & 15 & 15.96 & 1003.94 & 0.800 & 1.000 & 1.93 & 101.8 \\
+totaller+reflective-loop & 15 & 12.43 & 611.45 & 0.809 & 1.000 & 1.67 & 105.2 \\
+\bottomrule
+\end{tabular}

@@ -1,0 +1,41 @@
+\chapter{Vision of the solution}
+\label{cha:vision}
+
+This chapter sets out what the system is meant to do before any implementation decision is made. It is written in the future tense deliberately: everything stated here is a requirement the design in \Cref{cha:design} must satisfy, not a description of what was eventually built.
+
+\section{Usage scenario}
+\label{sec:vision-usage-scenario}
+
+The intended interaction is short and self-contained. A user's profile -- age, sex, body measurements, activity level, a dietary goal, any allergies or diagnosed conditions, and any standing food preferences or dislikes -- will already be on file, since none of it changes from one session to the next. At the start of a session the system will present a brief summary of that profile and ask the user to describe, in free text, anything specific they want for that day (an ingredient to use up, a craving, a time constraint) or to proceed with no additional request at all. From this input alone, the system will produce one complete plan for one day: a fixed number of meals, each with a named recipe, a step-by-step preparation method, and the exact grams of every ingredient it uses, together with a consolidated shopping list covering the whole day. A user will be able to take this list to the shop in the morning and cook every meal from it without needing to consult anything else. The system will not carry on a multi-turn conversation that incrementally edits a previously generated plan, nor will it remember what a user actually ate afterwards; each session produces one plan from a stated set of inputs.
+
+\section{Functional requirements}
+\label{sec:vision-functional-requirements}
+
+\begin{description}
+    \item[FR1] The system shall accept a fixed user profile (demographic data, dietary goal, allergies, medical conditions, food preferences) and an optional free-form session request, and shall produce a single, complete plan covering every meal of one day.
+    \item[FR2] Every meal in the plan shall include a named recipe with preparation instructions detailed enough for a home cook to follow, and a list of ingredients with their exact quantities in grams.
+    \item[FR3] Every ingredient quantity in the plan shall correspond to a real entry in a food composition database rather than to a value invented by the system; the system shall never report a nutrient figure that cannot be traced to a database entry and a specific quantity.
+    \item[FR4] The plan shall respect hard exclusions stated in the user's profile (allergens, a diet pattern such as vegetarianism) without exception, and shall take reasonable account of soft preferences (liked and disliked foods, a session request) where doing so does not conflict with a hard exclusion or a medical constraint.
+    \item[FR5] The plan shall target the macronutrient and calorie levels implied by the user's profile and dietary goal, computed independently of the language model's own claims about them.
+    \item[FR6] The system shall aggregate the ingredient quantities across the full day's meals into a single shopping list.
+\end{description}
+
+\section{Non-functional requirements}
+\label{sec:vision-nonfunctional-requirements}
+
+\begin{description}
+    \item[NFR1] The system's behaviour shall be reproducible and measurable well enough to support a controlled ablation study: individual grounding and review mechanisms shall be independently switchable without altering anything else about the pipeline, so that a difference in outcome between two configurations can be attributed to the mechanism that was toggled.
+    \item[NFR2] The system shall be usable with any of several large language model providers, so that the effect of model capability on plan quality can be measured without being tied to a single vendor's model family.
+    \item[NFR3] The system shall run as a command-line tool with no graphical interface; a terminal is a sufficient and appropriately scoped delivery mechanism for a single-session, text-in-text-out planning task, and building a graphical interface would add engineering effort without bearing on the system's core research question.
+    \item[NFR4] Every user-visible run of the system shall complete in a time and at a cost compatible with an interactive session, since a plan that takes several minutes or several dollars of model usage to produce would not be a viable substitute for existing planning workflows.
+\end{description}
+
+\section{Food lookup as a fixed baseline, not an experimental variable}
+\label{sec:vision-food-lookup-baseline}
+
+An early design question was whether the ablation study should also test a variant of the system with no food database access at all -- that is, a language model reasoning about nutrient values purely from its own training data. This variant was deliberately excluded from the experimental grid, for a reason distinct from a computational-budget trade-off: FR3 makes food lookup a correctness requirement, not a quality-of-life feature. A configuration without it would not be a weaker version of the same system; it would be a system that violates its own contract of never inventing a nutrient value, and comparing it against the grounded variants would measure how much better a system is at not lying about food, which is a foregone conclusion rather than an open research question. The ablation study in \Cref{cha:methodology} therefore treats the food knowledge base as always present, and varies only the deterministic totaller and the critique-and-refine loop, both of which are optional enhancements on top of a system that already respects FR3 in every configuration.
+
+\section{Success criteria}
+\label{sec:vision-success-criteria}
+
+The vision above is considered satisfied if the resulting system, evaluated as described in \Cref{cha:methodology}: produces plans whose delivered macronutrient totals are measurably closer to their targets when the deterministic totaller is available than when it is not; produces plans that are judged, by an independent automated rubric, to respect the stated hard exclusions and to reasonably satisfy the soft preferences and session request across a range of profile complexities, from an unremarkable healthy adult to a user managing two interacting chronic conditions; and does so within a runtime and a token cost that remain compatible with NFR4 across every evaluated configuration.

@@ -1,0 +1,75 @@
+\chapter{System design}
+\label{cha:design}
+
+This chapter presents the architecture that follows from the requirements in \Cref{cha:vision} and the technology choices in \Cref{cha:methods-and-tools}. Like \Cref{cha:vision}, it is written in the future tense: it describes what the system is designed to do, leaving the concrete difficulties met while building it to \Cref{cha:implementation}.
+
+\section{Architecture overview}
+\label{sec:design-pipeline}
+
+The system will be structured as a single, mostly linear pipeline invoked once per session, rather than as a long-running stateful service. \Cref{fig:diagram-pipeline} shows its stages. A fixed user profile and an optional free-form session request will first be passed to a meal-idea agent, whose sole responsibility is to propose a handful of concrete dish concepts per meal slot -- \textit{oatmeal with berries}, not \textit{a healthy breakfast} -- so that the downstream nutrition agent has specific starting points rather than an open-ended brief. The nutrition agent will then compose the actual recipes and portions, calling out to the food knowledge base (\Cref{sec:design-food-db}) for every ingredient it uses and, when the totaller is enabled, to the totaller tool (\Cref{sec:design-totaller}) to check its own running totals mid-generation. Its output will be a structured plan that references food items by database identifier rather than describing their nutrient content itself (\Cref{sec:design-no-invented-foods}), and an output validator will mechanically reject any plan referencing an identifier that does not resolve in the real database before the plan is accepted. When the critique-and-refine loop is enabled, the validated plan will pass through a further review stage (\Cref{sec:design-reflection}) before being hydrated into a fully resolved plan and turned into a shopping list.
+
+\begin{figure}[htbp]
+    \centering
+    \resizebox{!}{0.75\textheight}{\input{images/diagrams/pipeline.tex}}
+    \caption{End-to-end pipeline from a user profile and session request to a hydrated meal plan.}
+    \label{fig:diagram-pipeline}
+\end{figure}
+
+\section{Package layering}
+\label{sec:design-layering}
+
+The codebase will be split into four packages with a strict, one-directional dependency rule: a runtime package containing only what is needed to serve a session (the agents, the food knowledge base reader, the totaller, the reflection loop); a setup package containing one-off, offline provisioning code (downloading and building the food knowledge base from the bulk exports chosen in \Cref{sec:tools-food-data}); an evaluation package containing the ablation harness described in \Cref{cha:methodology}; and a small package of interactive debugging helpers. The setup, evaluation and debugging packages may import from the runtime package, but the runtime package may never import from any of the other three. This rule keeps a hard boundary between what runs in front of a user and what runs offline or for research purposes only: a change made for evaluation convenience can never silently add latency, a dependency, or a code path to the interactive session a real user experiences, which matters directly for NFR4.
+
+\section{Domain model: references versus hydrated plans}
+\label{sec:design-domain-model}
+
+Two distinct representations of a meal plan will exist in the system, and the distinction between them is deliberate rather than incidental. An \emph{agent plan} is what a language model actually produces: a set of meals, each a named recipe with a list of portions, where every portion is a triple of a database identifier, a human-readable name and a quantity in grams -- nothing more. A \emph{hydrated plan} is what results after every identifier in an agent plan has been resolved against the real food knowledge base into a full record carrying that food's actual nutrient profile. Only a hydrated plan can be passed to the totaller, because only a hydrated plan is guaranteed to contain nutrient data that came from the database rather than from the language model. This separation is what makes the no-invented-foods contract in \Cref{sec:design-no-invented-foods} structurally enforceable rather than merely a matter of prompt wording: an agent plan has no field in which a nutrient value could even be written down, so there is nothing for the model to hallucinate in the first place.
+
+\section{The no-invented-foods contract}
+\label{sec:design-no-invented-foods}
+
+FR3 requires that the system never report a nutrient figure that cannot be traced to a database entry and a specific quantity. This is enforced at two independent points, following the schema-first framework's output-validator hook chosen in \Cref{sec:tools-agent-framework}. First, the agent plan's schema (\Cref{sec:design-domain-model}) simply has no place to put a nutrient value: a portion is a code, a name and a gram quantity, so a model wishing to report an invented calorie count has no field to put it in and can only write it into free text, which is never parsed as nutrition data. Second, an output validator will run on every generated plan before it is accepted, attempting to resolve every referenced code against the real food knowledge base; a validator failure raises a structured retry request back to the model, listing exactly which codes did not resolve and reminding it that every code must be copied verbatim from a prior lookup result rather than guessed. This validator is the single point through which every agent plan -- whether from the initial generation, the reflection loop's refiner, or the totaller tool's own internal hydration step -- must pass, so the no-invented-foods guarantee holds identically regardless of which code path produced the plan.
+
+\section{Food knowledge base}
+\label{sec:design-food-db}
+
+The food knowledge base will combine the two bulk data sources chosen in \Cref{sec:tools-food-data} behind a single lookup interface, stored in the embedded analytical database chosen in \Cref{sec:tools-storage}. Each source will be materialised into its own flat table, since their native schemas differ too much to usefully merge (a packaged product's brand and ingredient list has no equivalent in a generic USDA entry, and vice versa), with every nutrient column normalised to a common unit and expressed per 100~g of food so that scaling by an arbitrary portion size is a single multiplication regardless of source. Every entry's identifier will be namespaced by its source (an Open Food Facts barcode or a USDA FoodData Central identifier) so that the two tables can share a single reference format without collision, and each table will carry both a full-text search index over its name and description fields and an embedding vector per entry, computed at build time with the embedding model chosen in \Cref{sec:tools-embeddings}, to support the hybrid search described next.
+
+\section{Hybrid search and the lookup tool contract}
+\label{sec:design-hybrid-search}
+
+The lookup tool exposed to the nutrition agent will accept a batch of natural-language queries in a single call -- rather than one call per ingredient -- so that composing a full day's meals does not require dozens of separate round trips against the context budget available to the model. Each query will be run against both data sources in parallel, and within each source, against both the lexical and the dense retrieval channels chosen in \Cref{sec:tools-retrieval}, fused by reciprocal rank fusion into one ranked list per source, as shown in \Cref{fig:diagram-retrieval}. The fused, ranked hits -- capped in number to keep the tool's response inside a predictable share of the context budget -- will be returned as a single structured result per query, carrying each candidate's identifier, name and per-100~g nutrient profile, so that the model can compare candidates and choose a portion size without a further round trip.
+
+\begin{figure}[htbp]
+    \centering
+    \resizebox{0.6\textwidth}{!}{\input{images/diagrams/retrieval.tex}}
+    \caption{Hybrid retrieval: a lookup query is ranked independently by a lexical and a dense channel, then combined by reciprocal rank fusion.}
+    \label{fig:diagram-retrieval}
+\end{figure}
+
+\section{Deterministic totaller}
+\label{sec:design-totaller}
+
+When enabled, the totaller will be reachable from two places: as a tool the nutrition agent (and, during the reflection loop, the refiner) may call mid-generation to check a proposed plan's running totals before finalising it, and as an independent post-hoc computation run by the evaluation harness on every hydrated plan regardless of whether the agent itself chose to call it. Both call sites will share the same underlying aggregation routine, operating only on a hydrated plan (\Cref{sec:design-domain-model}) using the exact rational arithmetic chosen in \Cref{sec:tools-aggregation}, so that the number the model sees mid-generation and the number the evaluation harness later scores the plan against are, by construction, computed identically.
+
+\section{Agents and prompt architecture}
+\label{sec:design-agents}
+
+Beyond the meal-idea agent already introduced in \Cref{sec:design-pipeline}, the pipeline will use a nutrition agent (and, structurally identical to it, a refiner used only inside the reflection loop) and, when the reflection loop is enabled, a tool-less critic. Every agent's system prompt will share a common block describing the user's profile, their computed macronutrient targets, and a fixed set of baseline dietary guardrails distilled from public health guidance (energy from fat and free sugars, a sodium ceiling, a potassium floor, a minimum fruit-and-vegetable intake) stated directly in the prompt rather than retrieved from an external source, on the reasoning that these particular guardrails apply near-universally to a healthy adult and do not vary enough between users to justify a retrieval step. Nothing about this architecture prevents adding a retrieval-augmented knowledge module for guidance that does vary substantially with a user's specific medical conditions; the current design simply narrows its knowledge grounding to the two mechanisms whose individual contribution the ablation study in \Cref{cha:methodology} sets out to measure, and leaves broader clinical-guideline retrieval as a direction for future work (\Cref{sec:conclusions-future-work}).
+
+\section{Critique-and-refine loop}
+\label{sec:design-reflection}
+
+When enabled, a generated (and validated) plan will be reviewed by the loop shown in \Cref{fig:diagram-reflection}. The critic, given the plan, the user's profile and request, and -- when the totaller is also enabled -- the deterministic totals and any coverage warnings computed for it (\Cref{sec:impl-missing-nutrients}), will report a list of concrete issues, or an empty list if it finds none. An empty list ends the loop immediately with the plan as approved. A nonempty list is passed to a refiner, structurally identical to the nutrition agent and sharing the same food-lookup and totaller tools, which is instructed to address only the listed issues with minimal changes elsewhere; its revised plan is then sent back to the critic for another pass. This repeats until the critic reports no further issues or a fixed iteration budget is exhausted, whichever comes first; if the budget is exhausted with issues still outstanding, the loop returns the last refined plan rather than failing the session outright, so that a session never ends in an error purely because the critic and refiner did not converge in time.
+
+\begin{figure}[htbp]
+    \centering
+    \resizebox{0.75\textwidth}{!}{\input{images/diagrams/reflection.tex}}
+    \caption{Critique-and-refine loop: an empty issue list ends the loop; a nonempty one triggers a refinement pass and another review.}
+    \label{fig:diagram-reflection}
+\end{figure}
+
+\section{The ablation switch}
+\label{sec:design-variant-config}
+
+Because NFR1 requires every grounding and review mechanism to be independently switchable, the pipeline will expose a single configuration object with one boolean flag per ablatable mechanism -- the totaller and the critique-and-refine loop -- read once at the start of a session and threaded through every stage that needs to know whether a given mechanism is active. Food knowledge base lookup is deliberately not one of these flags, for the reason given in \Cref{sec:vision-food-lookup-baseline}: it is a correctness requirement in every configuration, not an experimental variable. This configuration object is the single source of truth the evaluation harness in \Cref{cha:methodology} sets when it runs the ablation grid, so that a given run's variant label is derived mechanically from exactly the flags that were set for it, rather than tracked separately and potentially inconsistently.

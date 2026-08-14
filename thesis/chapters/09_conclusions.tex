@@ -1,0 +1,29 @@
+\chapter{Conclusions}
+\label{cha:conclusions}
+
+\section{Summary of findings}
+\label{sec:conclusions-summary}
+
+This thesis set out to measure how much two grounding and review mechanisms -- a deterministic macronutrient totaller and a critique-and-refine loop -- contribute to the reliability of an LLM-based one-day meal planner, on top of a food knowledge base the planner is already required to query rather than guess from. The resulting system enforces that requirement structurally: its language model never has a field in which to write a nutrient value, so every number in a delivered plan is traceable to a real food database entry and an exact arithmetic computation (\Cref{sec:impl-portion-ref,sec:design-no-invented-foods}). Measured against this grounded baseline, enabling the deterministic totaller alone roughly halved macronutrient error (H1, supported); enabling the critique-and-refine loop alone produced a smaller improvement at a substantially higher runtime and token cost, and combining both mechanisms improved on the totaller alone only modestly (H2, partially supported); and a preliminary, not-yet-fully-repeated comparison across three models found that the weakest model in the comparison benefited least from the full configuration rather than most, the opposite of a naive reading of H3 (inconclusive, pending the fuller replication discussed below). Beyond these headline numbers, \Cref{cha:results} identified two more specific findings worth carrying forward: residual macronutrient error concentrates disproportionately in fibre, tracing back to that nutrient's uneven coverage in the underlying food data rather than to any weakness in the aggregation itself, and the qualitative safety and preference metrics used in this evaluation saturate too readily on the scenario set tested to discriminate meaningfully between the stronger variants.
+
+\section{Limitations}
+\label{sec:conclusions-limitations}
+
+The evaluation in this thesis is bounded in scope in ways that should temper how broadly its conclusions are read. The scenario set spans three complexity tiers but only five specific profiles, chosen for the clarity of their associated dietary guidance rather than for exhaustive coverage of the conditions a real deployment would encounter. The qualitative judge is a single fixed model, and while keeping it fixed across every compared configuration isolates it as a consistent measuring instrument (\Cref{sec:methodology-qualitative}), it cannot rule out a systematic bias in that instrument itself. The model comparison experiment, at the time of writing, has a full three repetitions for only one of its three compared models, which is the most direct limitation on the confidence attached to \Cref{sec:results-model-comparison}'s conclusions. Finally, the system evaluated here produces a single, non-interactive plan per session; nothing in this evaluation speaks to how these grounding mechanisms would behave under a multi-turn, incrementally edited planning session.
+
+\section{Further work}
+\label{sec:conclusions-future-work}
+
+Several directions follow directly from the limitations above and from the paths not taken in \Cref{sec:impl-dead-ends}.
+
+\textbf{Completing the model comparison.} The most immediate next step is finishing the repetitions still missing for two of the three compared models (\Cref{sec:results-setup}), and extending the compared pool to a wider range of capability tiers, before drawing a firm conclusion about H3.
+
+\textbf{Human expert evaluation.} The qualitative scoring in this thesis relies entirely on an LLM-as-a-judge protocol; validating a sample of its scores against a registered dietitian's independent judgement would establish how much the judge's own biases (\Cref{sec:background-evaluation}) affect the specific rubric and scenarios used here, something no purely automated evaluation can determine on its own.
+
+\textbf{Multi-turn interactive refinement.} Extending the system to accept a follow-up request against an already-generated plan, rather than only a fresh session each time, was set aside in \Cref{sec:impl-dead-ends} as orthogonal to this thesis's research question; it remains a natural and comparatively well-scoped extension, since the critique-and-refine loop's revise-and-recheck pattern (\Cref{sec:design-reflection}) already provides most of the machinery a human-in-the-loop version of the same pattern would need.
+
+\textbf{Model-generated food descriptions for retrieval.} \Cref{sec:impl-dead-ends} also set aside having a language model author a richer description of each food catalogue entry specifically to improve the text embedded for dense retrieval (\Cref{sec:impl-hybrid-search}), instead of the fixed field-concatenation rule used throughout this work. Measuring whether such descriptions actually improve retrieval quality, and by how much relative to the added offline build cost, is left as an open question.
+
+\textbf{Elicitation of missing profile data.} The system currently assumes a complete, already-known user profile; a natural extension is a short elicitation dialogue that asks a small number of targeted follow-up questions when a profile is incomplete in a way that would materially affect the computed nutrient targets, rather than requiring every field to be supplied up front.
+
+\textbf{Robustness to prompt injection.} Because the system accepts a free-form session request as part of its input, a request crafted to redirect the underlying model away from meal planning entirely -- towards an unrelated task embedded in the request text -- was not evaluated in this thesis and is a natural robustness question for a system intended for real-world use, distinct from the nutritional-accuracy focus of the evaluation reported here.

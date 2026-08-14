@@ -1,0 +1,97 @@
+\chapter{Results and discussion}
+\label{cha:results}
+
+\section{Experimental setup}
+\label{sec:results-setup}
+
+The component ablation experiment (\Cref{sec:methodology-variants}) was run with \texttt{gpt-5.6-luna} as the fixed language model across all four variants, each of the five scenarios in \Cref{tab:methodology-scenarios}, repeated three times per (variant, scenario) pair, for 60 scored runs in total. The model comparison experiment was run at the strongest configuration (\texttt{totaller+reflective-loop}, referred to as \emph{full} in this chapter) across three models spanning distinct capability and cost tiers -- \texttt{gemini-3.5-flash-lite}, \texttt{gemini-3.6-flash}, and \texttt{gpt-5.6-luna} -- against the same five scenarios; at the time of writing this experiment has one completed repetition per (model, scenario) pair for the two Gemini models and three repetitions for \texttt{gpt-5.6-luna}, and the results reported for the Gemini models in this chapter should accordingly be read as indicative rather than as fully repetition-averaged figures. The judge model used for every qualitative score in both experiments is \texttt{gpt-5.6-luna}, kept fixed regardless of which model produced the plan being judged, for the reason given in \Cref{sec:methodology-qualitative}.
+
+\section{Component ablation}
+\label{sec:results-ablation}
+
+\Cref{tab:results-ablation-summary} reports the four-variant comparison. Enabling the totaller alone reduces macro\-nutrient MAE from \qty{27.41}{\percent} to \qty{14.13}{\percent}, roughly halving it, while leaving the soft-preference aggregate and safety adherence essentially unchanged. Enabling the reflection loop alone reduces MAE to \qty{15.96}{\percent}, a smaller improvement than the totaller alone despite roughly tripling both the average wall-clock time and the number of model requests per run, since every reflection pass adds at least one further critic call and, when issues are found, a further refiner call. Combining both mechanisms yields the lowest MAE of the four variants, \qty{12.43}{\percent}, and also the lowest MSE, confirming that the two mechanisms are at least partially complementary rather than one subsuming the other's benefit entirely.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \input{tables/ablation_variant_summary.tex}
+    \caption{Component ablation on \texttt{gpt-5.6-luna}: mean macro error, soft-preference aggregate, safety adherence, reflection iterations and wall-clock time, averaged over 15 runs per variant (5 scenarios \(\times\) 3 repetitions).}
+    \label{tab:results-ablation-summary}
+\end{table}
+
+\Cref{fig:results-ablation-mae} shows the same MAE comparison as a bar chart with per-variant standard deviation, generated directly from the scored runs (\Cref{sec:tools-evaluation}). The baseline variant carries a substantially larger standard deviation (\qty{20.11}{\percent}) than any grounded variant, indicating that the baseline's accuracy is not merely worse on average but considerably less predictable from one scenario to the next -- a pattern examined further in \Cref{sec:results-error-analysis}.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.75\textwidth]{../outputs/figures/ablation/mae_pct.pdf}
+    \caption{Macronutrient MAE by ablation variant, with error bars showing one population standard deviation across the 15 runs per variant.}
+    \label{fig:results-ablation-mae}
+\end{figure}
+
+\Cref{tab:results-per-scenario} breaks the same MAE figures down by scenario. The improvement from grounding is not uniform: the diabetes-hypertension scenario is already the baseline's best case (\qty{7.1}{\percent} MAE), and gains only marginally, or not at all, from either mechanism, while the lactose-intolerant-athlete-wants-cheesecake scenario improves the most in absolute terms, from a baseline MAE above \qty{50}{\percent} to close to \qty{14}{\percent} once the totaller is available. \Cref{sec:results-error-analysis} discusses why these two scenarios diverge so much.
+
+\begin{table}[htbp]
+    \centering
+    \footnotesize
+    \input{tables/ablation_per_scenario_mae.tex}
+    \caption{Mean MAE~[\%] by scenario and variant, \texttt{gpt-5.6-luna}, averaged over 3 repetitions per cell.}
+    \label{tab:results-per-scenario}
+\end{table}
+
+\section{Model comparison}
+\label{sec:results-model-comparison}
+
+\Cref{tab:results-model-summary} compares the three models under the full variant. \texttt{gemini-3.6-flash} achieves both the lowest MAE (\qty{7.73}{\percent}) and the highest soft-preference aggregate (0.851) of the three, but at close to five times the wall-clock time of \texttt{gemini-3.5-flash-lite} and with more than an order of magnitude higher estimated cost per run, as \Cref{tab:results-token-cost} shows. \texttt{gemini-3.5-flash-lite} never triggers a reflection iteration across any of its evaluated runs (a mean iteration count of \num{0.00}), which is consistent with its comparatively high MAE (\qty{22.71}{\percent}): a critic paired with this model appears to approve its first draft outright far more often than a critic paired with either of the other two models, whether because the critic itself (run with \texttt{gpt-5.6-luna} regardless of the generator, per \Cref{sec:results-setup}) is more lenient toward this model's output or because its drafts genuinely present fewer objections worth raising is not distinguishable from the aggregate figures alone.
+
+\begin{table}[htbp]
+    \centering
+    \input{tables/model_comparison_summary.tex}
+    \caption{Model comparison under the full variant: mean macro error, soft-preference aggregate, reflection iterations and wall-clock time.}
+    \label{tab:results-model-summary}
+\end{table}
+
+\section{Cost and latency}
+\label{sec:results-cost-latency}
+
+\Cref{tab:results-token-cost} converts the token telemetry recorded per run (\Cref{sec:methodology-operational}) into an estimated cost per run, using each model's published per-token pricing at the time of the evaluation. \texttt{gpt-5.6-luna} is, on this evaluated grid, both more accurate and roughly seventeen times cheaper per run than \texttt{gemini-3.6-flash}, entirely because of a large gap in per-token pricing that more than offsets \texttt{gemini-3.6-flash}'s slightly lower token consumption; \texttt{gemini-3.5-flash-lite} is cheaper still, but only because it essentially never engages the reflection loop, which is also why it is the least accurate of the three. This three-way trade-off between accuracy, latency and cost is exactly the kind of information a system designer choosing a model for this pipeline would need, and it is visible only because token usage was recorded per run from the start (\Cref{sec:impl-eval-harness}), not derived after the fact.
+
+\begin{table}[htbp]
+    \centering
+    \input{tables/model_comparison_token_cost.tex}
+    \caption{Mean token usage, request count and estimated cost per run under the full variant.}
+    \label{tab:results-token-cost}
+\end{table}
+
+Within the ablation experiment, \Cref{tab:results-token-latency} shows the same token and request growth driving the runtime increase already visible in \Cref{tab:results-ablation-summary}: enabling the totaller alone roughly doubles input token consumption relative to the baseline, because every totaller call requires re-sending the full candidate plan to be checked, and enabling reflection on top of that roughly doubles it again, since every critic and refiner pass repeats a large share of the original context.
+
+\begin{table}[htbp]
+    \centering
+    \input{tables/ablation_token_latency.tex}
+    \caption{Mean token usage, request count and wall-clock time by ablation variant, \texttt{gpt-5.6-luna}.}
+    \label{tab:results-token-latency}
+\end{table}
+
+\section{Error analysis}
+\label{sec:results-error-analysis}
+
+Three patterns in the results merit closer examination beyond the summary statistics above.
+
+\textbf{The baseline's worst case is a single dominant outlier.} The lactose-intolerant-athlete-wants-cheesecake scenario's baseline MAE of \qty{53.4}{\percent} in \Cref{tab:results-per-scenario} is driven overwhelmingly by one repetition in which the ungrounded model, tasked with fitting a calorie-dense dessert into a high-calorie athlete's plan with no deterministic check on the result, overshot its fibre target by over \qty{170}{\percent}; the other two repetitions of the same (scenario, baseline) cell are considerably closer to target. This is precisely the failure mode a deterministic totaller is designed to catch -- a plausible-sounding recipe whose aggregate nutrient profile is badly wrong -- and its large contribution to the baseline's overall standard deviation (\Cref{sec:results-ablation}) illustrates why an ungrounded model's error is not just larger on average but far less predictable from one run to the next.
+
+\textbf{Fibre dominates the residual macro error even in grounded variants.} Across every variant, the per-nutrient breakdown recorded alongside each run's MAE (\Cref{sec:methodology-quantitative}) shows fibre contributing a disproportionate share of the remaining error relative to energy, protein, carbohydrate or fat error, even once the totaller is enabled. This is consistent with the partial nutrient coverage described in \Cref{sec:impl-missing-nutrients}: fibre is one of the fields most often missing from a crowd-sourced product record, so even a totaller that sums exactly what data is available is, for a meaningful share of plans, summing an incomplete picture specifically for this nutrient, and no purely arithmetic grounding mechanism can correct for a value the food database itself never recorded.
+
+\textbf{Safety adherence and the soft aggregate saturate and barely move.} Safety adherence is \num{1.00} with zero recorded violations across all four ablation variants and all three compared models, and the soft-preference aggregate varies only within a narrow \numrange{0.79}{0.81} band across the four ablation variants despite the roughly two-fold spread in MAE between the weakest and strongest variant. Two explanations are consistent with this pattern and are not mutually exclusive: the judge's rubric for the five evaluated scenarios (\Cref{tab:methodology-scenarios}) may simply not be discriminating enough at the high end to separate a good plan from a very good one on these particular criteria, and it is also plausible that the scenarios themselves, while spanning three complexity tiers, do not yet include a case severe enough to make an allergen or diet-pattern violation likely for any of the models evaluated. Distinguishing between these explanations would require either a harder safety-specific stress scenario or a larger and more varied evaluated model pool than the three compared here, and is noted as a direction for further work in \Cref{sec:conclusions-future-work}.
+
+\section{Discussion of the hypotheses}
+\label{sec:results-discussion}
+
+\textbf{H1} (grounding in a food knowledge base plus a deterministic totaller reduces macronutrient error) is supported: enabling the totaller alone, with the language model and every other configuration flag held fixed, roughly halves MAE relative to the already-grounded (food-lookup-only) baseline, and the effect survives, in reduced but still measurable form, across all five scenarios in \Cref{tab:results-per-scenario} rather than being driven by one scenario alone.
+
+\textbf{H2} (the critique-and-refine loop further improves accuracy and adherence beyond grounding alone) is supported only partially. Reflection alone, without the totaller, does improve MAE relative to the ungrounded baseline, but by less than the totaller alone does, and combining both mechanisms improves MAE further than the totaller alone by a comparatively modest margin (\qty{14.13}{\percent} to \qty{12.43}{\percent}) relative to the roughly three-fold increase in wall-clock time and request count that reflection adds (\Cref{sec:results-cost-latency}). On the soft-preference aggregate and safety-adherence metrics specifically, \Cref{sec:results-error-analysis} shows essentially no measurable movement from enabling reflection at all, within the scenario set evaluated here.
+
+\textbf{H3} (the size of the benefit depends on model capability) finds preliminary support in the model comparison, but with an important caveat already flagged in \Cref{sec:results-setup}: \texttt{gemini-3.5-flash-lite}, the weakest of the three compared models by every capability indicator available, shows the least benefit from the full configuration, essentially never engaging the reflection loop and posting the highest MAE of the three, which is the opposite of what a naive reading of H3 would predict for the model with the most room to improve. Because this experiment currently rests on a single repetition per scenario for both Gemini models, this observation should be treated as a hypothesis for a fuller repeated run rather than as a settled finding: a more complete replication is needed before concluding whether weaker models genuinely benefit less from these mechanisms, or whether they instead need a differently tuned reflection budget or critic threshold to benefit from them at all.
+
+\section{Threats to validity}
+\label{sec:results-threats}
+
+Several limitations bound how far these results should be generalised. The scenario set, while spanning three complexity tiers, covers five specific profiles and health conditions rather than the full range of conditions dietary guidance addresses, and the safety-adherence saturation noted in \Cref{sec:results-error-analysis} may reflect this narrowness rather than genuine, universal safety. The judge model used for qualitative scoring is a single model, and while it is kept fixed across every compared configuration for the reason given in \Cref{sec:methodology-qualitative}, any systematic bias specific to that judge model applies uniformly to every result in this chapter and cannot be detected from within this evaluation alone. The model comparison experiment's incomplete repetition count for two of its three models, noted in \Cref{sec:results-setup}, is the most immediate limitation to address before treating \Cref{sec:results-model-comparison}'s conclusions as final; \Cref{sec:conclusions-future-work} returns to exactly what completing it would require.

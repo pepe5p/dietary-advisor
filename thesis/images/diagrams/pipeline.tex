@@ -1,0 +1,29 @@
+\begin{tikzpicture}[
+    node distance=6mm and 14mm,
+    box/.style={draw, rounded corners, align=center, minimum height=8mm, inner sep=2mm, font=\small},
+    tool/.style={draw, dashed, align=center, minimum height=7mm, inner sep=1.5mm, font=\scriptsize},
+    arr/.style={-{Latex[length=2mm]}},
+]
+
+\node[box] (input) {User profile\\ + session request};
+\node[box, below=of input] (idea) {Meal-idea agent};
+\node[box, below=of idea] (nutrition) {Nutrition agent};
+\node[tool, right=of nutrition] (lookup) {Food knowledge\\ base lookup};
+\node[tool, below=4mm of lookup] (totaller_tool) {Totaller tool\\ (if enabled)};
+\node[box, below=of nutrition] (plan) {AgentMealPlan\\ (codes and grams only)};
+\node[box, below=of plan] (validator) {Output validator\\ (every code resolves)};
+\node[box, below=of validator] (reflection) {Critique-and-refine loop\\ (if enabled, \Cref{fig:diagram-reflection})};
+\node[box, below=of reflection] (hydration) {Hydration to\\ verified food items};
+\node[box, below=of hydration] (output) {Meal plan\\ + shopping list};
+
+\draw[arr] (input) -- (idea);
+\draw[arr] (idea) -- (nutrition);
+\draw[arr] (nutrition) -- (lookup);
+\draw[arr] (nutrition) -- (totaller_tool);
+\draw[arr] (nutrition) -- (plan);
+\draw[arr] (plan) -- (validator);
+\draw[arr] (validator) -- (reflection);
+\draw[arr] (reflection) -- (hydration);
+\draw[arr] (hydration) -- (output);
+
+\end{tikzpicture}

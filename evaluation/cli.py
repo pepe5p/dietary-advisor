@@ -163,5 +163,21 @@ def plot(
         raise typer.Exit(code=1)
 
 
+@app.command()
+def tables(
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Render booktabs LaTeX tables for the thesis from currently scored runs."""
+    _configure_logging(verbose)
+    from evaluation.latex import write_tables
+
+    paths = write_tables()
+    if not paths:
+        console.print("[yellow]No score records available yet.[/yellow] Run `evaluate` first.")
+        raise typer.Exit(code=1)
+    for path in paths:
+        console.print(f"Wrote {path}")
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()

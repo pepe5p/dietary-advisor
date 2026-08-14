@@ -70,6 +70,8 @@ def _render_metric_figure(
     fig.tight_layout()
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=_DPI)
+    # Vector copy for the thesis: LaTeX floats should not embed raster bar charts.
+    fig.savefig(path.with_suffix(".pdf"))
     plt.close(fig)
 
 
@@ -85,4 +87,5 @@ def render_experiment(
         path = dest / metric.filename
         _render_metric_figure(name, records, metric, path)
         paths.append(path)
+        paths.append(path.with_suffix(".pdf"))
     return paths

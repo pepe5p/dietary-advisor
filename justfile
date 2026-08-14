@@ -117,6 +117,22 @@ dc command *args:
 build:
 	docker compose build {{CONTAINER_NAME}}
 
+[group("thesis")]
+[doc("Compile the thesis to thesis/praca.pdf")]
+thesis:
+	cd thesis && latexmk -pdf -interaction=nonstopmode -halt-on-error praca.tex
+
+[group("thesis")]
+[doc("Remove LaTeX build artifacts")]
+thesis_clean:
+	cd thesis && latexmk -C
+
+[group("thesis")]
+[doc("Regenerate thesis figures and tables from scored runs")]
+thesis_assets:
+	uv run python -m evaluation plot
+	uv run python -m evaluation tables
+
 [group("development")]
 [doc("Open bash console (useful when prefixed with dc, as it opens bash inside docker)")]
 @bash:

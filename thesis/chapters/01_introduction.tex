@@ -1,0 +1,45 @@
+\chapter{Introduction}
+\label{cha:introduction}
+
+\section{Motivation}
+\label{sec:introduction-motivation}
+
+Following a nutritionally balanced diet is one of the most consistently effective, and most consistently ignored, forms of preventive healthcare. The reasons for this gap are rarely a lack of information: national dietary guidelines, calorie tables and nutrient databases are freely available, yet turning them into a concrete, edible day of meals for a specific person -- with a specific set of allergies, medical conditions and food preferences -- is a planning problem that most people are neither trained nor willing to solve by hand. Registered dietitians solve it professionally, but their time is expensive and their availability limited, which motivates the long-standing interest in automated dietary recommendation systems.
+
+Large language models (LLMs) are, on the surface, an attractive engine for this kind of personalisation. A modern instruction-tuned model can hold a natural conversation about food preferences, reason about the interaction between a medical condition and a nutrient, and produce a fluent, encouraging explanation of its recommendations -- all without the rigid input forms that older expert systems required. This fluency, however, is a direct consequence of the architecture that produces it: a transformer-based language model is trained to predict the statistically most plausible continuation of a token sequence~\cite{vaswani2017attention}, not to perform verified arithmetic or to enforce a hard constraint. When such a model is asked to plan an entire day of meals, it must simultaneously act as a source of culinary creativity and as a calculator that keeps a running total of calories, protein, sodium and a dozen other nutrients against numeric targets -- a role it was never trained to play reliably. Recent evaluations of LLM-based meal planners confirm this failure mode empirically: even capable general-purpose models can miss calorie targets by a two-digit percentage, and larger open-weight models are not automatically better at the arithmetic than smaller ones~\cite{khamesian2025nutrigen}.
+
+The risk is not merely cosmetic. A meal plan for a healthy, unremarkable user that slightly overshoots a calorie target is a nuisance; the same error for a user managing type~2 diabetes and hypertension, where sodium and glycaemic load must stay within tight, medically motivated bounds, is a safety issue. A system that wants to make credible use of an LLM's language and reasoning ability in this domain therefore cannot treat the model as the sole source of truth for anything that is checkable: it must keep the model's fluency where it is useful (interpreting a request, proposing a recipe, explaining a rationale) and replace it with deterministic computation and verified data wherever a wrong answer is consequential. This is the guiding idea behind combining an LLM with a \emph{knowledge-based} system: a curated food composition database that the model must query rather than guess from, and a deterministic aggregation routine that computes nutrient totals independently of anything the model claims about them.
+
+\section{Goal and hypotheses}
+\label{sec:introduction-goal}
+
+The goal of this thesis is to design, implement and empirically evaluate such a hybrid system: an LLM-based agent for one-day meal planning that is grounded in a real food composition database and checked by a deterministic nutrient totaller, and to measure how much each of these grounding mechanisms -- together with an automated critique-and-refine loop -- actually contributes to the accuracy and reliability of the resulting plans. The investigation is organised around three hypotheses.
+
+\begin{description}
+    \item[H1] Grounding meal generation in a real food knowledge base, combined with a deterministic nutrient totaller that the agent can consult while planning, reduces the error between the requested and the delivered macronutrient targets compared to a language model that reasons about nutrition unaided.
+    \item[H2] Adding an automated critique-and-refine loop -- in which a second pass reviews the plan against the user's medical constraints and preferences and revises it when necessary -- further improves adherence to the stated requirements, beyond what grounding alone achieves.
+    \item[H3] The size of the benefit attributable to each of these mechanisms depends on the capability of the underlying language model: a weaker model has more to gain from external grounding and critique than a stronger one.
+\end{description}
+
+These hypotheses are tested with an ablation study (\Cref{cha:methodology,cha:results}) that selectively disables the totaller and the critique-and-refine loop across a fixed set of clinically motivated test scenarios, and with a secondary comparison across language models of different capability tiers under a fixed system configuration.
+
+\section{Scope and non-goals}
+\label{sec:introduction-scope}
+
+The system studied in this thesis produces a single, complete one-day meal plan from a fixed user profile and an optional free-form request; it is not a multi-turn conversational assistant that incrementally edits a plan over several exchanges, and it does not track meals actually eaten over time. The food knowledge base and the nutrient targets it works against cover macronutrients and a fixed set of micronutrients; it is not a substitute for an individualised consultation with a registered dietitian or physician, and the medical scenarios used for evaluation are a deliberately narrow slice of real clinical complexity, chosen for their well-documented dietary guidance rather than for exhaustive coverage. A graphical user interface, multi-language support in the generated plans, and long-term adherence tracking are all left outside the scope of this work, as none of them bear on the central research question of how much deterministic grounding and self-critique improve the reliability of LLM-generated nutrition advice.
+
+\section{Contributions}
+\label{sec:introduction-contributions}
+
+This thesis makes the following contributions:
+
+\begin{itemize}
+    \item A neuro-symbolic architecture for LLM-based meal planning in which the language model never emits a nutrient value itself; every nutrient figure in the final plan is computed by a deterministic aggregator from a food composition database entry that the model has retrieved and can be traced back to, closing off an entire class of numeric hallucination by construction rather than by prompting.
+    \item An ablation study isolating the individual and combined contribution of the deterministic totaller and a critique-and-refine loop to macronutrient accuracy and to preference and safety adherence, run across a set of complexity-tiered clinical scenarios and repeated language models.
+    \item A documented account of the engineering difficulties encountered while grounding a language model in a heterogeneous, incomplete real-world food database -- including partial nutrient coverage, hybrid lexical-semantic retrieval, and tool-call ergonomics under a limited context budget -- together with the design decisions used to address them.
+\end{itemize}
+
+\section{Thesis outline}
+\label{sec:introduction-outline}
+
+\Cref{cha:background} reviews the mathematical origins of diet optimisation, the failure modes of language models that motivate a hybrid design, and the tool-use and self-correction techniques the system builds on. \Cref{cha:vision} states the vision and requirements for the system before any implementation choice is made. \Cref{cha:methods-and-tools} surveys the candidate technologies for each layer of the system and justifies the choices carried into the design. \Cref{cha:design} presents the resulting architecture. \Cref{cha:implementation} is the centrepiece of the practical account: it walks through the concrete difficulties met while building the system and the reasoning behind each solution. \Cref{cha:methodology} defines the experimental protocol and every metric used to evaluate the hypotheses, and \Cref{cha:results} reports and discusses the results. \Cref{cha:conclusions} closes the thesis with a summary of findings, its limitations, and directions for further work.
