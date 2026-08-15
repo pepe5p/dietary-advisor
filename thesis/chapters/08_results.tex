@@ -1,97 +1,174 @@
 \chapter{Results and discussion}
 \label{cha:results}
 
+This chapter reports what the two experiments defined in \Cref{cha:methodology} measured, and what those measurements do and do not license as conclusions. Read in order, the results tell a story with one clear finding, one qualified one and one surprise. The clear finding is that deterministic grounding works, and works cheaply: a calculator the model can consult halves macronutrient error on its own. The qualified one is that the critique-and-refine loop adds a further, smaller improvement for a large increase in time and requests. The surprise is in the model comparison, where allowing a weak model to reason harder closes most of the gap to models several times its size, while the same lever does almost nothing for the strong models -- which reframes the capability question that H3 asks. The chapter closes with what the two judges revealed about the reliability of its own qualitative measurements, and with the limits that should be attached to all of the above.
+
 \section{Experimental setup}
 \label{sec:results-setup}
 
-The component ablation experiment (\Cref{sec:methodology-variants}) was run with \texttt{gpt-5.6-luna} as the fixed language model across all four variants, each of the five scenarios in \Cref{tab:methodology-scenarios}, repeated three times per (variant, scenario) pair, for 60 scored runs in total. The model comparison experiment was run at the strongest configuration (\texttt{totaller+reflective-loop}, referred to as \emph{full} in this chapter) across three models spanning distinct capability and cost tiers -- \texttt{gemini-3.5-flash-lite}, \texttt{gemini-3.6-flash}, and \texttt{gpt-5.6-luna} -- against the same five scenarios; at the time of writing this experiment has one completed repetition per (model, scenario) pair for the two Gemini models and three repetitions for \texttt{gpt-5.6-luna}, and the results reported for the Gemini models in this chapter should accordingly be read as indicative rather than as fully repetition-averaged figures. The judge model used for every qualitative score in both experiments is \texttt{gpt-5.6-luna}, kept fixed regardless of which model produced the plan being judged, for the reason given in \Cref{sec:methodology-qualitative}.
+The component ablation experiment was run with \texttt{gpt-5.6-luna} as the fixed language model across all four variants of \Cref{tab:methodology-variants}, against each of the five scenarios of \Cref{tab:methodology-scenarios}, three times per cell, for 60 runs. The model comparison experiment fixed the system at the full variant and swept the twelve model-and-effort configurations described in \Cref{sec:methodology-model-grid}: \texttt{gemini-3.5-flash-lite}, \texttt{gemini-3.6-flash}, \texttt{gemini-3.7-flash} and \texttt{gpt-5.6-luna}, each at three effort levels, again against all five scenarios three times, for 180 runs. Both grids are complete; every cell reported below rests on 15 runs.
+
+Every plan was scored by both judges of \Cref{sec:methodology-qualitative}, three times each: \texttt{gpt-5.6-luna} as Judge~1 and \texttt{deepseek-v4-flash-0731} as Judge~2. Judge~1 therefore shares a model family with one of the twelve compared configurations, which is the overlap the second judge exists to expose rather than an oversight; \Cref{sec:results-stability} reports whether it distorted anything. Judge-independent metrics -- macronutrient error, iteration count and elapsed time -- are identical whichever judge's records they are read from, and are quoted without a judge attribution throughout.
 
 \section{Component ablation}
 \label{sec:results-ablation}
 
-\Cref{tab:results-ablation-summary} reports the four-variant comparison. Enabling the totaller alone reduces macro\-nutrient MAE from \qty{27.41}{\percent} to \qty{14.13}{\percent}, roughly halving it, while leaving the soft-preference aggregate and safety adherence essentially unchanged. Enabling the reflection loop alone reduces MAE to \qty{15.96}{\percent}, a smaller improvement than the totaller alone despite roughly tripling both the average wall-clock time and the number of model requests per run, since every reflection pass adds at least one further critic call and, when issues are found, a further refiner call. Combining both mechanisms yields the lowest MAE of the four variants, \qty{12.43}{\percent}, and also the lowest MSE, confirming that the two mechanisms are at least partially complementary rather than one subsuming the other's benefit entirely.
+\Cref{tab:results-ablation-summary} reports the four-variant comparison and \Cref{fig:results-ablation-mae} shows its headline column. Enabling the totaller alone reduces macronutrient MAE from \qty{27.41}{\percent} to \qty{14.13}{\percent}, very nearly halving it. Enabling the reflection loop alone reaches \qty{15.96}{\percent} -- a real improvement, but a smaller one than the totaller achieves, and bought at roughly three times the wall-clock time. Combining both gives the best result of the four, \qty{12.43}{\percent} MAE and by some distance the lowest MSE at \num{611}, confirming that the two mechanisms are partly complementary rather than one subsuming the other.
 
 \begin{table}[htbp]
     \centering
     \small
     \input{tables/ablation_variant_summary.tex}
-    \caption{Component ablation on \texttt{gpt-5.6-luna}: mean macro error, soft-preference aggregate, safety adherence, reflection iterations and wall-clock time, averaged over 15 runs per variant (5 scenarios \(\times\) 3 repetitions).}
+    \caption{Component ablation on \texttt{gpt-5.6-luna}: mean macro error, soft-preference aggregate from each judge, Judge~1's safety adherence, reflection iterations and wall-clock time, over 15 runs per variant.}
     \label{tab:results-ablation-summary}
 \end{table}
 
-\Cref{fig:results-ablation-mae} shows the same MAE comparison as a bar chart with per-variant standard deviation, generated directly from the scored runs (\Cref{sec:tools-evaluation}). The baseline variant carries a substantially larger standard deviation (\qty{20.11}{\percent}) than any grounded variant, indicating that the baseline's accuracy is not merely worse on average but considerably less predictable from one scenario to the next -- a pattern examined further in \Cref{sec:results-error-analysis}.
-
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.75\textwidth]{../outputs/figures/ablation/mae_pct.pdf}
-    \caption{Macronutrient MAE by ablation variant, with error bars showing one population standard deviation across the 15 runs per variant.}
+    \includegraphics[width=\textwidth]{../outputs/figures/ablation/mae_pct.pdf}
+    \caption{Macronutrient MAE by ablation variant, with error bars showing the standard error of the mean across the 15 runs per variant.}
     \label{fig:results-ablation-mae}
 \end{figure}
 
-\Cref{tab:results-per-scenario} breaks the same MAE figures down by scenario. The improvement from grounding is not uniform: the diabetes-hypertension scenario is already the baseline's best case (\qty{7.1}{\percent} MAE), and gains only marginally, or not at all, from either mechanism, while the lactose-intolerant-athlete-wants-cheesecake scenario improves the most in absolute terms, from a baseline MAE above \qty{50}{\percent} to close to \qty{14}{\percent} once the totaller is available. \Cref{sec:results-error-analysis} discusses why these two scenarios diverge so much.
+The spread matters as much as the mean here. The baseline's population standard deviation is \qty{20.11}{\percent}, larger than the entire mean error of any grounded variant, while the three grounded variants sit between \qty{4.84}{\percent} and \qty{7.71}{\percent}. An ungrounded plan is therefore not merely worse on average but substantially less predictable, which for a system whose failures are silent is arguably the more serious property. \Cref{sec:results-error-analysis} traces most of that spread to a single scenario.
+
+The picture from the qualitative side is far less dramatic, and \Cref{fig:results-ablation-soft} shows why the second judge is worth its cost. Both judges place all four variants within a narrow band -- roughly \numrange{0.79}{0.81} for Judge~1 and \numrange{0.80}{0.84} for Judge~2 -- so neither detects the two-fold difference in macronutrient accuracy that \Cref{fig:results-ablation-mae} makes obvious. What the two series also show is a consistent offset: Judge~2 rates essentially every variant higher than Judge~1 does, by a margin comparable to the differences between the variants themselves. That is the central caution of this chapter's qualitative results, and \Cref{sec:results-stability} takes it up properly.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{../outputs/figures/ablation/soft_aggregate.pdf}
+    \caption{Soft-preference aggregate by ablation variant, scored independently by both judges. The variants are hard to separate; the two judges are not.}
+    \label{fig:results-ablation-soft}
+\end{figure}
+
+\Cref{tab:results-per-scenario} breaks the MAE figures down by scenario. The benefit of grounding is real but uneven. The diabetes-hypertension scenario is the baseline's best case at \qty{7.1}{\percent} and gains nothing from either mechanism -- both grounded variants are slightly worse -- whereas the lactose-intolerant-athlete scenario falls from \qty{53.4}{\percent} to \qty{13.5}{\percent} once the totaller is available. Grounding helps most exactly where the unaided model was doing worst.
 
 \begin{table}[htbp]
     \centering
     \footnotesize
     \input{tables/ablation_per_scenario_mae.tex}
-    \caption{Mean MAE~[\%] by scenario and variant, \texttt{gpt-5.6-luna}, averaged over 3 repetitions per cell.}
+    \caption{Mean MAE~[\%] by scenario and variant, \texttt{gpt-5.6-luna}, over 3 repetitions per cell.}
     \label{tab:results-per-scenario}
 \end{table}
 
 \section{Model comparison}
 \label{sec:results-model-comparison}
 
-\Cref{tab:results-model-summary} compares the three models under the full variant. \texttt{gemini-3.6-flash} achieves both the lowest MAE (\qty{7.73}{\percent}) and the highest soft-preference aggregate (0.851) of the three, but at close to five times the wall-clock time of \texttt{gemini-3.5-flash-lite} and with more than an order of magnitude higher estimated cost per run, as \Cref{tab:results-token-cost} shows. \texttt{gemini-3.5-flash-lite} never triggers a reflection iteration across any of its evaluated runs (a mean iteration count of \num{0.00}), which is consistent with its comparatively high MAE (\qty{22.71}{\percent}): a critic paired with this model appears to approve its first draft outright far more often than a critic paired with either of the other two models, whether because the critic itself (run with \texttt{gpt-5.6-luna} regardless of the generator, per \Cref{sec:results-setup}) is more lenient toward this model's output or because its drafts genuinely present fewer objections worth raising is not distinguishable from the aggregate figures alone.
+\Cref{tab:results-model-summary} lists all twelve configurations and \Cref{fig:results-models-mae} plots their macronutrient error. The best configuration in the entire grid is \texttt{gemini-3.6-flash} at low effort, at \qty{8.05}{\percent} MAE, and the worst by a wide margin is \texttt{gemini-3.5-flash-lite} at its provider default, at \qty{27.61}{\percent} -- a spread of more than a factor of three, which is larger than the spread the entire component ablation produced. The choice of generating model and how hard it is allowed to think therefore matters at least as much as which grounding mechanisms are switched on.
 
 \begin{table}[htbp]
     \centering
+    \small
     \input{tables/model_comparison_summary.tex}
-    \caption{Model comparison under the full variant: mean macro error, soft-preference aggregate, reflection iterations and wall-clock time.}
+    \caption{The twelve model-and-effort configurations under the full variant: mean macro error, per-judge soft-preference aggregate, reflection iterations and wall-clock time, over 15 runs each.}
     \label{tab:results-model-summary}
 \end{table}
 
-\section{Cost and latency}
-\label{sec:results-cost-latency}
-
-\Cref{tab:results-token-cost} converts the token telemetry recorded per run (\Cref{sec:methodology-operational}) into an estimated cost per run, using each model's published per-token pricing at the time of the evaluation. \texttt{gpt-5.6-luna} is, on this evaluated grid, both more accurate and roughly seventeen times cheaper per run than \texttt{gemini-3.6-flash}, entirely because of a large gap in per-token pricing that more than offsets \texttt{gemini-3.6-flash}'s slightly lower token consumption; \texttt{gemini-3.5-flash-lite} is cheaper still, but only because it essentially never engages the reflection loop, which is also why it is the least accurate of the three. This three-way trade-off between accuracy, latency and cost is exactly the kind of information a system designer choosing a model for this pipeline would need, and it is visible only because token usage was recorded per run from the start (\Cref{sec:impl-eval-harness}), not derived after the fact.
-
-\begin{table}[htbp]
+\begin{figure}[htbp]
     \centering
-    \input{tables/model_comparison_token_cost.tex}
-    \caption{Mean token usage, request count and estimated cost per run under the full variant.}
-    \label{tab:results-token-cost}
-\end{table}
+    \includegraphics[width=\textwidth]{../outputs/figures/models/mae_pct.pdf}
+    \caption{Macronutrient MAE for each of the twelve model-and-effort configurations under the full variant.}
+    \label{fig:results-models-mae}
+\end{figure}
 
-Within the ablation experiment, \Cref{tab:results-token-latency} shows the same token and request growth driving the runtime increase already visible in \Cref{tab:results-ablation-summary}: enabling the totaller alone roughly doubles input token consumption relative to the baseline, because every totaller call requires re-sending the full candidate plan to be checked, and enabling reflection on top of that roughly doubles it again, since every critic and refiner pass repeats a large share of the original context.
+Collapsing the effort levels, as \Cref{fig:results-models-by-model} does, gives each base model a single figure: \qty{9.60}{\percent} for \texttt{gemini-3.6-flash}, \qty{12.18}{\percent} for \texttt{gemini-3.7-flash}, \qty{13.51}{\percent} for \texttt{gpt-5.6-luna} and \qty{17.93}{\percent} for \texttt{gemini-3.5-flash-lite}. Two observations follow. The newer \texttt{gemini-3.7-flash} does not outperform the older \texttt{gemini-3.6-flash} on this task, so general model progress does not automatically transfer to constrained numeric planning. And the ordering by macronutrient accuracy does not match the ordering by qualitative score: \texttt{gemini-3.7-flash} earns the highest soft aggregate from both judges while placing second on error, which is a reminder that the two metrics measure genuinely different things.
 
-\begin{table}[htbp]
+\begin{figure}[htbp]
     \centering
-    \input{tables/ablation_token_latency.tex}
-    \caption{Mean token usage, request count and wall-clock time by ablation variant, \texttt{gpt-5.6-luna}.}
-    \label{tab:results-token-latency}
-\end{table}
+    \includegraphics[width=\textwidth]{../outputs/figures/models/mae_pct_by_model.pdf}
+    \caption{Macronutrient MAE aggregated over the three effort levels of each base model.}
+    \label{fig:results-models-by-model}
+\end{figure}
+
+The iteration counts in \Cref{tab:results-model-summary} expose a mechanism worth naming, because it is easy to misread. The critic runs on the same model as the generator it reviews (\Cref{sec:design-agents}), so the iteration count is not a property of the plans alone but of how demanding that particular model is of itself. \texttt{gpt-5.6-luna} averages between \num{1.33} and \num{1.67} refinement passes, whereas \texttt{gemini-3.7-flash} averages \num{0.02} -- it approves its own first draft almost every time. Yet \texttt{gemini-3.7-flash} still achieves a lower MAE than \texttt{gpt-5.6-luna}. A model that rarely invokes its own reflection loop is therefore not necessarily producing worse plans; it may simply be a more permissive critic of itself, which is a caveat for anyone tempted to read iteration counts as a quality signal.
+
+\section{Reasoning effort}
+\label{sec:results-effort}
+
+Pooling the twelve configurations into three effort buckets produces the cleanest monotonic trend in the entire evaluation, shown in \Cref{fig:results-effort-mae}: mean MAE falls from \qty{16.36}{\percent} at low effort to \qty{12.45}{\percent} at medium and \qty{11.11}{\percent} at high. Both judges' soft aggregates move in the same direction, from \num{0.770} to \num{0.787} for Judge~1 and from \num{0.800} to \num{0.831} for Judge~2. Reasoning effort buys accuracy, and it does so consistently enough to survive being averaged across four vendors' incomparable effort scales.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{../outputs/figures/models/mae_pct_by_effort.pdf}
+    \caption{Macronutrient MAE aggregated by reasoning-effort bucket across all four base models.}
+    \label{fig:results-effort-mae}
+\end{figure}
+
+The aggregate hides the more interesting result, which is how unevenly that benefit is distributed. For \texttt{gemini-3.5-flash-lite}, raising effort from the provider default to high cuts MAE from \qty{27.61}{\percent} to \qty{9.48}{\percent}, a reduction of roughly two thirds, and lifts its Judge~1 soft aggregate from \num{0.694} to \num{0.765}. That single configuration change takes the weakest model in the comparison from worst-in-grid to within striking distance of the best, at a fraction of the larger models' latency. For every other model the lever is nearly inert or actively unhelpful: \texttt{gemini-3.6-flash} is best at its \emph{lowest} effort (\qty{8.05}{\percent}, against \qty{10.66}{\percent} at high), \texttt{gemini-3.7-flash} is best in the middle, and only \texttt{gpt-5.6-luna} improves monotonically, and then only from \qty{16.48}{\percent} to \qty{11.61}{\percent}. The monotone aggregate trend, in other words, is carried almost entirely by one model that started out badly configured.
+
+What effort reliably does buy is time. \Cref{fig:results-effort-elapsed} shows mean elapsed time rising from \qty{52.0}{\second} to \qty{76.6}{\second} to \qty{142.6}{\second} across the three buckets, and the extremes are starker still: \texttt{gemini-3.5-flash-lite} at default effort completes a plan in \qty{21.2}{\second}, while \texttt{gpt-5.6-luna} at its highest setting takes \qty{276.8}{\second}, more than thirteen times longer for a worse macronutrient error. Latency scales with effort far more dependably than accuracy does, and NFR4's requirement of an interactive session is comfortably met at the low end of this range and clearly violated at the top.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{../outputs/figures/models/elapsed_s_by_effort.pdf}
+    \caption{Wall-clock time per run by reasoning-effort bucket. Unlike accuracy, latency responds to effort reliably.}
+    \label{fig:results-effort-elapsed}
+\end{figure}
+
+\section{Reflection behaviour and computational overhead}
+\label{sec:results-overhead}
+
+The two mechanisms under ablation are not free, and \Cref{fig:results-ablation-elapsed} quantifies what they cost in time. The totaller is cheap: it lifts a run from \qty{29.8}{\second} to \qty{39.2}{\second}, about a third more, in exchange for halving macronutrient error. Reflection is expensive: it takes the same run past \qty{100}{\second} whether or not the totaller is also enabled, roughly tripling the baseline. Token telemetry tells the same story from the other side. Enabling the totaller raises mean input tokens per run from about \num{32000} to \num{61000}, because each check resends the full candidate plan, and enabling reflection on top of that roughly doubles it again to about \num{115000}, with requests per run rising from \num{3.5} to \num{11.7}, since every critic pass and every refiner pass repeats a large share of the context.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{../outputs/figures/ablation/elapsed_s.pdf}
+    \caption{Wall-clock time per run by ablation variant. The totaller is inexpensive; reflection is not.}
+    \label{fig:results-ablation-elapsed}
+\end{figure}
+
+\Cref{fig:results-ablation-iterations} shows where reflection's time goes. With reflection enabled the loop runs \num{1.93} refinement passes on average without the totaller and \num{1.67} with it, against a cap of three. The reduction when the totaller is present is small but points the right way: a critic holding deterministic totals converges slightly sooner than one that has to judge numeric adequacy for itself, which is the grounding effect described in \Cref{sec:design-reflection} showing up in the loop's own behaviour rather than in the plan.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{../outputs/figures/ablation/iterations.pdf}
+    \caption{Mean refinement passes per run. Only the two reflection-enabled variants can be nonzero.}
+    \label{fig:results-ablation-iterations}
+\end{figure}
+
+\section{Stability and judge agreement}
+\label{sec:results-stability}
+
+Every mean in this chapter is an average over three repetitions of a nondeterministic process, so the question of how much an individual run deviates from its configuration's mean bears directly on how much weight the differences above can carry. \Cref{fig:results-stability} answers it with the run-to-run variability metric of \Cref{sec:methodology-stability}. Pooled over all 75 configuration groups, the mean absolute deviation of the soft aggregate is \num{0.026} under Judge~1 and \num{0.030} under Judge~2. Both are comfortably smaller than the roughly \num{0.13} spread separating the best and worst configurations' soft aggregates, so the qualitative ordering is not an artefact of sampling; but they are the same size as, or larger than, the gaps between the four ablation variants, which is a quantitative reason not to read anything into that ordering.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{../outputs/figures/stability/run_variability.pdf}
+    \caption{Run-to-run variability of the soft-preference aggregate: mean absolute deviation across the three repetitions of each configuration, per model and pooled, for both judges.}
+    \label{fig:results-stability}
+\end{figure}
+
+The two judges themselves behave as \Cref{sec:impl-judges} hoped they would. Judge~2 scores higher than Judge~1 almost everywhere -- by roughly \numrange{0.01}{0.08} depending on the configuration -- so absolute soft-aggregate values are clearly judge-dependent and should never be quoted as if they were properties of the plans alone. Their \emph{rankings}, however, largely agree: both place \texttt{gemini-3.5-flash-lite} at default effort last by a wide margin, both rank the three \texttt{gemini-3.5-flash-lite} configurations in increasing order of effort, and both fail to separate the four ablation variants. The one visible disagreement is instructive: Judge~1 ranks \texttt{gpt-5.6-luna} at its highest effort last of that model's three configurations, at \num{0.774}, whereas Judge~2 places the same configuration comfortably above the low-effort one, at \num{0.829}. The judge that shares a family with this model is therefore, if anything, harsher on it than the independent judge -- the opposite of the self-preference bias the design was guarding against. On the evidence available, the family overlap did not inflate that model's scores.
 
 \section{Error analysis}
 \label{sec:results-error-analysis}
 
-Three patterns in the results merit closer examination beyond the summary statistics above.
+Three patterns merit closer examination than the summary statistics allow.
 
-\textbf{The baseline's worst case is a single dominant outlier.} The lactose-intolerant-athlete-wants-cheesecake scenario's baseline MAE of \qty{53.4}{\percent} in \Cref{tab:results-per-scenario} is driven overwhelmingly by one repetition in which the ungrounded model, tasked with fitting a calorie-dense dessert into a high-calorie athlete's plan with no deterministic check on the result, overshot its fibre target by over \qty{170}{\percent}; the other two repetitions of the same (scenario, baseline) cell are considerably closer to target. This is precisely the failure mode a deterministic totaller is designed to catch -- a plausible-sounding recipe whose aggregate nutrient profile is badly wrong -- and its large contribution to the baseline's overall standard deviation (\Cref{sec:results-ablation}) illustrates why an ungrounded model's error is not just larger on average but far less predictable from one run to the next.
+\textbf{The baseline's worst case is one dominant outlier.} The lactose-intolerant-athlete scenario's baseline MAE of \qty{53.4}{\percent} in \Cref{tab:results-per-scenario} is driven overwhelmingly by a single repetition in which the ungrounded model, fitting a calorie-dense dessert into an athlete's already high energy target with nothing checking the result, overshot its fibre target by more than \qty{170}{\percent}; the other two repetitions of that cell are far closer to target. This is precisely the failure a deterministic totaller is designed to catch, and its contribution to the baseline's \qty{20.11}{\percent} standard deviation is why an ungrounded system should be described as unpredictable rather than merely inaccurate.
 
-\textbf{Fibre dominates the residual macro error even in grounded variants.} Across every variant, the per-nutrient breakdown recorded alongside each run's MAE (\Cref{sec:methodology-quantitative}) shows fibre contributing a disproportionate share of the remaining error relative to energy, protein, carbohydrate or fat error, even once the totaller is enabled. This is consistent with the partial nutrient coverage described in \Cref{sec:impl-missing-nutrients}: fibre is one of the fields most often missing from a crowd-sourced product record, so even a totaller that sums exactly what data is available is, for a meaningful share of plans, summing an incomplete picture specifically for this nutrient, and no purely arithmetic grounding mechanism can correct for a value the food database itself never recorded.
+\textbf{Fibre dominates the residual error even in grounded variants.} The per-nutrient breakdown recorded with each run (\Cref{sec:methodology-quantitative}) shows fibre contributing a disproportionate share of what error remains after grounding, well above energy, protein, carbohydrate or fat. This follows directly from the partial nutrient coverage of \Cref{sec:impl-missing-nutrients}: fibre is among the fields most often missing from a crowd-sourced product record, so for a meaningful share of plans the totaller is exactly summing an incomplete picture. No amount of arithmetic rigour can recover a value the database never recorded, which places a floor on what grounding alone can achieve.
 
-\textbf{Safety adherence and the soft aggregate saturate and barely move.} Safety adherence is \num{1.00} with zero recorded violations across all four ablation variants and all three compared models, and the soft-preference aggregate varies only within a narrow \numrange{0.79}{0.81} band across the four ablation variants despite the roughly two-fold spread in MAE between the weakest and strongest variant. Two explanations are consistent with this pattern and are not mutually exclusive: the judge's rubric for the five evaluated scenarios (\Cref{tab:methodology-scenarios}) may simply not be discriminating enough at the high end to separate a good plan from a very good one on these particular criteria, and it is also plausible that the scenarios themselves, while spanning three complexity tiers, do not yet include a case severe enough to make an allergen or diet-pattern violation likely for any of the models evaluated. Distinguishing between these explanations would require either a harder safety-specific stress scenario or a larger and more varied evaluated model pool than the three compared here, and is noted as a direction for further work in \Cref{sec:conclusions-future-work}.
+\textbf{Safety adherence is high but no longer uniformly perfect, and the judges disagree about where it slips.} Judge~1 records perfect adherence across all four ablation variants; Judge~2 does not, dropping to \num{0.928} on the totaller-only variant and \num{0.978} on the full variant. In the model comparison both judges flag \texttt{gemini-3.5-flash-lite} at default effort as the weakest configuration for safety (\num{0.966} and \num{0.963} respectively), which is consistent with it being the weakest configuration on every other axis. But the two disagree about the rest: Judge~1 finds only two further configurations short of perfect, Judge~2 finds five, and only three of those overlap. Since a safety judgement is a claim about whether a specific allergen or diet-pattern rule was broken -- something that ought to be objectively checkable from the plan -- this disagreement is more troubling than the offset in soft-preference scores. It suggests that allergen compliance is currently being assessed at a level of reliability well below what a deployed system would require, and argues for moving hard exclusions out of the judge's hands and into a deterministic checker, in the same spirit as the no-invented-foods contract.
 
 \section{Discussion of the hypotheses}
 \label{sec:results-discussion}
 
-\textbf{H1} (grounding in a food knowledge base plus a deterministic totaller reduces macronutrient error) is supported: enabling the totaller alone, with the language model and every other configuration flag held fixed, roughly halves MAE relative to the already-grounded (food-lookup-only) baseline, and the effect survives, in reduced but still measurable form, across all five scenarios in \Cref{tab:results-per-scenario} rather than being driven by one scenario alone.
+\textbf{H1} (grounding in a food knowledge base plus a deterministic totaller reduces macronutrient error) is supported. Enabling the totaller alone, with the model and every other flag fixed, nearly halves MAE relative to the already food-grounded baseline, and the improvement holds in four of five scenarios rather than resting on one. It is also the cheapest intervention measured here, adding about a third to run time.
 
-\textbf{H2} (the critique-and-refine loop further improves accuracy and adherence beyond grounding alone) is supported only partially. Reflection alone, without the totaller, does improve MAE relative to the ungrounded baseline, but by less than the totaller alone does, and combining both mechanisms improves MAE further than the totaller alone by a comparatively modest margin (\qty{14.13}{\percent} to \qty{12.43}{\percent}) relative to the roughly three-fold increase in wall-clock time and request count that reflection adds (\Cref{sec:results-cost-latency}). On the soft-preference aggregate and safety-adherence metrics specifically, \Cref{sec:results-error-analysis} shows essentially no measurable movement from enabling reflection at all, within the scenario set evaluated here.
+\textbf{H2} (the critique-and-refine loop further improves accuracy and adherence beyond grounding alone) is partially supported. Reflection does improve macronutrient error, both alone and on top of the totaller, but its marginal contribution over the totaller is modest -- \qty{14.13}{\percent} to \qty{12.43}{\percent} -- while roughly tripling wall-clock time and more than tripling requests. On the adherence side the hypothesis is not supported at all within this scenario set: neither judge detects a soft-preference or safety improvement from enabling reflection, and \Cref{sec:results-stability} shows that any such effect would in any case be smaller than the run-to-run noise. Reflection is defensible on accuracy grounds and on the strength of what it corrects in individual plans, but not on the evidence of the aggregate qualitative metrics.
 
-\textbf{H3} (the size of the benefit depends on model capability) finds preliminary support in the model comparison, but with an important caveat already flagged in \Cref{sec:results-setup}: \texttt{gemini-3.5-flash-lite}, the weakest of the three compared models by every capability indicator available, shows the least benefit from the full configuration, essentially never engaging the reflection loop and posting the highest MAE of the three, which is the opposite of what a naive reading of H3 would predict for the model with the most room to improve. Because this experiment currently rests on a single repetition per scenario for both Gemini models, this observation should be treated as a hypothesis for a fuller repeated run rather than as a settled finding: a more complete replication is needed before concluding whether weaker models genuinely benefit less from these mechanisms, or whether they instead need a differently tuned reflection budget or critic threshold to benefit from them at all.
+\textbf{H3} (the benefit depends on model capability) is supported, but only once capability is read as this thesis's revised formulation intends -- as a function of both the model and its reasoning effort. The naive version of the hypothesis, that a weaker model gains more from grounding and critique, is not what the data show: the weakest configuration engages the reflection loop rarely and still produces the worst plans. What the data do show is that the weakest model's deficit is largely a configuration artefact rather than a capability ceiling. Given a high reasoning-effort setting, \texttt{gemini-3.5-flash-lite} improves by roughly two thirds and approaches the accuracy of models that are far slower and more expensive to run, while the same lever leaves stronger models flat or slightly worse. The benefit of spending more computation therefore accrues overwhelmingly to models that were under-provisioned to begin with, which is a more actionable finding than the original hypothesis anticipated: for this task, matching effort to the model matters more than reaching for a larger model.
 
 \section{Threats to validity}
 \label{sec:results-threats}
 
-Several limitations bound how far these results should be generalised. The scenario set, while spanning three complexity tiers, covers five specific profiles and health conditions rather than the full range of conditions dietary guidance addresses, and the safety-adherence saturation noted in \Cref{sec:results-error-analysis} may reflect this narrowness rather than genuine, universal safety. The judge model used for qualitative scoring is a single model, and while it is kept fixed across every compared configuration for the reason given in \Cref{sec:methodology-qualitative}, any systematic bias specific to that judge model applies uniformly to every result in this chapter and cannot be detected from within this evaluation alone. The model comparison experiment's incomplete repetition count for two of its three models, noted in \Cref{sec:results-setup}, is the most immediate limitation to address before treating \Cref{sec:results-model-comparison}'s conclusions as final; \Cref{sec:conclusions-future-work} returns to exactly what completing it would require.
+Several limitations bound how far these results generalise.
+
+The scenario set is five profiles. They were chosen to vary in what they demand -- an unconstrained day, a hard exclusion against a conflicting request, interacting chronic conditions -- but five is too few to support claims about dietary planning in general, and the high safety-adherence scores may reflect that none of these scenarios is adversarial in the way a determined user could be.
+
+Both judges are language models. Adding the second judge makes vendor-specific bias visible and \Cref{sec:results-stability} shows it did not distort the rankings, but a bias shared by both -- a common preference for longer rationales, say -- would remain invisible from inside this evaluation. No human expert reviewed any plan, so every qualitative number in this chapter is a proxy for the judgement that would actually matter.
+
+Reasoning-effort levels are vendor-defined labels, not calibrated quantities. Comparisons of effort within a single model are sound, since only the label changes; the pooled comparison across models in \Cref{sec:results-effort} assumes a correspondence between different vendors' scales that no provider guarantees, and should be read as a direction rather than a measurement.
+
+Finally, all of the above describes one snapshot of a fast-moving set of hosted models, several of which were released within months of this evaluation and any of which may be silently updated behind the same identifier. The architectural conclusions -- that deterministic grounding is cheap and effective, that self-critique is expensive and marginal, that effort settings deserve tuning -- are more durable than the specific numbers attached to any named model here.

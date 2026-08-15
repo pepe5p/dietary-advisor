@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import math
 import textwrap
+from dataclasses import dataclass
 from pathlib import Path
 
 import matplotlib
@@ -32,6 +34,63 @@ from evaluation.scoring.store import ScoreRecord
 _DPI = 150
 _SERIES_COLORS = ("#4472C4", "#ED7D31", "#70AD47", "#A5A5A5")
 _EXTRA_GROUPINGS = (BY_MODEL, BY_EFFORT)
+
+# A4 with the aghdpl margins (30mm left, 20mm right) leaves a 160mm text block.
+# Every figure is drawn exactly that wide so the thesis can include it at
+# \textwidth unscaled, which makes the point sizes below the sizes LaTeX prints
+# next to 11pt body text.
+_TEXT_WIDTH_IN = 160 / 25.4
+_AXES_HEIGHT_IN = 2.8
+_MIN_HEIGHT_IN = 3.2
+# Room taken by the y-axis label plus its tick labels, excluded from the slot
+# arithmetic that decides whether a label fits.
+_Y_AXIS_ALLOWANCE_IN = 1.0
+_SLANT_DEGREES = 30
+_TITLE_SIZE = 10
+_AXIS_LABEL_SIZE = 9
+_TICK_SIZE = 8
+_VALUE_SIZE = 7
+_LEGEND_SIZE = 8
+_NOTE_SIZE = 7
+# Mean glyph advance of a mixed-case label, per point of font size.
+_CHAR_IN_PER_PT = 0.0068
+
+
+def _text_len_in(text: str, fontsize: int) -> float:
+    return len(text) * fontsize * _CHAR_IN_PER_PT
+
+
+@dataclass(frozen=True)
+class _Layout:
+    figsize: tuple[float, float]
+    tick_rotation: int
+    tick_alignment: str
+    value_rotation: int
+    headroom: float
+    title_wrap: int
+
+
+def _plan_layout(labels: list[str], value_texts: list[str], n_series: int) -> _Layout:
+    """Pick rotations and a figure height that keep every label legible at print size."""
+    axes_width = _TEXT_WIDTH_IN - _Y_AXIS_ALLOWANCE_IN
+    slot = axes_width / max(len(labels), 1)
+
+    widest_tick = max((_text_len_in(label, _TICK_SIZE) for label in labels), default=0.0)
+    slanted = widest_tick * math.cos(math.radians(_SLANT_DEGREES)) <= slot
+    tick_block = widest_tick * (math.sin(math.radians(_SLANT_DEGREES)) if slanted else 1.0)
+
+    widest_value = max((_text_len_in(text, _VALUE_SIZE) for text in value_texts), default=0.0)
+    upright_values = widest_value <= slot / n_series
+    headroom = 0.03 if upright_values else (widest_value + 0.06) / _AXES_HEIGHT_IN
+
+    return _Layout(
+        figsize=(_TEXT_WIDTH_IN, max(_MIN_HEIGHT_IN, _AXES_HEIGHT_IN + tick_block + 0.15)),
+        tick_rotation=_SLANT_DEGREES if slanted else 90,
+        tick_alignment="right" if slanted else "center",
+        value_rotation=0 if upright_values else 90,
+        headroom=headroom,
+        title_wrap=int(_TEXT_WIDTH_IN / (_TITLE_SIZE * _CHAR_IN_PER_PT)),
+    )
 
 
 def figures_dir(experiment: str, *, output_dir: Path | None = None) -> Path:
@@ -89,17 +148,22 @@ def _series_extents(series: list[tuple[str, list[GroupStats]]], metric: Metric) 
     return low, high
 
 
-def _apply_axis_limits(ax: plt.Axes, series: list[tuple[str, list[GroupStats]]], metric: Metric) -> None:
+def _apply_axis_limits(
+    ax: plt.Axes,
+    series: list[tuple[str, list[GroupStats]]],
+    metric: Metric,
+    headroom: float,
+) -> None:
     low, high = _series_extents(series, metric)
     if low == float("inf"):
         return
     if metric.zoom_ylim:
         pad = max((high - low) * 0.15, 0.01)
-        ax.set_ylim(low - pad, high + pad)
-        return
-    bottom = metric.floor if metric.floor is not None else low
-    pad = max((high - bottom) * 0.1, 0.05)
-    ax.set_ylim(bottom, high + pad)
+        bottom, top = low - pad, high + pad
+    else:
+        bottom = metric.floor if metric.floor is not None else low
+        top = high + max((high - bottom) * 0.1, 0.05)
+    ax.set_ylim(bottom, top + (top - bottom) * headroom)
 
 
 def _render_metric_figure(
@@ -124,8 +188,10 @@ def _render_metric_figure(
     n_series = len(series)
     bar_width = 0.8 / n_series
     show_error_bars = any(group.n > 1 for _, stats in series for group in stats)
+    value_texts = [f"{group.mean:.{metric.decimals}f}" for _, stats in series for group in stats]
+    layout = _plan_layout(labels, value_texts, n_series)
 
-    fig, ax = plt.subplots(figsize=(max(7.0, n_groups * 1.4), 4.5))
+    fig, ax = plt.subplots(figsize=layout.figsize)
     x = range(n_groups)
 
     for series_idx, (series_label, stats) in enumerate(series):
@@ -138,7 +204,7 @@ def _render_metric_figure(
             means,
             width=bar_width,
             yerr=[lower, upper] if show_error_bars else None,
-            capsize=4 if show_error_bars else 0,
+            capsize=3 if show_error_bars else 0,
             color=color,
             label=series_label or None,
         )
@@ -150,19 +216,30 @@ def _render_metric_figure(
                 f"{mean:.{metric.decimals}f}",
                 ha="center",
                 va="bottom",
-                fontsize=8,
+                fontsize=_VALUE_SIZE,
+                rotation=layout.value_rotation,
             )
 
     ax.set_xticks(list(x))
-    ax.set_xticklabels(labels, rotation=20, ha="right")
-    ax.set_ylabel(metric.ylabel)
-    title = textwrap.fill(_figure_title(experiment, records, metric, grouping), width=60)
-    ax.set_title(title, fontsize=10, pad=14)
-    ax.text(1.0, 1.02, "error bars: +/- SEM", transform=ax.transAxes, ha="right", va="bottom", fontsize=7)
+    ax.set_xticklabels(labels, rotation=layout.tick_rotation, ha=layout.tick_alignment)
+    ax.tick_params(labelsize=_TICK_SIZE)
+    ax.set_ylabel(metric.ylabel, fontsize=_AXIS_LABEL_SIZE)
+    title = textwrap.fill(_figure_title(experiment, records, metric, grouping), width=layout.title_wrap)
+    ax.set_title(title, fontsize=_TITLE_SIZE, pad=16)
+    if show_error_bars:
+        ax.text(
+            0.5,
+            1.0,
+            "error bars: \u00b1SEM",
+            transform=ax.transAxes,
+            ha="center",
+            va="bottom",
+            fontsize=_NOTE_SIZE,
+        )
     ax.grid(axis="y", linestyle="--", alpha=0.4)
     if n_series > 1:
-        ax.legend(fontsize=8)
-    _apply_axis_limits(ax, series, metric)
+        ax.legend(fontsize=_LEGEND_SIZE)
+    _apply_axis_limits(ax, series, metric, layout.headroom)
 
     fig.tight_layout()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -215,12 +292,13 @@ def _render_variability_subplot(
     ax: plt.Axes,
     label_order: list[str],
     series: list[tuple[str, list[ModelVariability | None]]],
-    metric: Metric,
+    layout: _Layout,
 ) -> None:
     n_groups = len(label_order)
     n_series = len(series)
     bar_width = 0.8 / n_series
     x = range(n_groups)
+    high = 0.0
 
     for series_idx, (series_label, stats) in enumerate(series):
         offsets = [idx + (series_idx - (n_series - 1) / 2) * bar_width for idx in x]
@@ -235,15 +313,25 @@ def _render_variability_subplot(
         for offset, entry in zip(offsets, stats, strict=True):
             if entry is None:
                 continue
-            ax.text(offset, entry.mean, f"{entry.mean:.3f}", ha="center", va="bottom", fontsize=7)
+            high = max(high, entry.mean)
+            ax.text(
+                offset,
+                entry.mean,
+                f"{entry.mean:.3f}",
+                ha="center",
+                va="bottom",
+                fontsize=_VALUE_SIZE,
+                rotation=layout.value_rotation,
+            )
 
     ax.set_xticks(list(x))
-    ax.set_xticklabels(label_order, rotation=20, ha="right")
-    ax.set_ylabel(SPREAD_COLUMN_LABEL)
-    ax.set_title(metric.title)
+    ax.set_xticklabels(label_order, rotation=layout.tick_rotation, ha=layout.tick_alignment)
+    ax.tick_params(labelsize=_TICK_SIZE)
+    ax.set_ylabel(SPREAD_COLUMN_LABEL, fontsize=_AXIS_LABEL_SIZE)
     ax.grid(axis="y", linestyle="--", alpha=0.4)
     if n_series > 1:
-        ax.legend(fontsize=8)
+        ax.legend(fontsize=_LEGEND_SIZE)
+    ax.set_ylim(0.0, high * (1.1 + layout.headroom))
 
 
 def render_run_variability(
@@ -259,10 +347,14 @@ def render_run_variability(
     dest = figures_dir("stability", output_dir=output_dir)
     path = dest / "run_variability.png"
 
-    fig, ax = plt.subplots(figsize=(max(8.0, len(label_order) * 1.2), 4.5))
-    _render_variability_subplot(ax, label_order, series, SOFT_METRIC)
+    value_texts = [f"{entry.mean:.3f}" for _, stats in series for entry in stats if entry]
+    layout = _plan_layout(label_order, value_texts, len(series))
 
-    fig.suptitle(f"Run-to-run variability ({reps} reps per spec)")
+    fig, ax = plt.subplots(figsize=layout.figsize)
+    _render_variability_subplot(ax, label_order, series, layout)
+
+    title = f"Run-to-run variability: {SOFT_METRIC.title} ({reps} reps per spec)"
+    ax.set_title(textwrap.fill(title, width=layout.title_wrap), fontsize=_TITLE_SIZE)
     fig.tight_layout()
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=_DPI)

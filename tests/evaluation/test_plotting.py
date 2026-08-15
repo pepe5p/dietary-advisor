@@ -180,6 +180,24 @@ def test_grouped_metric_stats_by_model_combines_efforts() -> None:
     assert stats[1].mean == pytest.approx(4.0)
 
 
+def test_grouped_metric_stats_by_model_sorts_descending() -> None:
+    records = [
+        _score_record(llm_model="openrouter:google/gemini-3.6-flash", mae_pct=4.0),
+        _score_record(llm_model="openrouter:openai/gpt-5.6-luna", mae_pct=12.0),
+    ]
+    stats = grouped_metric_stats(records, MAE_METRIC, BY_MODEL)
+    assert [group.label for group in stats] == ["gpt-5.6-luna", "gemini-3.6-flash"]
+
+
+def test_group_metric_stats_sorts_models_descending() -> None:
+    records = [
+        _score_record(llm_model="openrouter:google/gemini-3.6-flash", variant="totaller+reflective-loop", mae_pct=4.0),
+        _score_record(llm_model="openrouter:openai/gpt-5.6-luna", variant="totaller+reflective-loop", mae_pct=12.0),
+    ]
+    stats = group_metric_stats(records, MAE_METRIC)
+    assert [group.label for group in stats] == ["gpt-5.6-luna", "gemini-3.6-flash"]
+
+
 def test_grouped_metric_stats_by_effort_maps_and_orders_buckets() -> None:
     records = [
         _score_record(llm_model="openrouter:openai/gpt-5.6-luna#xhigh", mae_pct=6.0),
@@ -312,6 +330,22 @@ def test_pooled_variability_averages_all_specs() -> None:
     assert stats.label == POOLED_VARIABILITY_LABEL
     assert stats.n_specs == 2
     assert stats.mean == pytest.approx(0.4 / 3 / 2)
+
+
+def test_variability_by_judge_sorts_models_descending() -> None:
+    model_low = "openrouter:google/gemini-3.6-flash"
+    model_high = "openrouter:openai/gpt-5.6-luna"
+    groups = [
+        [_score_record(llm_model=model_low, soft=0.8) for _ in range(3)],
+        [_score_record(llm_model=model_high, soft=0.6 + 0.1 * rep) for rep in range(3)],
+    ]
+    label_order, _ = variability_by_judge({JUDGE_A.key: groups}, SOFT_METRIC)
+
+    assert label_order == [
+        _short_model_name(model_high),
+        _short_model_name(model_low),
+        POOLED_VARIABILITY_LABEL,
+    ]
 
 
 def test_variability_by_judge_appends_pooled_column() -> None:

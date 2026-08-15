@@ -1,6 +1,8 @@
 \chapter{Background and related work}
 \label{cha:background}
 
+The design defended in this thesis is a compromise between two research traditions that have each solved half of the dietary planning problem and neither of which has solved the other half. Operations research settled the arithmetic side of the problem in the 1940s and has been refining it ever since, producing diets that are provably optimal and frequently unappetising. Natural language processing has, much more recently, produced systems that understand what a person is asking for and can write a recipe they might enjoy, but that cannot be trusted to add up the recipe's contents. This chapter reviews both traditions and the machinery that has grown up between them: the failure modes that make an unaided language model unsuitable for this task, the tool-use and self-correction techniques that partially mitigate those failures, the food composition data any grounded system must build on, and the evaluation methods that make claims about such systems measurable. It closes with the recent dietary systems this work is most directly comparable to, and with the specific gap it sets out to fill.
+
 \section{Diet planning as a mathematical optimisation problem}
 \label{sec:background-diet-optimisation}
 

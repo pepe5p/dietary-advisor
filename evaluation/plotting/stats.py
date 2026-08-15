@@ -54,6 +54,8 @@ class Grouping:
     title: str
     label: Callable[[ScoreRecord], str]
     order: Callable[[set[str]], list[str]]
+    # Categories with no natural order (models) are ranked by the plotted mean.
+    sort_desc: bool = False
 
 
 class GroupStats(BaseModel):
@@ -202,6 +204,7 @@ def _default_grouping(records: list[ScoreRecord]) -> Grouping:
             title="",
             label=lambda record: _short_model_name(record.llm_model),
             order=lambda labels: _ordered(labels, preferred),
+            sort_desc=True,
         )
 
     pairs = sorted({(record.llm_model, record.variant) for record in records})
@@ -211,6 +214,7 @@ def _default_grouping(records: list[ScoreRecord]) -> Grouping:
         title="",
         label=lambda record: f"{_short_model_name(record.llm_model)} / {record.variant}",
         order=lambda labels: _ordered(labels, preferred),
+        sort_desc=True,
     )
 
 
@@ -219,6 +223,7 @@ BY_MODEL = Grouping(
     title="grouped by model",
     label=lambda record: _bare_short_model_name(record.llm_model),
     order=_bare_model_order,
+    sort_desc=True,
 )
 BY_EFFORT = Grouping(
     key="by_effort",
@@ -244,6 +249,8 @@ def grouped_metric_stats(records: list[ScoreRecord], metric: Metric, grouping: G
                 n=len(values),
             ),
         )
+    if grouping.sort_desc:
+        stats.sort(key=lambda group: group.mean, reverse=True)
     return stats
 
 
@@ -361,8 +368,13 @@ def variability_by_judge(
     if not per_judge:
         return [], []
 
-    label_order = [_short_model_name(model) for model in _model_order(all_models)]
-    label_order.append(POOLED_VARIABILITY_LABEL)
+    primary_key = next(iter(per_judge))
+    model_labels = [_short_model_name(model) for model in _model_order(all_models)]
+    model_labels.sort(
+        key=lambda label: per_judge[primary_key][label].mean if label in per_judge[primary_key] else 0.0,
+        reverse=True,
+    )
+    label_order = model_labels + [POOLED_VARIABILITY_LABEL]
     series: list[tuple[str, list[ModelVariability | None]]] = []
     for judge in all_judges():
         groups = groups_by_judge_key.get(judge.key)
