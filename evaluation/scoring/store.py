@@ -1,4 +1,4 @@
-"""JSON persistence for scored case-run results under ``output_dir/scores/``."""
+"""JSON persistence for scored case-run results, one directory per judge."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from evaluation.case_runner.grid import RunSpec
+from evaluation.judges import Judge
 from evaluation.persistence import artifact_path, is_present, load_json, resolve_output_dir, save_json
 from evaluation.validation.qualitative import QualitativeResult
 
@@ -28,21 +29,21 @@ class ScoreRecord(BaseModel):
     scored_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-def scores_dir(*, output_dir: Path | None = None) -> Path:
-    return resolve_output_dir(output_dir) / "scores"
+def scores_dir(*, judge: Judge, output_dir: Path | None = None) -> Path:
+    return resolve_output_dir(output_dir) / judge.scores_subdir
 
 
-def path_for(spec: RunSpec, *, output_dir: Path | None = None) -> Path:
-    return artifact_path(spec, output_dir=output_dir, subdir="scores")
+def path_for(spec: RunSpec, *, judge: Judge, output_dir: Path | None = None) -> Path:
+    return artifact_path(spec, output_dir=output_dir, subdir=judge.scores_subdir)
 
 
-def is_scored(spec: RunSpec, *, output_dir: Path | None = None) -> bool:
-    return is_present(path_for(spec, output_dir=output_dir))
+def is_scored(spec: RunSpec, *, judge: Judge, output_dir: Path | None = None) -> bool:
+    return is_present(path_for(spec, judge=judge, output_dir=output_dir))
 
 
-def save(spec: RunSpec, record: ScoreRecord, *, output_dir: Path | None = None) -> Path:
-    return save_json(path_for(spec, output_dir=output_dir), record)
+def save(spec: RunSpec, record: ScoreRecord, *, judge: Judge, output_dir: Path | None = None) -> Path:
+    return save_json(path_for(spec, judge=judge, output_dir=output_dir), record)
 
 
-def load(spec: RunSpec, *, output_dir: Path | None = None) -> ScoreRecord:
-    return load_json(path_for(spec, output_dir=output_dir), ScoreRecord)
+def load(spec: RunSpec, *, judge: Judge, output_dir: Path | None = None) -> ScoreRecord:
+    return load_json(path_for(spec, judge=judge, output_dir=output_dir), ScoreRecord)

@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 from dietary_advisor.config.llm import LlmSpec
 from evaluation.case_runner.grid import MINIMAL_SCENARIOS, MODEL_COMPARISON_MODELS, RunSpec, VARIANTS
+from evaluation.judges import all_judges
 from evaluation.scoring.store import ScoreRecord
 
 
@@ -17,6 +18,7 @@ class Metric:
     title: str
     ylabel: str
     value: Callable[[ScoreRecord], float]
+    judge_dependent: bool = False
 
     @property
     def filename(self) -> str:
@@ -50,12 +52,14 @@ METRICS: tuple[Metric, ...] = (
         "Soft preference aggregate",
         "Score",
         lambda record: record.qualitative.aggregate,
+        judge_dependent=True,
     ),
     Metric(
         "safety_adherence",
         "Safety adherence",
         "Score",
         lambda record: record.qualitative.safety_adherence,
+        judge_dependent=True,
     ),
     Metric("iterations", "Iterations", "Count", lambda record: float(record.iterations)),
     Metric("elapsed_s", "Elapsed time", "Seconds", lambda record: record.elapsed_s),
@@ -124,6 +128,39 @@ def group_metric_stats(records: list[ScoreRecord], metric: Metric) -> list[Group
             ),
         )
     return stats
+
+
+def primary_records(records_by_judge: dict[str, list[ScoreRecord]]) -> list[ScoreRecord]:
+    """Records of the first judge that has any, for metrics that do not depend on the judge."""
+    for judge in all_judges():
+        records = records_by_judge.get(judge.key)
+        if records:
+            return records
+    return []
+
+
+def group_metric_stats_by_judge(
+    records_by_judge: dict[str, list[ScoreRecord]],
+    metric: Metric,
+) -> list[tuple[str, list[GroupStats]]]:
+    """Per-judge group stats, every judge aligned to the first judge's group order."""
+    primary = primary_records(records_by_judge)
+    if not primary:
+        return []
+
+    label_order = [group.label for group in group_metric_stats(primary, metric)]
+    series: list[tuple[str, list[GroupStats]]] = []
+
+    for judge in all_judges():
+        records = records_by_judge.get(judge.key)
+        if not records:
+            continue
+        by_label = {group.label: group for group in group_metric_stats(records, metric)}
+        aligned = [by_label[label] for label in label_order if label in by_label]
+        if aligned:
+            series.append((judge.label, aligned))
+
+    return series
 
 
 def _short_scenario_name(scenario_id: str) -> str:

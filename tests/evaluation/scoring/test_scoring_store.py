@@ -7,8 +7,11 @@ from pathlib import Path
 from dietary_advisor.config.llm import LlmSpec
 from dietary_advisor.planning.pipeline import VariantConfig
 from evaluation.case_runner.grid import RunSpec
+from evaluation.judges import all_judges
 from evaluation.scoring.store import is_scored, load, path_for, save, ScoreRecord
 from evaluation.validation.qualitative import CriterionScore, QualitativeResult
+
+JUDGE_A, JUDGE_B = all_judges()[0], all_judges()[1]
 
 
 def test_path_for_uses_scores_subdir(tmp_path: Path) -> None:
@@ -17,9 +20,19 @@ def test_path_for_uses_scores_subdir(tmp_path: Path) -> None:
         variant=VariantConfig(),
         scenario_id="regular",
     )
-    path = path_for(spec, output_dir=tmp_path)
-    assert path.parent == tmp_path / "scores"
+    path = path_for(spec, judge=JUDGE_A, output_dir=tmp_path)
+    assert path.parent == tmp_path / JUDGE_A.scores_subdir
     assert path.name == "groq-llama-3.3-70b-versatile__totaller+reflective-loop__regular__rep0.json"
+
+
+def test_each_judge_gets_its_own_subdir(tmp_path: Path) -> None:
+    spec = RunSpec(
+        llm=LlmSpec(model="test-model"),
+        variant=VariantConfig(),
+        scenario_id="regular",
+    )
+    parents = {path_for(spec, judge=judge, output_dir=tmp_path).parent for judge in all_judges()}
+    assert len(parents) == len(all_judges())
 
 
 def test_save_load_round_trip(tmp_path: Path) -> None:
@@ -45,10 +58,11 @@ def test_save_load_round_trip(tmp_path: Path) -> None:
         iterations=1,
         elapsed_s=2.5,
     )
-    dest = save(spec=spec, record=record, output_dir=tmp_path)
+    dest = save(spec=spec, record=record, judge=JUDGE_A, output_dir=tmp_path)
     assert dest.is_file()
-    assert is_scored(spec=spec, output_dir=tmp_path)
+    assert is_scored(spec=spec, judge=JUDGE_A, output_dir=tmp_path)
+    assert not is_scored(spec=spec, judge=JUDGE_B, output_dir=tmp_path)
 
-    loaded = load(spec=spec, output_dir=tmp_path)
+    loaded = load(spec=spec, judge=JUDGE_A, output_dir=tmp_path)
     assert loaded.mae_pct == record.mae_pct
     assert loaded.qualitative.aggregate == record.qualitative.aggregate

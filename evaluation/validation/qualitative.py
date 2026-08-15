@@ -9,8 +9,8 @@ from pydantic_ai import Agent
 
 from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.agents.prompt_blocks import has_user_request
+from evaluation.judges import Judge
 from evaluation.scenarios import ALWAYS_SCORED_SOFT_CRITERIA, SoftCriterion
-from evaluation.settings import get_evaluation_settings
 
 _JUDGE_INTRO_WITH_QUERY = """You are a G-Eval judge for dietary meal-plan quality. You score how well a
 generated one-day meal plan satisfies *soft* session preferences from the user's
@@ -124,6 +124,7 @@ async def score_soft_preferences(
     *,
     allergens: Sequence[str] = (),
     diet_pattern: str = "omnivore",
+    judge: Judge,
 ) -> QualitativeResult:
     """Run a G-Eval judge call for soft criteria and allergen/diet safety.
 
@@ -132,11 +133,10 @@ async def score_soft_preferences(
     """
     composed = _compose_criteria(criteria)
     query_present = has_user_request(query)
-    settings = get_evaluation_settings()
-    judge = Agent(
-        settings.resolved_judge_model,
+    judge_agent = Agent(
+        judge.resolved_model,
         output_type=QualitativeResult,
-        system_prompt=judge_soft_preferences_system(has_user_query=query_present),
+        system_prompt=judge.system_prompt(has_user_query=query_present),
         retries=1,
     )
     prompt = _build_judge_prompt(
@@ -146,5 +146,5 @@ async def score_soft_preferences(
         allergens=allergens,
         diet_pattern=diet_pattern,
     )
-    res = await judge.run(prompt)
+    res = await judge_agent.run(prompt)
     return _normalize_soft_aggregate(res.output)

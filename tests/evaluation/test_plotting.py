@@ -9,11 +9,13 @@ import pytest
 from dietary_advisor.config.llm import LlmSpec
 from dietary_advisor.planning.pipeline import VariantConfig
 from evaluation.case_runner.grid import RunSpec
+from evaluation.judges import all_judges
 from evaluation.plotting.figures import render_experiment, render_run_variability
 from evaluation.plotting.stats import (
     _short_model_name,
     complete_spec_groups,
     group_metric_stats,
+    group_metric_stats_by_judge,
     METRICS,
     rep_spread_stats,
     scenario_spread_stats,
@@ -21,6 +23,8 @@ from evaluation.plotting.stats import (
 )
 from evaluation.scoring.store import ScoreRecord
 from evaluation.validation.qualitative import QualitativeResult
+
+JUDGE_A, JUDGE_B = all_judges()[0], all_judges()[1]
 
 
 def _score_record(
@@ -87,13 +91,33 @@ def test_group_metric_stats_orders_variants_by_grid_definition() -> None:
     ]
 
 
+def test_group_metric_stats_by_judge_aligns_labels() -> None:
+    records_j1 = [
+        _score_record(variant="baseline", soft=0.8),
+        _score_record(variant="totaller", soft=0.9),
+    ]
+    records_j2 = [
+        _score_record(variant="baseline", soft=0.6),
+        _score_record(variant="totaller", soft=0.7),
+    ]
+    series = group_metric_stats_by_judge(
+        {JUDGE_A.key: records_j1, JUDGE_B.key: records_j2},
+        METRICS[1],
+    )
+    assert len(series) == 2
+    assert [label for label, _ in series] == [JUDGE_A.label, JUDGE_B.label]
+    assert series[0][1][0].mean == pytest.approx(0.8)
+    assert series[1][1][0].mean == pytest.approx(0.6)
+
+
 def test_render_experiment_writes_one_png_per_metric(tmp_path: Path) -> None:
     variant = VariantConfig(totaller_enabled=False, reflection_enabled=False)
     records = [
         _score_record(variant=variant.label, scenario_id="regular", mae_pct=5.0),
         _score_record(variant=variant.label, scenario_id="vegetarian-allergic", mae_pct=7.0),
     ]
-    paths = render_experiment("ablation", records, output_dir=tmp_path)
+    records_by_judge = {JUDGE_A.key: records}
+    paths = render_experiment("ablation", records_by_judge, output_dir=tmp_path)
 
     png_paths = [path for path in paths if path.suffix == ".png"]
     assert len(png_paths) == len(METRICS)
@@ -166,11 +190,17 @@ def test_sem_for_reps_shrinks_with_sqrt_n() -> None:
 
 
 def test_render_run_variability_writes_png_and_pdf(tmp_path: Path) -> None:
-    groups = [
+    groups_j1 = [
         [_score_record(scenario_id="regular", mae_pct=5.0 + rep, soft=0.7 + 0.1 * rep) for rep in range(3)],
         [_score_record(scenario_id="diabetes-hypertension", mae_pct=3.0 + rep, soft=0.8) for rep in range(3)],
     ]
-    paths = render_run_variability(groups, output_dir=tmp_path)
+    groups_j2 = [
+        [_score_record(scenario_id="regular", mae_pct=5.0 + rep, soft=0.5 + 0.1 * rep) for rep in range(3)],
+    ]
+    paths = render_run_variability(
+        {JUDGE_A.key: groups_j1, JUDGE_B.key: groups_j2},
+        output_dir=tmp_path,
+    )
 
     png_path = tmp_path / "figures" / "stability" / "run_variability.png"
     assert paths[0] == png_path

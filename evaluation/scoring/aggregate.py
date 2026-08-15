@@ -22,10 +22,6 @@ class VariantSummary(BaseModel):
     n_safety_violations: int
 
 
-def _mean(values: list[float]) -> float:
-    return sum(values) / len(values) if values else 0.0
-
-
 def summarize(records: list[ScoreRecord]) -> list[VariantSummary]:
     groups: dict[tuple[str, str], list[ScoreRecord]] = {}
     for record in records:
@@ -49,3 +45,7 @@ def summarize(records: list[ScoreRecord]) -> list[VariantSummary]:
             ),
         )
     return summaries
+
+
+def _mean(values: list[float]) -> float:
+    return sum(values) / len(values) if values else 0.0

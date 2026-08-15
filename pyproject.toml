@@ -138,7 +138,6 @@ DEBUG = "True"
 SERVICE_NAME = "dietary-advisor"
 DA_LLM_MODEL = "test"
 DA_MEAL_IDEA_LLM_MODEL = "test"
-DA_JUDGE_MODEL = "test"
 # Overridden by the session fixture in tests/conftest.py with a real built DB.
 # The sentinel only surfaces if that fixture is bypassed, so a gap fails loudly
 # instead of silently falling back to the real .data/ artifacts.

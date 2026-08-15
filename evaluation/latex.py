@@ -13,7 +13,13 @@ from pathlib import Path
 from evaluation.case_runner.grid import experiment_runs, EXPERIMENTS
 from evaluation.case_runner.store import load as load_run
 from evaluation.case_runner.store import RunRecord
-from evaluation.plotting.stats import _bare_short_model_name, _short_model_name, _variant_order
+from evaluation.judges import all_judges
+from evaluation.plotting.stats import (
+    _bare_short_model_name,
+    _short_model_name,
+    _variant_order,
+    primary_records,
+)
 from evaluation.scoring.store import is_scored, ScoreRecord
 from evaluation.scoring.store import load as load_score
 
@@ -26,7 +32,6 @@ _MODEL_PRICING_USD_PER_1M: dict[str, tuple[float, float, float]] = {
     "gemini-3.6-flash": (0.75, 3.75, 0.075),
     "gemini-3.7-flash": (0.375, 1.875, 0.0375),
     "gpt-5.6-luna": (0.10, 0.60, 0.01),
-    "gpt-5.6-terra": (1.00, 6.00, 0.10),
 }
 
 
@@ -34,14 +39,19 @@ def _escape(text: str) -> str:
     return text.replace("_", r"\_").replace("%", r"\%").replace("&", r"\&").replace("#", r"\#")
 
 
-def _scored_records(experiment: str) -> list[ScoreRecord]:
+def _scored_records_by_judge(experiment: str) -> dict[str, list[ScoreRecord]]:
     specs = experiment_runs(experiment)
-    return [load_score(spec) for spec in specs if is_scored(spec)]
+    return {
+        judge.key: [load_score(spec, judge=judge) for spec in specs if is_scored(spec, judge=judge)]
+        for judge in all_judges()
+    }
 
 
 def _run_records(experiment: str) -> list[RunRecord]:
     specs = experiment_runs(experiment)
-    return [load_run(spec) for spec in specs if is_scored(spec)]
+    return [
+        load_run(spec) for spec in specs if any(is_scored(spec, judge=judge) for judge in all_judges())
+    ]
 
 
 def _group_by(records: list[ScoreRecord], key: str) -> dict[str, list[ScoreRecord]]:
@@ -51,55 +61,81 @@ def _group_by(records: list[ScoreRecord], key: str) -> dict[str, list[ScoreRecor
     return groups
 
 
-def variant_summary_table(records: list[ScoreRecord]) -> str:
-    """One row per ablation variant: error, preference and cost metrics, averaged over all runs."""
-    groups = _group_by(records, "variant")
-    order = _variant_order(set(groups))
+def _soft_by_key(records: list[ScoreRecord], key: str) -> dict[str, float]:
+    groups = _group_by(records, key)
+    return {label: statistics.fmean(r.qualitative.aggregate for r in group) for label, group in groups.items()}
 
+
+def _soft_columns(records_by_judge: dict[str, list[ScoreRecord]], key: str) -> list[tuple[str, dict[str, float]]]:
+    """One (header, per-group mean) column per registered judge, in registry order."""
+    return [
+        (rf"Soft agg.\ {_escape(judge.label)}", _soft_by_key(records_by_judge.get(judge.key, []), key))
+        for judge in all_judges()
+    ]
+
+
+def _soft_cells(columns: list[tuple[str, dict[str, float]]], group_key: str) -> list[str]:
+    cells = []
+    for _, means in columns:
+        value = means.get(group_key)
+        cells.append(f"{value:.3f}" if value is not None else "--")
+    return cells
+
+
+def variant_summary_table(records_by_judge: dict[str, list[ScoreRecord]]) -> str:
+    """One row per ablation variant: error, preference and cost metrics, averaged over all runs."""
+    groups = _group_by(primary_records(records_by_judge), "variant")
+    order = _variant_order(set(groups))
+    soft_columns = _soft_columns(records_by_judge, "variant")
+
+    headers = ["Variant", "$N$", r"MAE~[\%]", r"MSE~[\%]", *(head for head, _ in soft_columns)]
+    headers += ["Safety", "Iter.", r"Elapsed~[s]"]
     lines = [
-        r"\begin{tabular}{lrrrrrrr}",
+        rf"\begin{{tabular}}{{{'l' + 'r' * (len(headers) - 1)}}}",
         r"\toprule",
-        r"Variant & $N$ & MAE~[\%] & MSE~[\%] & Soft agg. & Safety & Iter. & Elapsed~[s] \\",
+        " & ".join(headers) + r" \\",
         r"\midrule",
     ]
     for label in order:
         group = groups[label]
-        n = len(group)
-        mae = statistics.fmean(r.mae_pct for r in group)
-        mse = statistics.fmean(r.mse_pct for r in group)
-        soft = statistics.fmean(r.qualitative.aggregate for r in group)
-        safety = statistics.fmean(r.qualitative.safety_adherence for r in group)
-        iterations = statistics.fmean(r.iterations for r in group)
-        elapsed = statistics.fmean(r.elapsed_s for r in group)
-        lines.append(
-            f"{_escape(label)} & {n} & {mae:.2f} & {mse:.2f} & {soft:.3f} & "
-            f"{safety:.3f} & {iterations:.2f} & {elapsed:.1f} \\\\",
-        )
+        cells = [
+            _escape(label),
+            str(len(group)),
+            f"{statistics.fmean(r.mae_pct for r in group):.2f}",
+            f"{statistics.fmean(r.mse_pct for r in group):.2f}",
+            *_soft_cells(soft_columns, label),
+            f"{statistics.fmean(r.qualitative.safety_adherence for r in group):.3f}",
+            f"{statistics.fmean(r.iterations for r in group):.2f}",
+            f"{statistics.fmean(r.elapsed_s for r in group):.1f}",
+        ]
+        lines.append(" & ".join(cells) + r" \\")
     lines += [r"\bottomrule", r"\end{tabular}"]
     return "\n".join(lines)
 
 
-def model_summary_table(records: list[ScoreRecord]) -> str:
+def model_summary_table(records_by_judge: dict[str, list[ScoreRecord]]) -> str:
     """One row per model under the full variant: error, preference and cost metrics."""
-    groups = _group_by(records, "llm_model")
+    groups = _group_by(primary_records(records_by_judge), "llm_model")
+    soft_columns = _soft_columns(records_by_judge, "llm_model")
 
+    headers = ["Model", "$N$", r"MAE~[\%]", *(head for head, _ in soft_columns), "Iter.", r"Elapsed~[s]"]
     lines = [
-        r"\begin{tabular}{lrrrrr}",
+        rf"\begin{{tabular}}{{{'l' + 'r' * (len(headers) - 1)}}}",
         r"\toprule",
-        r"Model & $N$ & MAE~[\%] & Soft agg. & Iter. & Elapsed~[s] \\",
+        " & ".join(headers) + r" \\",
         r"\midrule",
     ]
     for model in sorted(groups):
         group = groups[model]
-        n = len(group)
-        mae = statistics.fmean(r.mae_pct for r in group)
-        soft = statistics.fmean(r.qualitative.aggregate for r in group)
-        iterations = statistics.fmean(r.iterations for r in group)
-        elapsed = statistics.fmean(r.elapsed_s for r in group)
-        lines.append(
-            f"{_escape(_short_model_name(model))} & {n} & {mae:.2f} & "
-            f"{soft:.3f} & {iterations:.2f} & {elapsed:.1f} \\\\",
-        )
+        cells = [
+            _escape(_short_model_name(model)),
+            str(len(group)),
+            f"{statistics.fmean(r.mae_pct for r in group):.2f}",
+            *_soft_cells(soft_columns, model),
+            f"{statistics.fmean(r.iterations for r in group):.2f}",
+            f"{statistics.fmean(r.elapsed_s for r in group):.1f}",
+        ]
+        lines.append(" & ".join(cells) + r" \\")
     lines += [r"\bottomrule", r"\end{tabular}"]
     return "\n".join(lines)
 
@@ -199,11 +235,12 @@ def write_tables(*, tables_dir: Path | None = None) -> list[Path]:
     written: list[Path] = []
 
     if "ablation" in EXPERIMENTS:
-        ablation_scores = _scored_records("ablation")
-        if ablation_scores:
+        ablation_scores = _scored_records_by_judge("ablation")
+        ablation_primary = primary_records(ablation_scores)
+        if ablation_primary:
             for name, content in (
                 ("ablation_variant_summary.tex", variant_summary_table(ablation_scores)),
-                ("ablation_per_scenario_mae.tex", per_scenario_mae_table(ablation_scores)),
+                ("ablation_per_scenario_mae.tex", per_scenario_mae_table(ablation_primary)),
             ):
                 path = dest / name
                 path.write_text(content + "\n", encoding="utf-8")
@@ -216,8 +253,8 @@ def write_tables(*, tables_dir: Path | None = None) -> list[Path]:
                 written.append(path)
 
     if "models" in EXPERIMENTS:
-        model_scores = _scored_records("models")
-        if model_scores:
+        model_scores = _scored_records_by_judge("models")
+        if primary_records(model_scores):
             path = dest / "model_comparison_summary.tex"
             path.write_text(model_summary_table(model_scores) + "\n", encoding="utf-8")
             written.append(path)

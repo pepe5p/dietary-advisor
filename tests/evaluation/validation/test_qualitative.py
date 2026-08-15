@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from pydantic_ai.models.test import TestModel
 
+from evaluation.judges import all_judges
 from evaluation.scenarios import ALWAYS_SCORED_SOFT_CRITERIA, SoftCriterion
-from evaluation.settings import get_evaluation_settings
 from evaluation.validation.qualitative import (
     _build_judge_prompt,
     CriterionScore,
@@ -38,10 +38,9 @@ async def test_score_soft_preferences_with_test_model(monkeypatch: pytest.Monkey
         safety_adherence=1.0,
         safety_violations=[],
     )
-    monkeypatch.setitem(
-        get_evaluation_settings().__dict__,
-        "resolved_judge_model",
-        TestModel(custom_output_args=expected.model_dump()),
+    monkeypatch.setattr(
+        "evaluation.judges.resolve_judge_model",
+        lambda _model_id: TestModel(custom_output_args=expected.model_dump()),
     )
     result = await score_soft_preferences(
         plan,
@@ -49,6 +48,7 @@ async def test_score_soft_preferences_with_test_model(monkeypatch: pytest.Monkey
         criteria,
         allergens=["peanuts"],
         diet_pattern="vegetarian",
+        judge=all_judges()[0],
     )
     assert result is not None
     assert result.aggregate == pytest.approx(0.925)
@@ -73,10 +73,9 @@ async def test_score_soft_preferences_runs_safety_without_scenario_criteria(
         safety_adherence=0.0,
         safety_violations=["Lunch uses milk yogurt but profile is vegan"],
     )
-    monkeypatch.setitem(
-        get_evaluation_settings().__dict__,
-        "resolved_judge_model",
-        TestModel(custom_output_args=expected.model_dump()),
+    monkeypatch.setattr(
+        "evaluation.judges.resolve_judge_model",
+        lambda _model_id: TestModel(custom_output_args=expected.model_dump()),
     )
     result = await score_soft_preferences(
         plan,
@@ -84,6 +83,7 @@ async def test_score_soft_preferences_runs_safety_without_scenario_criteria(
         (),
         allergens=[],
         diet_pattern="vegan",
+        judge=all_judges()[0],
     )
     assert result is not None
     assert len(result.scores) == 1
@@ -110,3 +110,13 @@ def test_judge_system_prompt_omits_query_framing_when_absent() -> None:
     prompt = judge_soft_preferences_system(has_user_query=False)
     assert "session preferences from the user's query" not in prompt
     assert "supplied soft criteria" in prompt
+
+
+def test_registered_judges_share_prompt_and_differ_only_by_model() -> None:
+    judges = all_judges()
+    expected = judge_soft_preferences_system(has_user_query=True)
+
+    assert len(judges) > 1
+    assert all(judge.system_prompt(has_user_query=True) == expected for judge in judges)
+    assert len({judge.model_id for judge in judges}) == len(judges)
+    assert len({judge.scores_subdir for judge in judges}) == len(judges)

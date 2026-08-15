@@ -90,14 +90,15 @@ just build && just dc setup && just dc run_cases
 
 `docker-compose.yml` loads `.env` via `env_file`; all variables are read by
 `dietary_advisor.config.Settings`, plus setup-only knobs (source URLs, download
-caches, RAG chunking) in `setup.settings.SetupSettings` and the evaluation
-judge model in `evaluation.settings.EvaluationSettings` - both extend the
-shared `Settings`.
+caches, RAG chunking) in `setup.settings.SetupSettings`; evaluation output paths live in
+`evaluation.settings.EvaluationSettings` — both extend the shared `Settings`.
 
-`DA_LLM_MODEL`/`DA_JUDGE_MODEL`/`DA_MEAL_IDEA_LLM_MODEL` are `pydantic-ai` model identifiers
+`DA_LLM_MODEL`/`DA_MEAL_IDEA_LLM_MODEL` are `pydantic-ai` model identifiers
 (`openai:gpt-4o-mini`, `anthropic:claude-3-5-sonnet-latest`, `groq:llama-3.3-70b-versatile`,
 ...). The meal-idea brainstorm runs on `DA_MEAL_IDEA_LLM_MODEL` independently of
-`DA_LLM_MODEL` (and of the model the ablation harness sweeps).
+`DA_LLM_MODEL` (and of the model the ablation harness sweeps). Soft-preference scoring
+uses two fixed judges (see `evaluation/judges.py`) with the same rubric; results land
+in `outputs/scores_judge_1/` and `outputs/scores_judge_2/`.
 
 `DA_LLM_MODEL` may carry a `#<effort>` suffix (`minimal`/`low`/`medium`/`high`/`xhigh`,
 e.g. `openrouter:openai/gpt-5.6-luna#high`) to request a non-default reasoning

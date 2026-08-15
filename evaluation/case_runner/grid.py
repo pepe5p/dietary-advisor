@@ -18,19 +18,26 @@ VARIANTS = [
     FULL_VARIANT,
 ]
 
-ABLATION_MODELS = [LlmSpec(model="openrouter:openai/gpt-5.6-luna")]
+ABLATION_MODELS = [
+    LlmSpec(model="openrouter:openai/gpt-5.6-luna"),
+]
+
 MODEL_COMPARISON_MODELS = [
+    # gemini-3.5-flash-lite
     LlmSpec(model="openrouter:google/gemini-3.5-flash-lite"),  # default reasoning is "minimal"
     LlmSpec(model="openrouter:google/gemini-3.5-flash-lite", reasoning="medium"),
     LlmSpec(model="openrouter:google/gemini-3.5-flash-lite", reasoning="high"),
+    # gemini-3.6-flash
     LlmSpec(model="openrouter:google/gemini-3.6-flash", reasoning="low"),
-    LlmSpec(model="openrouter:google/gemini-3.6-flash"),  # default reasoning is "medium"
+    LlmSpec(model="openrouter:google/gemini-3.6-flash"),
     LlmSpec(model="openrouter:google/gemini-3.6-flash", reasoning="high"),
+    # gemini-3.7-flash
     LlmSpec(model="openrouter:google/gemini-3.7-flash", reasoning="low"),
     LlmSpec(model="openrouter:google/gemini-3.7-flash", reasoning="medium"),
     LlmSpec(model="openrouter:google/gemini-3.7-flash", reasoning="high"),
+    # gpt-5.6-luna
     LlmSpec(model="openrouter:openai/gpt-5.6-luna", reasoning="low"),
-    LlmSpec(model="openrouter:openai/gpt-5.6-luna"),  # default reasoning is "medium"
+    LlmSpec(model="openrouter:openai/gpt-5.6-luna"),
     LlmSpec(model="openrouter:openai/gpt-5.6-luna", reasoning="xhigh"),
 ]
 
