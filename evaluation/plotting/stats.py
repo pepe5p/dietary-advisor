@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import statistics
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -7,9 +8,24 @@ from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict
 
 from dietary_advisor.config.llm import LlmSpec
-from evaluation.case_runner.grid import MODEL_COMPARISON_MODELS, RunSpec, VARIANTS
+from dietary_advisor.planning.pipeline import VariantConfig
+from evaluation.case_runner.grid import DEFAULT_EFFORT, MODEL_COMPARISON_MODELS, RunSpec, VARIANTS
 from evaluation.judges import all_judges
 from evaluation.scoring.store import ScoreRecord
+
+_REFLECTION_LABELS = {
+    VariantConfig(totaller_enabled=totaller, rag_enabled=rag, reflection_enabled=True).label
+    for totaller in (False, True)
+    for rag in (False, True)
+}
+_EFFORT_BUCKETS = ("low", "medium", "high")
+_EFFORT_TO_BUCKET = {
+    "minimal": "low",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "xhigh": "high",
+}
 
 
 @dataclass(frozen=True)
@@ -19,10 +35,25 @@ class Metric:
     ylabel: str
     value: Callable[[ScoreRecord], float]
     judge_dependent: bool = False
+    # Soft scores cluster near 0.8; a zero-based axis hides between-group differences.
+    zoom_ylim: bool = False
+    applies_to: Callable[[ScoreRecord], bool] | None = None
+    # Every metric here is a non-negative quantity, so error bars are clamped
+    # at this value rather than implying impossible readings.
+    floor: float | None = 0.0
+    decimals: int = 2
 
     @property
     def filename(self) -> str:
         return f"{self.key}.png"
+
+
+@dataclass(frozen=True)
+class Grouping:
+    key: str
+    title: str
+    label: Callable[[ScoreRecord], str]
+    order: Callable[[set[str]], list[str]]
 
 
 class GroupStats(BaseModel):
@@ -32,6 +63,10 @@ class GroupStats(BaseModel):
     mean: float
     std: float
     n: int
+
+    @property
+    def sem(self) -> float:
+        return self.std / math.sqrt(self.n) if self.n > 1 else 0.0
 
 
 class ModelVariability(BaseModel):
@@ -45,24 +80,49 @@ class ModelVariability(BaseModel):
 SPREAD_COLUMN_LABEL = "Spread (mean |run - spec mean|)"
 POOLED_VARIABILITY_LABEL = "all"
 
+
+def _has_reflection(record: ScoreRecord) -> bool:
+    return record.variant in _REFLECTION_LABELS
+
+
+MAE_METRIC = Metric("mae_pct", "Macro MAE %", "MAE %", lambda record: record.mae_pct)
+SOFT_METRIC = Metric(
+    "soft_aggregate",
+    "Soft preference aggregate",
+    "Score",
+    lambda record: record.qualitative.aggregate,
+    judge_dependent=True,
+    zoom_ylim=True,
+    decimals=3,
+)
+SAFETY_METRIC = Metric(
+    "safety_adherence",
+    "Safety adherence",
+    "Score",
+    lambda record: record.qualitative.safety_adherence,
+    judge_dependent=True,
+)
+ITERATIONS_METRIC = Metric(
+    "iterations",
+    "Iterations",
+    "Count",
+    lambda record: float(record.iterations),
+    applies_to=_has_reflection,
+)
+ELAPSED_METRIC = Metric("elapsed_s", "Elapsed time", "Seconds", lambda record: record.elapsed_s)
+
 METRICS: tuple[Metric, ...] = (
-    Metric("mae_pct", "Macro MAE %", "MAE %", lambda record: record.mae_pct),
-    Metric(
-        "soft_aggregate",
-        "Soft preference aggregate",
-        "Score",
-        lambda record: record.qualitative.aggregate,
-        judge_dependent=True,
-    ),
-    Metric(
-        "safety_adherence",
-        "Safety adherence",
-        "Score",
-        lambda record: record.qualitative.safety_adherence,
-        judge_dependent=True,
-    ),
-    Metric("iterations", "Iterations", "Count", lambda record: float(record.iterations)),
-    Metric("elapsed_s", "Elapsed time", "Seconds", lambda record: record.elapsed_s),
+    MAE_METRIC,
+    SOFT_METRIC,
+    SAFETY_METRIC,
+    ITERATIONS_METRIC,
+    ELAPSED_METRIC,
+)
+PLOT_METRICS: tuple[Metric, ...] = (
+    MAE_METRIC,
+    SOFT_METRIC,
+    ITERATIONS_METRIC,
+    ELAPSED_METRIC,
 )
 
 
@@ -78,15 +138,46 @@ def _bare_short_model_name(model: str) -> str:
     return LlmSpec.parse(model).model.rsplit("/", 1)[-1]
 
 
+def _ordered(labels: set[str], preferred: list[str]) -> list[str]:
+    ordered = [label for label in preferred if label in labels]
+    return ordered + sorted(labels - set(ordered))
+
+
 def _variant_order(variants: set[str]) -> list[str]:
-    preferred = [variant.label for variant in VARIANTS]
-    ordered = [label for label in preferred if label in variants]
-    return ordered + sorted(variants - set(ordered))
+    return _ordered(variants, [variant.label for variant in VARIANTS])
 
 
 def _model_order(models: set[str]) -> list[str]:
-    ordered = [str(spec) for spec in MODEL_COMPARISON_MODELS if str(spec) in models]
-    return ordered + sorted(models - set(ordered))
+    return _ordered(models, [str(spec) for spec in MODEL_COMPARISON_MODELS])
+
+
+def _bare_model_order(labels: set[str]) -> list[str]:
+    preferred: list[str] = []
+    seen: set[str] = set()
+    for spec in MODEL_COMPARISON_MODELS:
+        name = spec.model.rsplit("/", 1)[-1]
+        if name not in seen:
+            seen.add(name)
+            preferred.append(name)
+    return _ordered(labels, preferred)
+
+
+def _resolved_effort(model: str) -> str:
+    spec = LlmSpec.parse(model)
+    if spec.reasoning is not None:
+        return spec.reasoning
+    try:
+        return DEFAULT_EFFORT[spec.model]
+    except KeyError:
+        raise KeyError(f"No default effort for {spec.model}") from None
+
+
+def _effort_bucket(model: str) -> str:
+    effort = _resolved_effort(model)
+    try:
+        return _EFFORT_TO_BUCKET[effort]
+    except KeyError:
+        raise ValueError(f"Unknown effort {effort!r} for {model}") from None
 
 
 def _group_records(records: list[ScoreRecord]) -> dict[tuple[str, str], list[ScoreRecord]]:
@@ -97,28 +188,54 @@ def _group_records(records: list[ScoreRecord]) -> dict[tuple[str, str], list[Sco
     return groups
 
 
-def group_metric_stats(records: list[ScoreRecord], metric: Metric) -> list[GroupStats]:
-    groups = _group_records(records)
-    models = {model for model, _ in groups}
-    variants = {variant for _, variant in groups}
+def _default_grouping(records: list[ScoreRecord]) -> Grouping:
+    models = {record.llm_model for record in records}
+    variants = {record.variant for record in records}
 
     if len(models) == 1:
-        model = next(iter(models))
-        ordered_variants = _variant_order(variants)
-        keys = [(model, variant) for variant in ordered_variants]
-        labels = ordered_variants
-    elif len(variants) == 1:
-        variant = next(iter(variants))
-        ordered_models = _model_order(models)
-        keys = [(model, variant) for model in ordered_models]
-        labels = [_short_model_name(model) for model in ordered_models]
-    else:
-        keys = sorted(groups)
-        labels = [f"{_short_model_name(model)} / {variant}" for model, variant in keys]
+        return Grouping(key="", title="", label=lambda record: record.variant, order=_variant_order)
+
+    if len(variants) == 1:
+        preferred = [_short_model_name(model) for model in _model_order(models)]
+        return Grouping(
+            key="",
+            title="",
+            label=lambda record: _short_model_name(record.llm_model),
+            order=lambda labels: _ordered(labels, preferred),
+        )
+
+    pairs = sorted({(record.llm_model, record.variant) for record in records})
+    preferred = [f"{_short_model_name(model)} / {variant}" for model, variant in pairs]
+    return Grouping(
+        key="",
+        title="",
+        label=lambda record: f"{_short_model_name(record.llm_model)} / {record.variant}",
+        order=lambda labels: _ordered(labels, preferred),
+    )
+
+
+BY_MODEL = Grouping(
+    key="by_model",
+    title="grouped by model",
+    label=lambda record: _bare_short_model_name(record.llm_model),
+    order=_bare_model_order,
+)
+BY_EFFORT = Grouping(
+    key="by_effort",
+    title="grouped by effort",
+    label=lambda record: _effort_bucket(record.llm_model),
+    order=lambda labels: _ordered(labels, list(_EFFORT_BUCKETS)),
+)
+
+
+def grouped_metric_stats(records: list[ScoreRecord], metric: Metric, grouping: Grouping) -> list[GroupStats]:
+    buckets: dict[str, list[ScoreRecord]] = {}
+    for record in records:
+        buckets.setdefault(grouping.label(record), []).append(record)
 
     stats: list[GroupStats] = []
-    for label, key in zip(labels, keys, strict=True):
-        values = [metric.value(record) for record in groups[key]]
+    for label in grouping.order(set(buckets)):
+        values = [metric.value(record) for record in buckets[label]]
         stats.append(
             GroupStats(
                 label=label,
@@ -128,6 +245,10 @@ def group_metric_stats(records: list[ScoreRecord], metric: Metric) -> list[Group
             ),
         )
     return stats
+
+
+def group_metric_stats(records: list[ScoreRecord], metric: Metric) -> list[GroupStats]:
+    return grouped_metric_stats(records, metric, _default_grouping(records))
 
 
 def primary_records(records_by_judge: dict[str, list[ScoreRecord]]) -> list[ScoreRecord]:
@@ -142,20 +263,22 @@ def primary_records(records_by_judge: dict[str, list[ScoreRecord]]) -> list[Scor
 def group_metric_stats_by_judge(
     records_by_judge: dict[str, list[ScoreRecord]],
     metric: Metric,
+    grouping: Grouping | None = None,
 ) -> list[tuple[str, list[GroupStats]]]:
     """Per-judge group stats, every judge aligned to the first judge's group order."""
     primary = primary_records(records_by_judge)
     if not primary:
         return []
 
-    label_order = [group.label for group in group_metric_stats(primary, metric)]
+    grouping = grouping or _default_grouping(primary)
+    label_order = [group.label for group in grouped_metric_stats(primary, metric, grouping)]
     series: list[tuple[str, list[GroupStats]]] = []
 
     for judge in all_judges():
         records = records_by_judge.get(judge.key)
         if not records:
             continue
-        by_label = {group.label: group for group in group_metric_stats(records, metric)}
+        by_label = {group.label: group for group in grouped_metric_stats(records, metric, grouping)}
         aligned = [by_label[label] for label in label_order if label in by_label]
         if aligned:
             series.append((judge.label, aligned))

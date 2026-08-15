@@ -186,10 +186,10 @@ def _plot_run_variability() -> bool:
     from evaluation.judges import all_judges
     from evaluation.plotting import (
         complete_spec_groups,
-        METRICS,
         model_variability,
         pooled_variability,
         render_run_variability,
+        SOFT_METRIC,
         SPREAD_COLUMN_LABEL,
     )
     from evaluation.scoring import is_scored, load
@@ -207,7 +207,7 @@ def _plot_run_variability() -> bool:
         console.print("[yellow]No run specs with all three repetitions scored.[/yellow]")
         return False
 
-    soft_metric = METRICS[1]
+    soft_metric = SOFT_METRIC
     soft_by_judge = {judge.key: model_variability(groups, soft_metric) for judge, groups in scored}
     soft_by_label = {judge.key: {entry.label: entry for entry in soft_by_judge[judge.key]} for judge, _ in scored}
 

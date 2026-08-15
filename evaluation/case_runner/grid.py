@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from pydantic_ai.settings import ThinkingEffort
+
 from dietary_advisor.config.llm import LlmSpec
 from dietary_advisor.planning.pipeline import VariantConfig
 from evaluation.scenarios import SCENARIOS
@@ -40,6 +42,13 @@ MODEL_COMPARISON_MODELS = [
     LlmSpec(model="openrouter:openai/gpt-5.6-luna"),
     LlmSpec(model="openrouter:openai/gpt-5.6-luna", reasoning="xhigh"),
 ]
+
+# Effort the provider applies when a spec sets no explicit reasoning effort.
+DEFAULT_EFFORT: dict[str, ThinkingEffort] = {
+    "openrouter:google/gemini-3.5-flash-lite": "minimal",
+    "openrouter:google/gemini-3.6-flash": "medium",
+    "openrouter:openai/gpt-5.6-luna": "medium",
+}
 
 
 MINIMAL_SCENARIOS = [
