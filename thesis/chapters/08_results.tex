@@ -25,7 +25,7 @@ Every plan was scored by both judges of \Cref{sec:methodology-qualitative}, thre
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\textwidth]{../outputs/figures/ablation/mae_pct.pdf}
+    \includegraphics[width=\textwidth]{images/generated/ablation/mae_pct.pdf}
     \caption{Macronutrient MAE by ablation variant, with error bars showing the standard error of the mean across the 15 runs per variant.}
     \label{fig:results-ablation-mae}
 \end{figure}
@@ -36,7 +36,7 @@ The picture from the qualitative side is far less dramatic, and \Cref{fig:result
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\textwidth]{../outputs/figures/ablation/soft_aggregate.pdf}
+    \includegraphics[width=\textwidth]{images/generated/ablation/soft_aggregate.pdf}
     \caption{Soft-preference aggregate by ablation variant, scored independently by both judges. The variants are hard to separate; the two judges are not.}
     \label{fig:results-ablation-soft}
 \end{figure}
@@ -66,7 +66,7 @@ The picture from the qualitative side is far less dramatic, and \Cref{fig:result
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\textwidth]{../outputs/figures/models/mae_pct.pdf}
+    \includegraphics[width=\textwidth]{images/generated/models/mae_pct.pdf}
     \caption{Macronutrient MAE for each of the twelve model-and-effort configurations under the full variant.}
     \label{fig:results-models-mae}
 \end{figure}
@@ -75,7 +75,7 @@ Collapsing the effort levels, as \Cref{fig:results-models-by-model} does, gives 
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\textwidth]{../outputs/figures/models/mae_pct_by_model.pdf}
+    \includegraphics[width=\textwidth]{images/generated/models/mae_pct_by_model.pdf}
     \caption{Macronutrient MAE aggregated over the three effort levels of each base model.}
     \label{fig:results-models-by-model}
 \end{figure}
@@ -89,7 +89,7 @@ Pooling the twelve configurations into three effort buckets produces the cleanes
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\textwidth]{../outputs/figures/models/mae_pct_by_effort.pdf}
+    \includegraphics[width=\textwidth]{images/generated/models/mae_pct_by_effort.pdf}
     \caption{Macronutrient MAE aggregated by reasoning-effort bucket across all four base models.}
     \label{fig:results-effort-mae}
 \end{figure}
@@ -100,7 +100,7 @@ What effort reliably does buy is time. \Cref{fig:results-effort-elapsed} shows m
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\textwidth]{../outputs/figures/models/elapsed_s_by_effort.pdf}
+    \includegraphics[width=\textwidth]{images/generated/models/elapsed_s_by_effort.pdf}
     \caption{Wall-clock time per run by reasoning-effort bucket. Unlike accuracy, latency responds to effort reliably.}
     \label{fig:results-effort-elapsed}
 \end{figure}
@@ -112,7 +112,7 @@ The two mechanisms under ablation are not free, and \Cref{fig:results-ablation-e
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\textwidth]{../outputs/figures/ablation/elapsed_s.pdf}
+    \includegraphics[width=\textwidth]{images/generated/ablation/elapsed_s.pdf}
     \caption{Wall-clock time per run by ablation variant. The totaller is inexpensive; reflection is not.}
     \label{fig:results-ablation-elapsed}
 \end{figure}
@@ -121,7 +121,7 @@ The two mechanisms under ablation are not free, and \Cref{fig:results-ablation-e
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\textwidth]{../outputs/figures/ablation/iterations.pdf}
+    \includegraphics[width=\textwidth]{images/generated/ablation/iterations.pdf}
     \caption{Mean refinement passes per run. Only the two reflection-enabled variants can be nonzero.}
     \label{fig:results-ablation-iterations}
 \end{figure}
@@ -133,7 +133,7 @@ Every mean in this chapter is an average over three repetitions of a nondetermin
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\textwidth]{../outputs/figures/stability/run_variability.pdf}
+    \includegraphics[width=\textwidth]{images/generated/stability/run_variability.pdf}
     \caption{Run-to-run variability of the soft-preference aggregate: mean absolute deviation across the three repetitions of each configuration, per model and pooled, for both judges.}
     \label{fig:results-stability}
 \end{figure}
