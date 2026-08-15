@@ -97,8 +97,9 @@ caches, RAG chunking) in `setup.settings.SetupSettings`; evaluation output paths
 (`openai:gpt-4o-mini`, `anthropic:claude-3-5-sonnet-latest`, `groq:llama-3.3-70b-versatile`,
 ...). The meal-idea brainstorm runs on `DA_MEAL_IDEA_LLM_MODEL` independently of
 `DA_LLM_MODEL` (and of the model the ablation harness sweeps). Soft-preference scoring
-uses two fixed judges (see `evaluation/judges.py`) with the same rubric; results land
-in `outputs/scores_judge_1/` and `outputs/scores_judge_2/`.
+uses two fixed judges (see `evaluation/judges.py`) with the same rubric; each judge scores every run
+`JUDGE_REPS` times into `outputs/scores_judge_N/{spec_key}__jrep{n}.json`, and all reporting uses the
+mean verdict across those repetitions.
 
 `DA_LLM_MODEL` may carry a `#<effort>` suffix (`minimal`/`low`/`medium`/`high`/`xhigh`,
 e.g. `openrouter:openai/gpt-5.6-luna#high`) to request a non-default reasoning

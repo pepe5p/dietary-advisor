@@ -59,9 +59,9 @@ def evaluate(
     """Score stored case-run records and print a per-variant summary."""
     _configure_logging(verbose)
     from evaluation.case_runner import is_done, planned_runs
-    from evaluation.judges import all_judges
+    from evaluation.judges import all_judges, JUDGE_REPS
     from evaluation.plotting import primary_records
-    from evaluation.scoring import is_scored, load, score_runs, summarize
+    from evaluation.scoring import is_scored, load, score_runs, scored_reps, summarize
 
     specs = planned_runs()
     stored = sum(1 for s in specs if is_done(s))
@@ -75,11 +75,13 @@ def evaluate(
 
     any_to_score = False
     for judge in all_judges():
-        already_scored = sum(1 for s in specs if is_done(s) and is_scored(s, judge=judge))
-        to_score = stored - already_scored if not force else stored
+        done_specs = [s for s in specs if is_done(s)]
+        already = sum(len(scored_reps(s, judge=judge)) for s in done_specs)
+        total_verdicts = len(done_specs) * JUDGE_REPS
+        to_score = total_verdicts - already if not force else total_verdicts
         console.print(
             f"[bold]{judge.key}[/bold] ({judge.model_id}): "
-            f"[cyan]{already_scored}[/cyan] already scored, "
+            f"[cyan]{already}[/cyan] / {total_verdicts} verdicts scored, "
             f"[cyan]{to_score}[/cyan] to score."
         )
         if to_score > 0 or force:
@@ -93,7 +95,7 @@ def evaluate(
                 f"[bold]{judge.key}[/bold]: "
                 f"[green]Succeeded[/green] {summary.succeeded} / "
                 f"[red]failed[/red] {summary.failed} "
-                f"(of {summary.attempted} attempted; {summary.already_scored} were already scored)."
+                f"(of {summary.attempted} verdicts attempted; {summary.already_scored} were already scored)."
             )
         if any(s.failed for s in summaries.values()):
             raise typer.Exit(code=1)
@@ -129,14 +131,14 @@ def evaluate(
         key = (row.llm_model, row.variant)
         judge_cells: list[str] = []
         for judge in all_judges():
-            summary = summaries_by_judge[judge.key].get(key)
+            judge_row = summaries_by_judge[judge.key].get(key)
             judge_cells += (
                 [
-                    f"{summary.soft_aggregate:.4f}",
-                    f"{summary.safety_adherence:.4f}",
-                    str(summary.n_safety_violations),
+                    f"{judge_row.soft_aggregate:.4f}",
+                    f"{judge_row.safety_adherence:.4f}",
+                    str(judge_row.n_safety_violations),
                 ]
-                if summary
+                if judge_row
                 else ["--", "--", "--"]
             )
         table.add_row(
@@ -160,8 +162,7 @@ def _plot_experiment(experiment: str) -> bool:
 
     specs = experiment_runs(experiment)
     records_by_judge = {
-        judge.key: [load(spec, judge=judge) for spec in specs if is_scored(spec, judge=judge)]
-        for judge in all_judges()
+        judge.key: [load(spec, judge=judge) for spec in specs if is_scored(spec, judge=judge)] for judge in all_judges()
     }
 
     scored_per_judge = ", ".join(f"{judge.key} {len(records_by_judge[judge.key])}" for judge in all_judges())
@@ -186,9 +187,10 @@ def _plot_run_variability() -> bool:
     from evaluation.plotting import (
         complete_spec_groups,
         METRICS,
+        model_variability,
+        pooled_variability,
         render_run_variability,
-        scenario_spread_stats,
-        sem_for_reps,
+        SPREAD_COLUMN_LABEL,
     )
     from evaluation.scoring import is_scored, load
 
@@ -205,48 +207,35 @@ def _plot_run_variability() -> bool:
         console.print("[yellow]No run specs with all three repetitions scored.[/yellow]")
         return False
 
-    primary_judge, primary_groups = scored[0]
-    mae_stats = scenario_spread_stats(primary_groups, METRICS[0])
-    soft_stats_by_judge = {judge.key: scenario_spread_stats(groups, METRICS[1]) for judge, groups in scored}
+    soft_metric = METRICS[1]
+    soft_by_judge = {judge.key: model_variability(groups, soft_metric) for judge, groups in scored}
+    soft_by_label = {judge.key: {entry.label: entry for entry in soft_by_judge[judge.key]} for judge, _ in scored}
 
-    console.print(
-        f"Run variability: [bold]{len(primary_groups)}[/bold] complete specs ({primary_judge.label})."
-    )
-    table = Table(title="Run variability by scenario")
-    table.add_column("Scenario")
-    table.add_column("Specs", justify="right")
-    table.add_column("MAE mean", justify="right")
-    table.add_column("MAE pooled std", justify="right")
-    table.add_column("MAE SEM@3", justify="right")
+    completeness = ", ".join(f"{judge.label} {len(groups)}" for judge, groups in scored)
+    console.print(f"Run variability: complete specs per judge: [bold]{completeness}[/bold].")
+
+    table = Table(title=f"{soft_metric.title} run spread by model -- {SPREAD_COLUMN_LABEL}")
+    table.add_column("Model", no_wrap=True)
     for judge, _ in scored:
-        table.add_column(f"Soft {judge.label} mean", justify="right")
-        table.add_column(f"Soft {judge.label} pooled std", justify="right")
-        table.add_column(f"Soft {judge.label} SEM@3", justify="right")
+        table.add_column(f"Specs ({judge.label})", justify="right")
+        table.add_column(f"Spread ({judge.label})", justify="right")
 
-    soft_by_label = {
-        judge.key: {entry.label: entry for entry in soft_stats_by_judge[judge.key]} for judge, _ in scored
-    }
-    for mae in mae_stats:
-        soft_cells: list[str] = []
+    seen: list[str] = []
+    for judge, _ in scored:
+        seen += [label for label in soft_by_label[judge.key] if label not in seen]
+
+    for label in seen:
+        cells: list[str] = []
         for judge, _ in scored:
-            soft = soft_by_label[judge.key].get(mae.label)
-            soft_cells += (
-                [
-                    f"{soft.grand_mean:.3f}",
-                    f"{soft.pooled_std:.3f}",
-                    f"{sem_for_reps(soft.pooled_std, 3):.3f}",
-                ]
-                if soft
-                else ["--", "--", "--"]
-            )
-        table.add_row(
-            mae.label,
-            str(mae.n_specs),
-            f"{mae.grand_mean:.2f}",
-            f"{mae.pooled_std:.2f}",
-            f"{sem_for_reps(mae.pooled_std, 3):.2f}",
-            *soft_cells,
-        )
+            entry = soft_by_label[judge.key].get(label)
+            cells += [str(entry.n_specs), f"{entry.mean:.3f}"] if entry else ["--", "--"]
+        table.add_row(label, *cells)
+
+    pooled_cells: list[str] = []
+    for _, groups in scored:
+        pooled = pooled_variability(groups, soft_metric)
+        pooled_cells += [str(pooled.n_specs), f"{pooled.mean:.3f}"]
+    table.add_row("all", *pooled_cells)
     console.print(table)
 
     paths = render_run_variability(groups_by_judge)

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict
 
 from dietary_advisor.config.llm import LlmSpec
-from evaluation.case_runner.grid import MINIMAL_SCENARIOS, MODEL_COMPARISON_MODELS, RunSpec, VARIANTS
+from evaluation.case_runner.grid import MODEL_COMPARISON_MODELS, RunSpec, VARIANTS
 from evaluation.judges import all_judges
 from evaluation.scoring.store import ScoreRecord
 
@@ -34,16 +34,16 @@ class GroupStats(BaseModel):
     n: int
 
 
-class SpreadStats(BaseModel):
+class ModelVariability(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     label: str
+    mean: float
     n_specs: int
-    grand_mean: float
-    deviations: list[float]
-    per_spec_std: list[float]
-    pooled_std: float
 
+
+SPREAD_COLUMN_LABEL = "Spread (sum |run - mean|)"
+POOLED_VARIABILITY_LABEL = "all"
 
 METRICS: tuple[Metric, ...] = (
     Metric("mae_pct", "Macro MAE %", "MAE %", lambda record: record.mae_pct),
@@ -163,16 +163,6 @@ def group_metric_stats_by_judge(
     return series
 
 
-def _short_scenario_name(scenario_id: str) -> str:
-    parts = scenario_id.split("-")
-    return "-".join(parts[:2])
-
-
-def _scenario_order(scenarios: set[str]) -> list[str]:
-    ordered = [scenario for scenario in MINIMAL_SCENARIOS if scenario in scenarios]
-    return ordered + sorted(scenarios - set(ordered))
-
-
 def complete_spec_groups(
     pairs: list[tuple[RunSpec, ScoreRecord]],
     *,
@@ -191,51 +181,73 @@ def complete_spec_groups(
     return result
 
 
-def rep_spread_stats(
-    groups: list[list[ScoreRecord]],
-    metric: Metric,
-    *,
-    label: str,
-) -> SpreadStats:
-    per_spec_std: list[float] = []
-    deviations: list[float] = []
-    spec_means: list[float] = []
+def relative_spread(values: list[float]) -> float:
+    mean = statistics.fmean(values)
+    return sum(abs(value - mean) for value in values)
 
+
+def model_variability(groups: list[list[ScoreRecord]], metric: Metric) -> list[ModelVariability]:
+    by_model: dict[str, list[float]] = {}
     for group in groups:
-        values = [metric.value(record) for record in group]
-        mean = statistics.fmean(values)
-        spec_means.append(mean)
-        std = statistics.stdev(values) if len(values) > 1 else 0.0
-        per_spec_std.append(std)
-        deviations.extend(value - mean for value in values)
+        spread = relative_spread([metric.value(record) for record in group])
+        model = group[0].llm_model
+        by_model.setdefault(model, []).append(spread)
 
-    pooled_std = statistics.fmean([std**2 for std in per_spec_std]) ** 0.5 if per_spec_std else 0.0
-    return SpreadStats(
-        label=label,
-        n_specs=len(groups),
-        grand_mean=statistics.fmean(spec_means) if spec_means else 0.0,
-        deviations=deviations,
-        per_spec_std=per_spec_std,
-        pooled_std=pooled_std,
-    )
-
-
-def scenario_spread_stats(
-    groups: list[list[ScoreRecord]],
-    metric: Metric,
-) -> list[SpreadStats]:
-    by_scenario: dict[str, list[list[ScoreRecord]]] = {}
-    for group in groups:
-        scenario_id = group[0].scenario_id
-        by_scenario.setdefault(scenario_id, []).append(group)
-
-    stats = [
-        rep_spread_stats(by_scenario[scenario_id], metric, label=_short_scenario_name(scenario_id))
-        for scenario_id in _scenario_order(set(by_scenario))
-    ]
-    stats.append(rep_spread_stats(groups, metric, label="all"))
+    stats: list[ModelVariability] = []
+    for model in _model_order(set(by_model)):
+        spreads = by_model[model]
+        stats.append(
+            ModelVariability(
+                label=_short_model_name(model),
+                mean=statistics.fmean(spreads),
+                n_specs=len(spreads),
+            ),
+        )
     return stats
 
 
-def sem_for_reps(pooled_std: float, n: int) -> float:
-    return pooled_std / (n**0.5)
+def pooled_variability(groups: list[list[ScoreRecord]], metric: Metric) -> ModelVariability:
+    spreads = [relative_spread([metric.value(record) for record in group]) for group in groups]
+    return ModelVariability(
+        label=POOLED_VARIABILITY_LABEL,
+        mean=statistics.fmean(spreads),
+        n_specs=len(spreads),
+    )
+
+
+def variability_by_judge(
+    groups_by_judge: dict[str, list[list[ScoreRecord]]],
+    metric: Metric,
+) -> tuple[list[str], list[tuple[str, list[ModelVariability | None]]]]:
+    all_models: set[str] = set()
+    per_judge: dict[str, dict[str, ModelVariability]] = {}
+    groups_by_judge_key: dict[str, list[list[ScoreRecord]]] = {}
+
+    for judge in all_judges():
+        groups = groups_by_judge.get(judge.key)
+        if not groups:
+            continue
+        groups_by_judge_key[judge.key] = groups
+        stats = model_variability(groups, metric)
+        if not stats:
+            continue
+        per_judge[judge.key] = {entry.label: entry for entry in stats}
+        for group in groups:
+            all_models.add(group[0].llm_model)
+
+    if not per_judge:
+        return [], []
+
+    label_order = [_short_model_name(model) for model in _model_order(all_models)]
+    label_order.append(POOLED_VARIABILITY_LABEL)
+    series: list[tuple[str, list[ModelVariability | None]]] = []
+    for judge in all_judges():
+        groups = groups_by_judge_key.get(judge.key)
+        by_label = per_judge.get(judge.key)
+        if not groups or not by_label:
+            continue
+        aligned = [by_label.get(label) for label in label_order[:-1]]
+        aligned.append(pooled_variability(groups, metric))
+        series.append((judge.label, aligned))
+
+    return label_order, series

@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import logging
+from collections.abc import Callable, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field
-from pydantic_ai import Agent
+from pydantic_ai import Agent, ModelRetry
 
 from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.agents.prompt_blocks import has_user_request
 from evaluation.judges import Judge
 from evaluation.scenarios import ALWAYS_SCORED_SOFT_CRITERIA, SoftCriterion
+
+log = logging.getLogger(__name__)
 
 _JUDGE_INTRO_WITH_QUERY = """You are a G-Eval judge for dietary meal-plan quality. You score how well a
 generated one-day meal plan satisfies *soft* session preferences from the user's
@@ -54,9 +57,6 @@ plus the safety fields.
 def judge_soft_preferences_system(*, has_user_query: bool = True) -> str:
     intro = _JUDGE_INTRO_WITH_QUERY if has_user_query else _JUDGE_INTRO_NO_QUERY
     return intro + _JUDGE_BODY
-
-
-JUDGE_SOFT_PREFERENCES_SYSTEM = judge_soft_preferences_system()
 
 
 class CriterionScore(BaseModel):
@@ -113,8 +113,36 @@ def _build_judge_prompt(
 
 
 def _normalize_soft_aggregate(result: QualitativeResult) -> QualitativeResult:
-    soft_agg = 0.0 if not result.scores else sum(s.score for s in result.scores) / len(result.scores)
+    soft_agg = sum(s.score for s in result.scores) / len(result.scores)
     return result.model_copy(update={"aggregate": round(soft_agg, 4)})
+
+
+def _validate_criteria_coverage(
+    expected: tuple[SoftCriterion, ...],
+) -> Callable[[QualitativeResult], QualitativeResult]:
+    expected_ids = [c.id for c in expected]
+
+    def validate(result: QualitativeResult) -> QualitativeResult:
+        returned = [s.criterion_id for s in result.scores]
+        missing = [cid for cid in expected_ids if cid not in returned]
+        unexpected = [cid for cid in returned if cid not in expected_ids]
+        duplicated = sorted({cid for cid in returned if returned.count(cid) > 1})
+        if not (missing or unexpected or duplicated):
+            return result
+        log.warning(
+            "Judge returned %d/%d criteria (missing=%s unexpected=%s duplicated=%s)",
+            len(set(returned)),
+            len(expected_ids),
+            missing,
+            unexpected,
+            duplicated,
+        )
+        raise ModelRetry(
+            f"Score exactly the soft criterion ids listed in the prompt, one entry each. "
+            f"Missing: {missing}. Unexpected: {unexpected}. Duplicated: {duplicated}."
+        )
+
+    return validate
 
 
 async def score_soft_preferences(
@@ -136,9 +164,10 @@ async def score_soft_preferences(
     judge_agent = Agent(
         judge.resolved_model,
         output_type=QualitativeResult,
-        system_prompt=judge.system_prompt(has_user_query=query_present),
-        retries=1,
+        system_prompt=judge_soft_preferences_system(has_user_query=query_present),
+        retries=2,
     )
+    judge_agent.output_validator(_validate_criteria_coverage(composed))
     prompt = _build_judge_prompt(
         plan,
         query,

@@ -49,9 +49,7 @@ def _scored_records_by_judge(experiment: str) -> dict[str, list[ScoreRecord]]:
 
 def _run_records(experiment: str) -> list[RunRecord]:
     specs = experiment_runs(experiment)
-    return [
-        load_run(spec) for spec in specs if any(is_scored(spec, judge=judge) for judge in all_judges())
-    ]
+    return [load_run(spec) for spec in specs if any(is_scored(spec, judge=judge) for judge in all_judges())]
 
 
 def _group_by(records: list[ScoreRecord], key: str) -> dict[str, list[ScoreRecord]]:

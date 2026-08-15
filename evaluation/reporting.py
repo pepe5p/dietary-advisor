@@ -64,9 +64,7 @@ def build_experiment_metrics(
             )
 
     summaries = {
-        judge.key: summarize(records_by_judge[judge.key])
-        for judge in all_judges()
-        if records_by_judge.get(judge.key)
+        judge.key: summarize(records_by_judge[judge.key]) for judge in all_judges() if records_by_judge.get(judge.key)
     }
     return ExperimentMetrics(
         experiment=experiment,

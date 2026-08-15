@@ -17,9 +17,11 @@ from evaluation.plotting.stats import (
     group_metric_stats,
     group_metric_stats_by_judge,
     METRICS,
-    rep_spread_stats,
-    scenario_spread_stats,
-    sem_for_reps,
+    model_variability,
+    pooled_variability,
+    POOLED_VARIABILITY_LABEL,
+    relative_spread,
+    variability_by_judge,
 )
 from evaluation.scoring.store import ScoreRecord
 from evaluation.validation.qualitative import QualitativeResult
@@ -151,51 +153,160 @@ def test_complete_spec_groups_drops_incomplete_specs() -> None:
     assert len(groups[0]) == 3
 
 
-def test_rep_spread_stats_centers_runs_on_spec_mean() -> None:
-    group = [
-        _score_record(mae_pct=8.0),
-        _score_record(mae_pct=10.0),
-        _score_record(mae_pct=12.0),
+def test_relative_spread_computes_sum_abs_deviations() -> None:
+    assert relative_spread([0.6, 0.8, 1.0]) == pytest.approx(0.4)
+
+
+def test_relative_spread_is_zero_for_identical_values() -> None:
+    assert relative_spread([0.0, 0.0, 0.0]) == pytest.approx(0.0)
+
+
+def test_model_variability_averages_spreads_within_model() -> None:
+    model_a = "openrouter:openai/gpt-5.6-luna"
+    model_b = "openrouter:google/gemini-3.6-flash"
+    groups = [
+        [
+            _score_record(llm_model=model_a, soft=0.6),
+            _score_record(llm_model=model_a, soft=0.8),
+            _score_record(llm_model=model_a, soft=1.0),
+        ],
+        [
+            _score_record(llm_model=model_b, soft=0.8),
+            _score_record(llm_model=model_b, soft=0.8),
+            _score_record(llm_model=model_b, soft=0.8),
+        ],
     ]
-    stats = rep_spread_stats([group], METRICS[0], label="regular")
+    stats = model_variability(groups, METRICS[1])
 
-    assert stats.grand_mean == pytest.approx(10.0)
-    assert stats.per_spec_std == [pytest.approx(2.0)]
-    assert stats.pooled_std == pytest.approx(2.0)
-    assert stats.deviations == [pytest.approx(-2.0), pytest.approx(0.0), pytest.approx(2.0)]
+    assert len(stats) == 2
+    assert stats[0].label == _short_model_name(model_b)
+    assert stats[0].mean == pytest.approx(0.0)
+    assert stats[0].n_specs == 1
+    assert stats[1].label == _short_model_name(model_a)
+    assert stats[1].mean == pytest.approx(0.4)
+    assert stats[1].n_specs == 1
 
 
-def test_scenario_spread_stats_orders_scenarios_and_separates_noise() -> None:
-    regular_group = [
-        _score_record(scenario_id="regular", mae_pct=8.0),
-        _score_record(scenario_id="regular", mae_pct=10.0),
-        _score_record(scenario_id="regular", mae_pct=12.0),
+def test_model_variability_orders_models_by_grid_definition() -> None:
+    model_a = "openrouter:google/gemini-3.5-flash-lite"
+    model_b = "openrouter:google/gemini-3.6-flash"
+    groups = [
+        [_score_record(llm_model=model_b, soft=0.7 + 0.1 * rep) for rep in range(3)],
+        [_score_record(llm_model=model_a, soft=0.7 + 0.1 * rep) for rep in range(3)],
     ]
-    diabetes_group = [
-        _score_record(scenario_id="diabetes-hypertension", mae_pct=4.0),
-        _score_record(scenario_id="diabetes-hypertension", mae_pct=4.0),
-        _score_record(scenario_id="diabetes-hypertension", mae_pct=4.0),
+    stats = model_variability(groups, METRICS[1])
+
+    assert [entry.label for entry in stats] == [
+        _short_model_name(model_a),
+        _short_model_name(model_b),
     ]
-    stats = scenario_spread_stats([regular_group, diabetes_group], METRICS[0])
-
-    assert [entry.label for entry in stats] == ["regular", "diabetes-hypertension", "all"]
-    assert stats[0].pooled_std == pytest.approx(2.0)
-    assert stats[1].pooled_std == pytest.approx(0.0)
-    assert stats[2].pooled_std == pytest.approx(2.0**0.5)
 
 
-def test_sem_for_reps_shrinks_with_sqrt_n() -> None:
-    assert sem_for_reps(2.0, 1) == pytest.approx(2.0)
-    assert sem_for_reps(2.0, 2) == pytest.approx(2.0 / 2**0.5)
+def test_model_variability_averages_zero_spread_specs() -> None:
+    model = "openrouter:openai/gpt-5.6-luna"
+    groups = [
+        [
+            _score_record(llm_model=model, soft=0.0),
+            _score_record(llm_model=model, soft=0.0),
+            _score_record(llm_model=model, soft=0.0),
+        ],
+        [
+            _score_record(llm_model=model, soft=0.6),
+            _score_record(llm_model=model, soft=0.8),
+            _score_record(llm_model=model, soft=1.0),
+        ],
+    ]
+    stats = model_variability(groups, METRICS[1])
+
+    assert len(stats) == 1
+    assert stats[0].n_specs == 2
+    assert stats[0].mean == pytest.approx(0.2)
+
+
+def test_pooled_variability_averages_all_specs() -> None:
+    model_a = "openrouter:openai/gpt-5.6-luna"
+    model_b = "openrouter:google/gemini-3.6-flash"
+    groups = [
+        [
+            _score_record(llm_model=model_a, soft=0.6),
+            _score_record(llm_model=model_a, soft=0.8),
+            _score_record(llm_model=model_a, soft=1.0),
+        ],
+        [
+            _score_record(llm_model=model_b, soft=0.8),
+            _score_record(llm_model=model_b, soft=0.8),
+            _score_record(llm_model=model_b, soft=0.8),
+        ],
+    ]
+    stats = pooled_variability(groups, METRICS[1])
+
+    assert stats.label == POOLED_VARIABILITY_LABEL
+    assert stats.n_specs == 2
+    assert stats.mean == pytest.approx(0.2)
+
+
+def test_variability_by_judge_appends_pooled_column() -> None:
+    model = "openrouter:openai/gpt-5.6-luna"
+    groups = [
+        [_score_record(llm_model=model, soft=0.6 + 0.1 * rep) for rep in range(3)],
+    ]
+    label_order, series = variability_by_judge({JUDGE_A.key: groups}, METRICS[1])
+
+    assert label_order[-1] == POOLED_VARIABILITY_LABEL
+    pooled = series[0][1][-1]
+    assert pooled is not None
+    assert pooled.mean == pytest.approx(relative_spread([0.6, 0.7, 0.8]))
+
+
+def test_variability_by_judge_counts_specs_per_judge() -> None:
+    model = "openrouter:openai/gpt-5.6-luna"
+    groups_j1 = [
+        [_score_record(llm_model=model, scenario_id=scenario, soft=0.6 + 0.1 * rep) for rep in range(3)]
+        for scenario in ("regular", "vegetarian-allergic")
+    ]
+    groups_j2 = [
+        [_score_record(llm_model=model, scenario_id="regular", soft=0.6 + 0.1 * rep) for rep in range(3)],
+    ]
+    _, series = variability_by_judge({JUDGE_A.key: groups_j1, JUDGE_B.key: groups_j2}, METRICS[1])
+
+    n_specs_by_judge = {label: [entry.n_specs for entry in stats if entry] for label, stats in series}
+    assert n_specs_by_judge[JUDGE_A.label] == [2, 2]
+    assert n_specs_by_judge[JUDGE_B.label] == [1, 1]
 
 
 def test_render_run_variability_writes_png_and_pdf(tmp_path: Path) -> None:
+    model_a = "openrouter:openai/gpt-5.6-luna"
+    model_b = "openrouter:google/gemini-3.6-flash"
     groups_j1 = [
-        [_score_record(scenario_id="regular", mae_pct=5.0 + rep, soft=0.7 + 0.1 * rep) for rep in range(3)],
-        [_score_record(scenario_id="diabetes-hypertension", mae_pct=3.0 + rep, soft=0.8) for rep in range(3)],
+        [
+            _score_record(
+                llm_model=model_a,
+                scenario_id="regular",
+                mae_pct=5.0 + rep,
+                soft=0.7 + 0.1 * rep,
+            )
+            for rep in range(3)
+        ],
+        [
+            _score_record(
+                llm_model=model_b,
+                scenario_id="diabetes-hypertension",
+                mae_pct=3.0 + rep,
+                soft=0.8,
+            )
+            for rep in range(3)
+        ],
     ]
     groups_j2 = [
-        [_score_record(scenario_id="regular", mae_pct=5.0 + rep, soft=0.5 + 0.1 * rep) for rep in range(3)],
+        [
+            _score_record(
+                llm_model=model_a,
+                scenario_id="regular",
+                mae_pct=5.0 + rep,
+                soft=0.5 + 0.1 * rep,
+            )
+            for rep in range(3)
+        ],
     ]
     paths = render_run_variability(
         {JUDGE_A.key: groups_j1, JUDGE_B.key: groups_j2},

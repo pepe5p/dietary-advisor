@@ -13,18 +13,25 @@ from dietary_advisor.profiles import get_profile
 from evaluation.case_runner.grid import planned_runs, RunSpec
 from evaluation.case_runner.store import is_done
 from evaluation.case_runner.store import load as load_run
-from evaluation.judges import all_judges, Judge
+from evaluation.judges import all_judges, Judge, JUDGE_REPS
 from evaluation.scenarios import SCENARIOS
-from evaluation.scoring.store import is_scored, save, ScoreRecord
+from evaluation.scoring.store import has_rep, save, ScoreRecord
 from evaluation.settings import get_evaluation_settings
 from evaluation.validation.qualitative import score_soft_preferences
-from evaluation.validation.quantitative import macro_errors
+from evaluation.validation.quantitative import macro_errors, NutrientErrors
 
 log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class ScoreSummary:
+    """Per-judge scoring summary.
+
+    ``planned`` and ``missing`` count case-run specs. ``already_scored``,
+    ``attempted``, ``succeeded``, and ``failed`` count individual judge calls
+    (spec x judge-rep pairs).
+    """
+
     planned: int
     missing: int
     already_scored: int
@@ -43,23 +50,40 @@ async def _score_runs_for_judge(
 ) -> ScoreSummary:
     missing = [s for s in all_specs if not is_done(s, output_dir=output_dir)]
     present = [s for s in all_specs if is_done(s, output_dir=output_dir)]
-    already_scored = [s for s in present if is_scored(s, judge=judge, output_dir=output_dir) and not force]
-    to_score = [s for s in present if force or not is_scored(s, judge=judge, output_dir=output_dir)]
+
+    to_score: list[tuple[RunSpec, int]] = [
+        (spec, rep)
+        for spec in present
+        for rep in range(JUDGE_REPS)
+        if force or not has_rep(spec, judge=judge, rep=rep, output_dir=output_dir)
+    ]
+    already_scored = len(present) * JUDGE_REPS - len(to_score) if not force else 0
 
     if not to_score:
         return ScoreSummary(
             planned=len(all_specs),
             missing=len(missing),
-            already_scored=len(already_scored),
+            already_scored=already_scored,
             attempted=0,
             succeeded=0,
             failed=0,
         )
 
+    errors_by_spec: dict[RunSpec, NutrientErrors] = {}
+    for spec in {spec for spec, _ in to_score}:
+        run_record = load_run(spec, output_dir=output_dir)
+        errors_by_spec[spec] = macro_errors(run_record.agent_plan, run_record.targets, food_db)
+
     succeeded = 0
     failed = 0
-    for spec in to_score:
-        ok = await _score_one(spec, food_db=food_db, judge=judge, output_dir=output_dir)
+    for spec, rep in to_score:
+        ok = await _score_one(
+            spec,
+            rep=rep,
+            judge=judge,
+            output_dir=output_dir,
+            errors=errors_by_spec[spec],
+        )
         if ok:
             succeeded += 1
         else:
@@ -68,7 +92,7 @@ async def _score_runs_for_judge(
     return ScoreSummary(
         planned=len(all_specs),
         missing=len(missing),
-        already_scored=len(already_scored),
+        already_scored=already_scored,
         attempted=len(to_score),
         succeeded=succeeded,
         failed=failed,
@@ -83,10 +107,10 @@ async def score_runs(
     lookup: FoodDb | None = None,
     force: bool = False,
 ) -> dict[str, ScoreSummary]:
-    """Score every planned spec that has a stored run record, once per judge.
+    """Score every planned spec that has a stored run record, once per judge rep.
 
-    Already-scored specs are skipped unless ``force`` is set. Failures leave no
-    score file, so the next invocation retries them.
+    Already-scored judge reps are skipped unless ``force`` is set. Failures leave
+    no score file, so the next invocation retries them.
     """
     dest = output_dir if output_dir is not None else get_evaluation_settings().output_dir
     all_specs = list(specs) if specs is not None else planned_runs()
@@ -114,15 +138,15 @@ async def score_runs(
 async def _score_one(
     spec: RunSpec,
     *,
-    food_db: FoodDb,
+    rep: int,
     judge: Judge,
     output_dir: Path,
+    errors: NutrientErrors,
 ) -> bool:
     run_record = load_run(spec, output_dir=output_dir)
     scenario = SCENARIOS[run_record.scenario_id]
     profile = get_profile(scenario.profile_id)
     try:
-        errors = macro_errors(run_record.agent_plan, run_record.targets, food_db)
         qualitative = await score_soft_preferences(
             run_record.agent_plan,
             run_record.query,
@@ -133,9 +157,10 @@ async def _score_one(
         )
     except Exception as exc:  # noqa: BLE001 - judge/DB failures must not abort the grid
         log.warning(
-            "Scoring failed for %s (%s): %s\n%s",
+            "Scoring failed for %s (%s jrep%d): %s\n%s",
             spec.spec_key,
             judge.key,
+            rep,
             exc,
             traceback.format_exc(limit=4),
         )
@@ -153,11 +178,12 @@ async def _score_one(
         iterations=run_record.iterations,
         elapsed_s=run_record.elapsed_s,
     )
-    dest = save(spec=spec, record=score_record, judge=judge, output_dir=output_dir)
+    dest = save(spec=spec, record=score_record, judge=judge, rep=rep, output_dir=output_dir)
     log.info(
-        "Scored %s (%s) -> %s (MAE %.1f%%, soft %.2f)",
+        "Scored %s (%s jrep%d) -> %s (MAE %.1f%%, soft %.2f)",
         spec.spec_key,
         judge.key,
+        rep,
         dest,
         errors.mae,
         qualitative.aggregate,

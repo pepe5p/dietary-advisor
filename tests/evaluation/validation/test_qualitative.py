@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.models.test import TestModel
 
 from evaluation.judges import all_judges
@@ -112,11 +113,75 @@ def test_judge_system_prompt_omits_query_framing_when_absent() -> None:
     assert "supplied soft criteria" in prompt
 
 
-def test_registered_judges_share_prompt_and_differ_only_by_model() -> None:
+def test_registered_judges_differ_only_by_model() -> None:
     judges = all_judges()
-    expected = judge_soft_preferences_system(has_user_query=True)
 
     assert len(judges) > 1
-    assert all(judge.system_prompt(has_user_query=True) == expected for judge in judges)
     assert len({judge.model_id for judge in judges}) == len(judges)
     assert len({judge.scores_subdir for judge in judges}) == len(judges)
+
+
+@pytest.mark.asyncio()
+async def test_score_soft_preferences_rejects_missing_criterion_ids(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan = agent_plan_rice_lunch()
+    criteria = (SoftCriterion("recipe_simplicity", "Recipes should be quick and simple."),)
+    partial = QualitativeResult(
+        scores=[
+            CriterionScore(
+                criterion_id="recipe-makes-sense",
+                score=1.0,
+                reasoning="Rice lunch steps are coherent.",
+            ),
+        ],
+        aggregate=1.0,
+        safety_adherence=1.0,
+        safety_violations=[],
+    )
+    monkeypatch.setattr(
+        "evaluation.judges.resolve_judge_model",
+        lambda _model_id: TestModel(custom_output_args=partial.model_dump()),
+    )
+    with pytest.raises(UnexpectedModelBehavior, match="Exceeded maximum retries"):
+        await score_soft_preferences(
+            plan,
+            "quick simple meals please",
+            criteria,
+            judge=all_judges()[0],
+        )
+
+
+@pytest.mark.asyncio()
+async def test_score_soft_preferences_rejects_unexpected_criterion_ids(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan = agent_plan_rice_lunch()
+    unexpected = QualitativeResult(
+        scores=[
+            CriterionScore(
+                criterion_id="recipe-makes-sense",
+                score=1.0,
+                reasoning="Rice lunch steps are coherent.",
+            ),
+            CriterionScore(
+                criterion_id="not-in-rubric",
+                score=0.5,
+                reasoning="Extra criterion.",
+            ),
+        ],
+        aggregate=0.75,
+        safety_adherence=1.0,
+        safety_violations=[],
+    )
+    monkeypatch.setattr(
+        "evaluation.judges.resolve_judge_model",
+        lambda _model_id: TestModel(custom_output_args=unexpected.model_dump()),
+    )
+    with pytest.raises(UnexpectedModelBehavior, match="Exceeded maximum retries"):
+        await score_soft_preferences(
+            plan,
+            "",
+            (),
+            judge=all_judges()[0],
+        )
