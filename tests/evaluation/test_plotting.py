@@ -16,11 +16,11 @@ from evaluation.plotting.stats import (
     complete_spec_groups,
     group_metric_stats,
     group_metric_stats_by_judge,
+    mean_abs_deviation,
     METRICS,
     model_variability,
     pooled_variability,
     POOLED_VARIABILITY_LABEL,
-    relative_spread,
     variability_by_judge,
 )
 from evaluation.scoring.store import ScoreRecord
@@ -153,12 +153,12 @@ def test_complete_spec_groups_drops_incomplete_specs() -> None:
     assert len(groups[0]) == 3
 
 
-def test_relative_spread_computes_sum_abs_deviations() -> None:
-    assert relative_spread([0.6, 0.8, 1.0]) == pytest.approx(0.4)
+def test_mean_abs_deviation_averages_distance_from_the_mean() -> None:
+    assert mean_abs_deviation([0.6, 0.8, 1.0]) == pytest.approx(0.4 / 3)
 
 
-def test_relative_spread_is_zero_for_identical_values() -> None:
-    assert relative_spread([0.0, 0.0, 0.0]) == pytest.approx(0.0)
+def test_mean_abs_deviation_is_zero_for_identical_values() -> None:
+    assert mean_abs_deviation([0.0, 0.0, 0.0]) == pytest.approx(0.0)
 
 
 def test_model_variability_averages_spreads_within_model() -> None:
@@ -183,7 +183,7 @@ def test_model_variability_averages_spreads_within_model() -> None:
     assert stats[0].mean == pytest.approx(0.0)
     assert stats[0].n_specs == 1
     assert stats[1].label == _short_model_name(model_a)
-    assert stats[1].mean == pytest.approx(0.4)
+    assert stats[1].mean == pytest.approx(0.4 / 3)
     assert stats[1].n_specs == 1
 
 
@@ -220,7 +220,7 @@ def test_model_variability_averages_zero_spread_specs() -> None:
 
     assert len(stats) == 1
     assert stats[0].n_specs == 2
-    assert stats[0].mean == pytest.approx(0.2)
+    assert stats[0].mean == pytest.approx(0.4 / 3 / 2)
 
 
 def test_pooled_variability_averages_all_specs() -> None:
@@ -242,7 +242,7 @@ def test_pooled_variability_averages_all_specs() -> None:
 
     assert stats.label == POOLED_VARIABILITY_LABEL
     assert stats.n_specs == 2
-    assert stats.mean == pytest.approx(0.2)
+    assert stats.mean == pytest.approx(0.4 / 3 / 2)
 
 
 def test_variability_by_judge_appends_pooled_column() -> None:
@@ -255,7 +255,7 @@ def test_variability_by_judge_appends_pooled_column() -> None:
     assert label_order[-1] == POOLED_VARIABILITY_LABEL
     pooled = series[0][1][-1]
     assert pooled is not None
-    assert pooled.mean == pytest.approx(relative_spread([0.6, 0.7, 0.8]))
+    assert pooled.mean == pytest.approx(mean_abs_deviation([0.6, 0.7, 0.8]))
 
 
 def test_variability_by_judge_counts_specs_per_judge() -> None:

@@ -42,7 +42,7 @@ class ModelVariability(BaseModel):
     n_specs: int
 
 
-SPREAD_COLUMN_LABEL = "Spread (sum |run - mean|)"
+SPREAD_COLUMN_LABEL = "Spread (mean |run - spec mean|)"
 POOLED_VARIABILITY_LABEL = "all"
 
 METRICS: tuple[Metric, ...] = (
@@ -181,15 +181,15 @@ def complete_spec_groups(
     return result
 
 
-def relative_spread(values: list[float]) -> float:
+def mean_abs_deviation(values: list[float]) -> float:
     mean = statistics.fmean(values)
-    return sum(abs(value - mean) for value in values)
+    return statistics.fmean([abs(value - mean) for value in values])
 
 
 def model_variability(groups: list[list[ScoreRecord]], metric: Metric) -> list[ModelVariability]:
     by_model: dict[str, list[float]] = {}
     for group in groups:
-        spread = relative_spread([metric.value(record) for record in group])
+        spread = mean_abs_deviation([metric.value(record) for record in group])
         model = group[0].llm_model
         by_model.setdefault(model, []).append(spread)
 
@@ -207,7 +207,7 @@ def model_variability(groups: list[list[ScoreRecord]], metric: Metric) -> list[M
 
 
 def pooled_variability(groups: list[list[ScoreRecord]], metric: Metric) -> ModelVariability:
-    spreads = [relative_spread([metric.value(record) for record in group]) for group in groups]
+    spreads = [mean_abs_deviation([metric.value(record) for record in group]) for group in groups]
     return ModelVariability(
         label=POOLED_VARIABILITY_LABEL,
         mean=statistics.fmean(spreads),
