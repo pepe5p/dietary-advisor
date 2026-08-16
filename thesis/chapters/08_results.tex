@@ -10,6 +10,8 @@ The component ablation experiment was run with \texttt{gpt-5.6-luna} as the fixe
 
 Every plan was scored by both judges of \Cref{sec:methodology-qualitative}, three times each: \texttt{gpt-5.6-luna} as Judge~1 and \texttt{deepseek-v4-flash-0731} as Judge~2. Judge~1 therefore shares a model family with one of the twelve compared configurations, which is the overlap the second judge exists to expose rather than an oversight; \Cref{sec:results-stability} reports whether it distorted anything. Judge-independent metrics -- macronutrient error, iteration count and elapsed time -- are identical whichever judge's records they are read from, and are quoted without a judge attribution throughout.
 
+Two conventions apply to every number and figure below. A figure quoted for a variant, a model or an effort level is an arithmetic mean over the runs in that group. Error bars on the figures show the standard error of that mean, since what the figures are used to decide is whether two group means differ; where the variation between individual runs is the point instead, the population standard deviation is quoted in the text.
+
 \section{Component ablation}
 \label{sec:results-ablation}
 
@@ -26,11 +28,11 @@ Every plan was scored by both judges of \Cref{sec:methodology-qualitative}, thre
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{images/generated/ablation/mae_pct.pdf}
-    \caption{Macronutrient MAE by ablation variant, with error bars showing the standard error of the mean across the 15 runs per variant.}
+    \caption{Macronutrient MAE by ablation variant, over the 15 runs per variant.}
     \label{fig:results-ablation-mae}
 \end{figure}
 
-The spread matters as much as the mean here. The baseline's population standard deviation is \qty{20.11}{\percent}, larger than the entire mean error of any grounded variant, while the three grounded variants sit between \qty{4.84}{\percent} and \qty{7.71}{\percent}. An ungrounded plan is therefore not merely worse on average but substantially less predictable, which for a system whose failures are silent is arguably the more serious property. \Cref{sec:results-error-analysis} traces most of that spread to a single scenario.
+The variation between runs matters as much as the mean here. The baseline's population standard deviation is \qty{20.11}{\percent}, larger than the entire mean error of any grounded variant, while the three grounded variants sit between \qty{4.84}{\percent} and \qty{7.71}{\percent}. An ungrounded plan is therefore not merely worse on average but substantially less predictable, which for a system whose failures are silent is arguably the more serious property. \Cref{sec:results-error-analysis} traces most of that deviation to a single scenario.
 
 The qualitative side separates the variants far less, and \Cref{fig:results-ablation-soft} shows what the second judge contributes. Both judges place all four variants within a narrow band -- roughly \numrange{0.79}{0.81} for Judge~1 and \numrange{0.80}{0.84} for Judge~2 -- so neither reflects the two-fold difference in macronutrient accuracy visible in \Cref{fig:results-ablation-mae}. What the two series also show is a consistent offset: Judge~2 rates essentially every variant higher than Judge~1 does, by a margin comparable to the differences between the variants themselves. That is the central caution of this chapter's qualitative results, and \Cref{sec:results-stability} takes it up properly.
 
@@ -54,7 +56,7 @@ The qualitative side separates the variants far less, and \Cref{fig:results-abla
 \section{Model comparison}
 \label{sec:results-model-comparison}
 
-\Cref{tab:results-model-summary} lists all twelve configurations and \Cref{fig:results-models-mae} plots their macronutrient error. The best configuration in the entire grid is \texttt{gemini-3.6-flash} at low effort, at \qty{8.05}{\percent} MAE, and the worst by a wide margin is \texttt{gemini-3.5-flash-lite} at its provider default, at \qty{27.61}{\percent} -- a spread of more than a factor of three, which is larger than the spread the entire component ablation produced. The choice of generating model and how hard it is allowed to think therefore matters at least as much as which grounding mechanisms are switched on.
+\Cref{tab:results-model-summary} lists all twelve configurations and \Cref{fig:results-models-mae} plots their macronutrient error. The best configuration in the entire grid is \texttt{gemini-3.6-flash} at low effort, at \qty{8.05}{\percent} MAE, and the worst by a wide margin is \texttt{gemini-3.5-flash-lite} at its provider default, at \qty{27.61}{\percent} -- a range of more than a factor of three, wider than the range the entire component ablation produced. The choice of generating model and how hard it is allowed to think therefore matters at least as much as which grounding mechanisms are switched on.
 
 \begin{table}[htbp]
     \centering
@@ -129,12 +131,12 @@ The two mechanisms under ablation are not free, and \Cref{fig:results-ablation-e
 \section{Stability and judge agreement}
 \label{sec:results-stability}
 
-Every mean in this chapter is an average over three repetitions of a nondeterministic process, so the question of how much an individual run deviates from its configuration's mean bears directly on how much weight the differences above can carry. \Cref{fig:results-stability} answers it with the run-to-run variability metric of \Cref{sec:methodology-stability}. Pooled over all 75 configuration groups, the mean absolute deviation of the soft aggregate is \num{0.026} under Judge~1 and \num{0.030} under Judge~2. Both are comfortably smaller than the roughly \num{0.13} spread separating the best and worst configurations' soft aggregates, so the qualitative ordering is not an artefact of sampling; but they are the same size as, or larger than, the gaps between the four ablation variants, which is a quantitative reason not to read anything into that ordering.
+Every mean in this chapter is an average over three repetitions of a nondeterministic process, so the question of how much an individual run deviates from its configuration's mean bears directly on how much weight the differences above can carry. \Cref{fig:results-stability} answers it with the run-to-run variability metric of \Cref{sec:methodology-stability}. Pooled over all 75 cells, the spread of the soft aggregate is \num{0.026} under Judge~1 and \num{0.030} under Judge~2. Both are comfortably smaller than the roughly \num{0.13} gap separating the best and worst configurations' soft aggregates, so the qualitative ordering is not an artefact of sampling; but they are the same size as, or larger than, the gaps between the four ablation variants, which is a quantitative reason not to read anything into that ordering.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{images/generated/stability/run_variability.pdf}
-    \caption{Run-to-run variability of the soft-preference aggregate: mean absolute deviation across the three repetitions of each configuration, per model and pooled, for both judges.}
+    \caption{Run-to-run variability of the soft-preference aggregate: the per-cell spread of \Cref{sec:methodology-stability}, averaged per model and pooled, for both judges.}
     \label{fig:results-stability}
 \end{figure}
 
