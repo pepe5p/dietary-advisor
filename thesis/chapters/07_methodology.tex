@@ -9,12 +9,12 @@ This chapter defines exactly how the three hypotheses from \Cref{sec:introductio
 The hypotheses in \Cref{sec:introduction-goal} translate into three concrete research questions.
 
 \begin{description}
-    \item[RQ1] How much does enabling the deterministic totaller, alone, change macronutrient accuracy relative to a plan produced without either grounding mechanism?
+    \item[RQ1] How much does enabling the deterministic totaller change macronutrient accuracy, relative to the same food-grounded system with the totaller disabled?
     \item[RQ2] How much does enabling the critique-and-refine loop, alone and in combination with the totaller, change macronutrient accuracy and adherence to stated preferences and constraints?
-    \item[RQ3] How do these outcomes change with the capability of the underlying language model, where capability is varied both by swapping the model and by raising its reasoning-effort setting?
+    \item[RQ3] Under a fixed system configuration, how does plan quality vary with the choice of language model and with its reasoning-effort level, and to what extent can raising the effort level substitute for a larger model?
 \end{description}
 
-RQ1 and RQ2 are answered by a single \emph{component ablation} experiment (\Cref{sec:methodology-variants}) that holds the language model fixed and varies only the totaller and reflection flags. RQ3 is answered by a separate \emph{model comparison} experiment that holds the system configuration fixed at its strongest setting and varies the model and its reasoning effort together, as described in \Cref{sec:methodology-model-grid}.
+RQ1~and RQ2~are answered by a single \emph{component ablation} experiment (\Cref{sec:methodology-variants}) that holds the language model fixed and varies only the totaller and reflection flags. RQ3~is answered by a separate \emph{model comparison} experiment that holds the system configuration fixed at its strongest setting and varies the model and its reasoning-effort level together, as described in \Cref{sec:methodology-model-grid}.
 
 \section{Ablation variants}
 \label{sec:methodology-variants}

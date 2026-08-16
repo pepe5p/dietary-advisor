@@ -49,9 +49,16 @@
 
 \newtheorem{definition}{Definition}
 
-% Long bold description labels (FR1, a rejected alternative's name, ...) overflow the
-% hanging indent under the default style; put the label on its own line instead.
-\setlist[description]{style=nextline, leftmargin=0pt}
+% The class sizes the description label column for the single-symbol labels of its
+% eqwhere environment, which is too narrow for labels such as NFR1: the trailing en-dash
+% wraps onto a line of its own. Just wide enough for the longest label used here.
+\setlist[description]{labelwidth=2.6em}
+
+% The class appends an en-dash to every description label, so a short label must stay
+% on the same line as its text; otherwise the line ends on "H1 --". Lists whose labels
+% are sentence-length request style=nextline locally instead.
+\newlist{longdescription}{description}{1}
+\setlist[longdescription]{style=nextline, leftmargin=0pt, topsep=10pt}
 
 % hyperref last, after biblatex; cleveref right after hyperref.
 \usepackage[hidelinks]{hyperref}
@@ -62,7 +69,7 @@
 \author{Piotr Karaś}
 \shortauthor{P. Karaś}
 
-\titlePL{Integracja wielkich modeli językowych z systemami rekomendacji dietetycznych opartymi na wiedzy}
+\titlePL{Integracja dużych modeli językowych z systemami doradczymi wspierającymi planowanie diety}
 \titleEN{Integrating Large Language Models into Knowledge-Based Dietary Recommendation Systems}
 
 \shorttitlePL{Integracja LLM z systemami rekomendacji dietetycznych}
@@ -78,13 +85,18 @@
 
 \faculty{Faculty of Electrical Engineering, Automatics, Computer Science and Biomedical Engineering}
 
-\acknowledgements{I would like to thank Mateusz Ślażyński PhD for his supervision and guidance throughout this thesis.}
+\acknowledgements{Sincere thanks are due to Mateusz Ślażyński PhD for his supervision and guidance throughout the preparation of this thesis.}
 
 \setlength{\cftsecnumwidth}{10mm}
 
 %---------------------------------------------------------------------------
 \setcounter{secnumdepth}{4}
 \brokenpenalty=10000\relax
+
+% Forbid line breaks inside inline maths after a relation or a binary operator,
+% so that constructs such as "M = " never end a line.
+\binoppenalty=10000
+\relpenalty=10000
 
 \begin{document}
 
