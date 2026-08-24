@@ -29,7 +29,7 @@ from evaluation.plotting.stats import (
     SPREAD_COLUMN_LABEL,
     variability_by_judge,
 )
-from evaluation.scoring.store import ScoreRecord
+from evaluation.records import ScoredRun
 
 _DPI = 150
 _SERIES_COLORS = ("#4472C4", "#ED7D31", "#70AD47", "#A5A5A5")
@@ -99,7 +99,7 @@ def figures_dir(experiment: str, *, output_dir: Path | None = None) -> Path:
 
 def _figure_title(
     experiment: str,
-    records: list[ScoreRecord],
+    records: list[ScoredRun],
     metric: Metric,
     grouping: Grouping | None = None,
 ) -> str:
@@ -119,9 +119,9 @@ def _figure_title(
 
 
 def _filter_records(
-    records_by_judge: dict[str, list[ScoreRecord]],
+    records_by_judge: dict[str, list[ScoredRun]],
     metric: Metric,
-) -> dict[str, list[ScoreRecord]]:
+) -> dict[str, list[ScoredRun]]:
     if metric.applies_to is None:
         return records_by_judge
     return {
@@ -168,7 +168,7 @@ def _apply_axis_limits(
 
 def _render_metric_figure(
     experiment: str,
-    records: list[ScoreRecord],
+    records: list[ScoredRun],
     metric: Metric,
     path: Path,
     *,
@@ -250,7 +250,7 @@ def _render_metric_figure(
 
 def _write_metric_figure(
     name: str,
-    records_by_judge: dict[str, list[ScoreRecord]],
+    records_by_judge: dict[str, list[ScoredRun]],
     metric: Metric,
     path: Path,
     grouping: Grouping | None = None,
@@ -266,7 +266,7 @@ def _write_metric_figure(
 
 def render_experiment(
     name: str,
-    records_by_judge: dict[str, list[ScoreRecord]],
+    records_by_judge: dict[str, list[ScoredRun]],
     *,
     output_dir: Path | None = None,
 ) -> list[Path]:
@@ -335,7 +335,7 @@ def _render_variability_subplot(
 
 
 def render_run_variability(
-    groups_by_judge: dict[str, list[list[ScoreRecord]]],
+    groups_by_judge: dict[str, list[list[ScoredRun]]],
     *,
     output_dir: Path | None = None,
     reps: int = 3,

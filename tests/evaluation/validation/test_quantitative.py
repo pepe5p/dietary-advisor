@@ -25,6 +25,24 @@ def test_macro_errors_zero_when_totals_match_targets(food_db: FoodDb, any_code: 
     assert err.mse == 0.0
 
 
+def test_macro_errors_excludes_fibre_from_mae(food_db: FoodDb, any_code: str) -> None:
+    plan = agent_plan_single(any_code, grams=200.0)
+    totals = total_agent_meal_plan(plan, food_db)
+    actual_fiber = totals.totals.get(NutrientName.FIBER_G, 0.0)
+    targets = MacroTargets(
+        energy_kcal=totals.totals[NutrientName.ENERGY_KCAL],
+        protein_g=totals.totals.get(NutrientName.PROTEIN_G, 0.0),
+        carbs_g=totals.totals.get(NutrientName.CARBS_G, 0.0),
+        fat_g=totals.totals.get(NutrientName.FAT_G, 0.0),
+        fiber_g=1.0 if actual_fiber != 1.0 else 100.0,
+    )
+    err = macro_errors(plan, targets, food_db)
+    assert err.mae == 0.0
+    assert err.mse == 0.0
+    assert "fiber_g" in err.per_nutrient
+    assert err.per_nutrient["fiber_g"] != 0.0
+
+
 def test_macro_errors_positive_when_off_target(food_db: FoodDb, any_code: str) -> None:
     plan = agent_plan_single(any_code, grams=400.0)
     targets = MacroTargets(energy_kcal=500.0, protein_g=10.0, carbs_g=50.0, fat_g=5.0)

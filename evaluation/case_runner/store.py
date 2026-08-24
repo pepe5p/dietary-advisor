@@ -12,10 +12,11 @@ from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.totaller.nutrition import MacroTargets
 from evaluation.case_runner.grid import RunSpec
 from evaluation.persistence import artifact_path, is_present, load_json, save_json
+from evaluation.validation.quantitative import NutrientErrors
 
 
 class RunRecord(BaseModel):
-    """Everything the later scoring stage needs from one successful pipeline run."""
+    """One successful pipeline run, including judge-independent error metrics."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -28,6 +29,9 @@ class RunRecord(BaseModel):
     query: str
     agent_plan: AgentMealPlan
     targets: MacroTargets
+    mae_pct: float
+    mse_pct: float
+    per_nutrient_pct: dict[str, float]
     iterations: int
     telemetry: dict[str, Any]
     elapsed_s: float
@@ -59,6 +63,7 @@ def record_from_result(
     iterations: int,
     telemetry: dict[str, Any],
     elapsed_s: float,
+    errors: NutrientErrors,
 ) -> RunRecord:
     v = spec.variant
     return RunRecord(
@@ -71,6 +76,9 @@ def record_from_result(
         query=query,
         agent_plan=agent_plan,
         targets=targets,
+        mae_pct=errors.mae,
+        mse_pct=errors.mse,
+        per_nutrient_pct=errors.per_nutrient,
         iterations=iterations,
         telemetry=telemetry,
         elapsed_s=elapsed_s,

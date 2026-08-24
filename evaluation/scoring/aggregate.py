@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel, ConfigDict
 
-from evaluation.scoring.store import ScoreRecord
+if TYPE_CHECKING:
+    from evaluation.records import ScoredRun
 
 
 class VariantSummary(BaseModel):
@@ -22,8 +25,8 @@ class VariantSummary(BaseModel):
     n_safety_violations: int
 
 
-def summarize(records: list[ScoreRecord]) -> list[VariantSummary]:
-    groups: dict[tuple[str, str], list[ScoreRecord]] = {}
+def summarize(records: list[ScoredRun]) -> list[VariantSummary]:
+    groups: dict[tuple[str, str], list[ScoredRun]] = {}
     for record in records:
         key = (record.llm_model, record.variant)
         groups.setdefault(key, []).append(record)

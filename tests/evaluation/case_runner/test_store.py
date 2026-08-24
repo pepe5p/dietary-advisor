@@ -36,6 +36,9 @@ def test_save_load_round_trip(tmp_path: Path) -> None:
         query="Plan one balanced day.",
         agent_plan=agent_plan_rice_lunch(user_id="regular"),
         targets=MacroTargets(energy_kcal=2000, protein_g=100, carbs_g=200, fat_g=70),
+        mae_pct=5.5,
+        mse_pct=42.0,
+        per_nutrient_pct={"energy_kcal": 3.0},
         iterations=1,
         telemetry={"requests": 2, "total_tokens": 100},
         elapsed_s=1.5,
@@ -51,3 +54,6 @@ def test_save_load_round_trip(tmp_path: Path) -> None:
     assert loaded.agent_plan.user_id == "regular"
     assert loaded.targets.energy_kcal == 2000
     assert loaded.iterations == 1
+    assert loaded.mae_pct == 5.5
+    assert loaded.mse_pct == 42.0
+    assert loaded.per_nutrient_pct == {"energy_kcal": 3.0}

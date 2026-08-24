@@ -21,9 +21,6 @@ def _record(
         variant="baseline",
         scenario_id="regular",
         judge_model="test-judge",
-        mae_pct=10.0,
-        mse_pct=100.0,
-        per_nutrient_pct={"energy_kcal": 10.0},
         qualitative=QualitativeResult(
             scores=[
                 CriterionScore(criterion_id=criterion_id, score=score, reasoning=reasoning)

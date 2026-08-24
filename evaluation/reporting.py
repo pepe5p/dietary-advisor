@@ -8,8 +8,8 @@ from pydantic import BaseModel, ConfigDict
 from evaluation.judges import all_judges
 from evaluation.persistence import resolve_output_dir, save_json
 from evaluation.plotting.stats import group_metric_stats, GroupStats, METRICS, primary_records
+from evaluation.records import ScoredRun
 from evaluation.scoring.aggregate import summarize, VariantSummary
-from evaluation.scoring.store import ScoreRecord
 
 
 class MetricStats(BaseModel):
@@ -41,7 +41,7 @@ def metrics_path(experiment: str, *, output_dir: Path | None = None) -> Path:
 
 def build_experiment_metrics(
     experiment: str,
-    records_by_judge: dict[str, list[ScoreRecord]],
+    records_by_judge: dict[str, list[ScoredRun]],
 ) -> ExperimentMetrics:
     primary = primary_records(records_by_judge)
     metrics: dict[str, MetricStats] = {}
@@ -78,7 +78,7 @@ def build_experiment_metrics(
 
 def write_experiment_metrics(
     experiment: str,
-    records_by_judge: dict[str, list[ScoreRecord]],
+    records_by_judge: dict[str, list[ScoredRun]],
     *,
     output_dir: Path | None = None,
 ) -> Path:

@@ -19,6 +19,7 @@ from evaluation.case_runner.grid import planned_runs, RunSpec
 from evaluation.case_runner.store import is_done, record_from_result, save
 from evaluation.scenarios import SCENARIOS
 from evaluation.settings import get_evaluation_settings
+from evaluation.validation.quantitative import macro_errors
 
 log = logging.getLogger(__name__)
 
@@ -63,28 +64,28 @@ async def collect_runs(
             failed=0,
         )
 
-    if run_fn is not None:
-        for spec in remaining:
-            ok = await _run_and_save(spec, run=run_fn, output_dir=dest)
-            if ok:
-                succeeded += 1
-            else:
-                failed += 1
-        return CollectSummary(
-            planned=len(all_specs),
-            already_done=already_done,
-            attempted=len(remaining),
-            succeeded=succeeded,
-            failed=failed,
-        )
-
-    groups: dict[tuple[LlmSpec, VariantConfig], list[RunSpec]] = defaultdict(list)
-    for spec in remaining:
-        groups[(spec.llm, spec.variant)].append(spec)
-
     owns_lookup = lookup is None
     food_db = lookup if lookup is not None else FoodDb.open()
     try:
+        if run_fn is not None:
+            for spec in remaining:
+                ok = await _run_and_save(spec, run=run_fn, output_dir=dest, food_db=food_db)
+                if ok:
+                    succeeded += 1
+                else:
+                    failed += 1
+            return CollectSummary(
+                planned=len(all_specs),
+                already_done=already_done,
+                attempted=len(remaining),
+                succeeded=succeeded,
+                failed=failed,
+            )
+
+        groups: dict[tuple[LlmSpec, VariantConfig], list[RunSpec]] = defaultdict(list)
+        for spec in remaining:
+            groups[(spec.llm, spec.variant)].append(spec)
+
         for (llm, variant), group in groups.items():
             with Pipeline(variant, food_db=food_db, llm=llm) as pipeline:
                 # Default-arg bind: loop rebinds `pipeline` each iteration.
@@ -97,7 +98,7 @@ async def collect_runs(
                     return await _pipeline.run(profile, query)
 
                 for spec in group:
-                    ok = await _run_and_save(spec, run=_default_run, output_dir=dest)
+                    ok = await _run_and_save(spec, run=_default_run, output_dir=dest, food_db=food_db)
                     if ok:
                         succeeded += 1
                     else:
@@ -120,6 +121,7 @@ async def _run_and_save(
     *,
     run: RunFn,
     output_dir: Path,
+    food_db: FoodDb,
 ) -> bool:
     scenario = SCENARIOS[spec.scenario_id]
     profile = get_profile(scenario.profile_id)
@@ -136,6 +138,7 @@ async def _run_and_save(
         return False
 
     elapsed = time.perf_counter() - t0
+    errors = macro_errors(result.agent_plan, result.targets, food_db)
     record = record_from_result(
         spec=spec,
         query=scenario.query,
@@ -144,6 +147,7 @@ async def _run_and_save(
         iterations=result.iterations,
         telemetry=result.telemetry.as_dict(),
         elapsed_s=round(elapsed, 2),
+        errors=errors,
     )
     dest = save(spec=spec, record=record, output_dir=output_dir)
     log.info(

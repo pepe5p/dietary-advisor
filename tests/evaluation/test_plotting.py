@@ -30,8 +30,8 @@ from evaluation.plotting.stats import (
     SOFT_METRIC,
     variability_by_judge,
 )
-from evaluation.scoring.store import ScoreRecord
-from evaluation.validation.qualitative import QualitativeResult
+from evaluation.records import ScoredRun
+from tests.evaluation.conftest import make_scored_run
 
 JUDGE_A, JUDGE_B = all_judges()[0], all_judges()[1]
 
@@ -46,19 +46,14 @@ def _score_record(
     safety: float = 1.0,
     iterations: int = 1,
     elapsed_s: float = 2.0,
-) -> ScoreRecord:
-    return ScoreRecord(
+) -> ScoredRun:
+    return make_scored_run(
         llm_model=llm_model,
         variant=variant,
         scenario_id=scenario_id,
-        judge_model="test-judge",
         mae_pct=mae_pct,
-        mse_pct=mae_pct**2,
-        per_nutrient_pct={"energy_kcal": mae_pct},
-        qualitative=QualitativeResult(
-            aggregate=soft,
-            safety_adherence=safety,
-        ),
+        soft=soft,
+        safety=safety,
         iterations=iterations,
         elapsed_s=elapsed_s,
     )

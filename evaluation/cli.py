@@ -61,7 +61,8 @@ def evaluate(
     from evaluation.case_runner import is_done, planned_runs
     from evaluation.judges import all_judges, JUDGE_REPS
     from evaluation.plotting import primary_records
-    from evaluation.scoring import is_scored, load, score_runs, scored_reps, summarize
+    from evaluation.records import scored_runs
+    from evaluation.scoring import score_runs, scored_reps, summarize
 
     specs = planned_runs()
     stored = sum(1 for s in specs if is_done(s))
@@ -102,9 +103,7 @@ def evaluate(
     else:
         console.print("[green]Nothing to score.[/green]")
 
-    records_by_judge = {
-        judge.key: [load(s, judge=judge) for s in specs if is_scored(s, judge=judge)] for judge in all_judges()
-    }
+    records_by_judge = {judge.key: [record for _, record in scored_runs(specs, judge=judge)] for judge in all_judges()}
     primary = primary_records(records_by_judge)
     if not primary:
         console.print("[yellow]No score records available yet.[/yellow]")
@@ -157,13 +156,11 @@ def _plot_experiment(experiment: str) -> bool:
     from evaluation.case_runner.grid import experiment_runs
     from evaluation.judges import all_judges
     from evaluation.plotting import primary_records, render_experiment
+    from evaluation.records import scored_runs
     from evaluation.reporting import write_experiment_metrics
-    from evaluation.scoring import is_scored, load
 
     specs = experiment_runs(experiment)
-    records_by_judge = {
-        judge.key: [load(spec, judge=judge) for spec in specs if is_scored(spec, judge=judge)] for judge in all_judges()
-    }
+    records_by_judge = {judge.key: [record for _, record in scored_runs(specs, judge=judge)] for judge in all_judges()}
 
     scored_per_judge = ", ".join(f"{judge.key} {len(records_by_judge[judge.key])}" for judge in all_judges())
     console.print(f"Experiment [bold]{experiment}[/bold]: {len(specs)} runs planned (scored: {scored_per_judge}).")
@@ -192,15 +189,10 @@ def _plot_run_variability() -> bool:
         SOFT_METRIC,
         SPREAD_COLUMN_LABEL,
     )
-    from evaluation.scoring import is_scored, load
+    from evaluation.records import scored_runs
 
     specs = planned_runs()
-    groups_by_judge = {
-        judge.key: complete_spec_groups(
-            [(spec, load(spec, judge=judge)) for spec in specs if is_scored(spec, judge=judge)]
-        )
-        for judge in all_judges()
-    }
+    groups_by_judge = {judge.key: complete_spec_groups(scored_runs(specs, judge=judge)) for judge in all_judges()}
 
     scored = [(judge, groups_by_judge[judge.key]) for judge in all_judges() if groups_by_judge[judge.key]]
     if not scored:

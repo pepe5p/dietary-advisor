@@ -77,15 +77,15 @@ Each scenario's underlying profile is frozen ahead of time -- age, sex, body mea
 \section{Quantitative scoring: macronutrient error}
 \label{sec:methodology-quantitative}
 
-The quantitative scoring stage measures how closely a plan's delivered macronutrients match its target, using the same deterministic aggregator described in \Cref{sec:design-totaller} to compute the delivered values -- independently of whether the totaller tool was available to the model during generation, so that even a baseline-variant plan's accuracy is judged by a real, exactly computed total rather than by anything the model claimed.
+The quantitative scoring stage measures how closely a plan's delivered energy and macronutrients - match its target, using the same deterministic aggregator described in \Cref{sec:design-totaller} to compute the delivered values -- independently of whether the totaller tool was available to the model during generation, so that even a baseline-variant plan's accuracy is judged by a real, exactly computed total rather than by anything the model claimed.
 
-For each tracked macronutrient $n$ (energy, protein, carbohydrates, fat and fibre) with a positive target, a signed relative error is computed as
+For each tracked nutrient $n$ (energy, protein, carbohydrates, and fat) with a positive target, a signed relative error is computed as
 \[
     \mathrm{rel}_n = \frac{\mathrm{actual}_n - \mathrm{target}_n}{\mathrm{target}_n} \times 100\%,
 \]
-where $\mathrm{actual}_n$ is the deterministically computed total for a hydrated plan and $\mathrm{target}_n$ is the profile's frozen target for that nutrient. Each run is summarised by the mean absolute and the mean squared value of $\mathrm{rel}_n$ across the tracked macronutrients, referred to below as $\mathrm{MAE\%}$ and $\mathrm{MSE\%}$.
+where $\mathrm{actual}_n$ is the deterministically computed total for a hydrated plan and $\mathrm{target}_n$ is the profile's frozen target for that nutrient. Each run is summarised by the mean absolute and the mean squared value of $\mathrm{rel}_n$, referred to below as $\mathrm{MAE\%}$ and $\mathrm{MSE\%}$.
 
-Expressing the error relative to its target rather than in absolute nutrient units is what keeps a single figure comparable across nutrients measured on very different scales -- kilocalories against grams of fibre, for instance. Both statistics are reported because the failure this evaluation is most interested in is the occasional badly wrong plan rather than a uniform drift away from target, and the two separate those cases. Because both are computed from the stored plan by a deterministic routine, they do not depend on the judges at all, and are identical no matter which judge's records they are read from.
+Expressing the error relative to its target rather than in absolute nutrient units is what keeps a single figure comparable across nutrients measured on very different scales -- kilocalories against grams of fat, for instance. Both statistics are reported because the failure this evaluation is most interested in is the occasional badly wrong plan rather than a uniform drift away from target, and the two separate those cases. Because both are computed from the stored plan by a deterministic routine, they do not depend on the judges at all, and are identical no matter which judge's records they are read from.
 
 \section{Qualitative scoring: the judge protocol}
 \label{sec:methodology-qualitative}

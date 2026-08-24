@@ -32,9 +32,6 @@ def _record(*, soft: float = 0.9) -> ScoreRecord:
         variant="totaller+reflective-loop",
         scenario_id="regular",
         judge_model="test-judge",
-        mae_pct=5.5,
-        mse_pct=42.0,
-        per_nutrient_pct={"energy_kcal": 3.0},
         qualitative=QualitativeResult(
             scores=[
                 CriterionScore(
@@ -82,7 +79,7 @@ def test_save_load_round_trip(tmp_path: Path) -> None:
     assert scored_reps(spec, judge=JUDGE_A, output_dir=tmp_path) == [0]
 
     loaded = load(spec=spec, judge=JUDGE_A, output_dir=tmp_path)
-    assert loaded.mae_pct == record.mae_pct
+    assert loaded.judge_model == record.judge_model
     assert loaded.qualitative.aggregate == record.qualitative.aggregate
 
 

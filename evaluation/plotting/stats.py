@@ -11,7 +11,7 @@ from dietary_advisor.config.llm import LlmSpec
 from dietary_advisor.planning.pipeline import VariantConfig
 from evaluation.case_runner.grid import DEFAULT_EFFORT, MODEL_COMPARISON_MODELS, RunSpec, VARIANTS
 from evaluation.judges import all_judges
-from evaluation.scoring.store import ScoreRecord
+from evaluation.records import ScoredRun
 
 _REFLECTION_LABELS = {
     VariantConfig(totaller_enabled=totaller, rag_enabled=rag, reflection_enabled=True).label
@@ -33,11 +33,11 @@ class Metric:
     key: str
     title: str
     ylabel: str
-    value: Callable[[ScoreRecord], float]
+    value: Callable[[ScoredRun], float]
     judge_dependent: bool = False
     # Soft scores cluster near 0.8; a zero-based axis hides between-group differences.
     zoom_ylim: bool = False
-    applies_to: Callable[[ScoreRecord], bool] | None = None
+    applies_to: Callable[[ScoredRun], bool] | None = None
     # Every metric here is a non-negative quantity, so error bars are clamped
     # at this value rather than implying impossible readings.
     floor: float | None = 0.0
@@ -52,7 +52,7 @@ class Metric:
 class Grouping:
     key: str
     title: str
-    label: Callable[[ScoreRecord], str]
+    label: Callable[[ScoredRun], str]
     order: Callable[[set[str]], list[str]]
     # Categories with no natural order (models) are ranked by the plotted mean.
     sort_desc: bool = False
@@ -83,7 +83,7 @@ SPREAD_COLUMN_LABEL = "Spread (mean |run - spec mean|)"
 POOLED_VARIABILITY_LABEL = "all"
 
 
-def _has_reflection(record: ScoreRecord) -> bool:
+def _has_reflection(record: ScoredRun) -> bool:
     return record.variant in _REFLECTION_LABELS
 
 
@@ -182,15 +182,15 @@ def _effort_bucket(model: str) -> str:
         raise ValueError(f"Unknown effort {effort!r} for {model}") from None
 
 
-def _group_records(records: list[ScoreRecord]) -> dict[tuple[str, str], list[ScoreRecord]]:
-    groups: dict[tuple[str, str], list[ScoreRecord]] = {}
+def _group_records(records: list[ScoredRun]) -> dict[tuple[str, str], list[ScoredRun]]:
+    groups: dict[tuple[str, str], list[ScoredRun]] = {}
     for record in records:
         key = (record.llm_model, record.variant)
         groups.setdefault(key, []).append(record)
     return groups
 
 
-def _default_grouping(records: list[ScoreRecord]) -> Grouping:
+def _default_grouping(records: list[ScoredRun]) -> Grouping:
     models = {record.llm_model for record in records}
     variants = {record.variant for record in records}
 
@@ -233,8 +233,8 @@ BY_EFFORT = Grouping(
 )
 
 
-def grouped_metric_stats(records: list[ScoreRecord], metric: Metric, grouping: Grouping) -> list[GroupStats]:
-    buckets: dict[str, list[ScoreRecord]] = {}
+def grouped_metric_stats(records: list[ScoredRun], metric: Metric, grouping: Grouping) -> list[GroupStats]:
+    buckets: dict[str, list[ScoredRun]] = {}
     for record in records:
         buckets.setdefault(grouping.label(record), []).append(record)
 
@@ -254,11 +254,11 @@ def grouped_metric_stats(records: list[ScoreRecord], metric: Metric, grouping: G
     return stats
 
 
-def group_metric_stats(records: list[ScoreRecord], metric: Metric) -> list[GroupStats]:
+def group_metric_stats(records: list[ScoredRun], metric: Metric) -> list[GroupStats]:
     return grouped_metric_stats(records, metric, _default_grouping(records))
 
 
-def primary_records(records_by_judge: dict[str, list[ScoreRecord]]) -> list[ScoreRecord]:
+def primary_records(records_by_judge: dict[str, list[ScoredRun]]) -> list[ScoredRun]:
     """Records of the first judge that has any, for metrics that do not depend on the judge."""
     for judge in all_judges():
         records = records_by_judge.get(judge.key)
@@ -268,7 +268,7 @@ def primary_records(records_by_judge: dict[str, list[ScoreRecord]]) -> list[Scor
 
 
 def group_metric_stats_by_judge(
-    records_by_judge: dict[str, list[ScoreRecord]],
+    records_by_judge: dict[str, list[ScoredRun]],
     metric: Metric,
     grouping: Grouping | None = None,
 ) -> list[tuple[str, list[GroupStats]]]:
@@ -294,16 +294,16 @@ def group_metric_stats_by_judge(
 
 
 def complete_spec_groups(
-    pairs: list[tuple[RunSpec, ScoreRecord]],
+    pairs: list[tuple[RunSpec, ScoredRun]],
     *,
     reps: int = 3,
-) -> list[list[ScoreRecord]]:
-    groups: dict[tuple[str, str, str], dict[int, ScoreRecord]] = {}
+) -> list[list[ScoredRun]]:
+    groups: dict[tuple[str, str, str], dict[int, ScoredRun]] = {}
     for spec, record in pairs:
         key = (spec.llm.name, spec.variant.label, spec.scenario_id)
         groups.setdefault(key, {})[spec.rep] = record
 
-    result: list[list[ScoreRecord]] = []
+    result: list[list[ScoredRun]] = []
     for by_rep in groups.values():
         if set(by_rep) != set(range(reps)):
             continue
@@ -316,7 +316,7 @@ def mean_abs_deviation(values: list[float]) -> float:
     return statistics.fmean([abs(value - mean) for value in values])
 
 
-def model_variability(groups: list[list[ScoreRecord]], metric: Metric) -> list[ModelVariability]:
+def model_variability(groups: list[list[ScoredRun]], metric: Metric) -> list[ModelVariability]:
     by_model: dict[str, list[float]] = {}
     for group in groups:
         spread = mean_abs_deviation([metric.value(record) for record in group])
@@ -336,7 +336,7 @@ def model_variability(groups: list[list[ScoreRecord]], metric: Metric) -> list[M
     return stats
 
 
-def pooled_variability(groups: list[list[ScoreRecord]], metric: Metric) -> ModelVariability:
+def pooled_variability(groups: list[list[ScoredRun]], metric: Metric) -> ModelVariability:
     spreads = [mean_abs_deviation([metric.value(record) for record in group]) for group in groups]
     return ModelVariability(
         label=POOLED_VARIABILITY_LABEL,
@@ -346,12 +346,12 @@ def pooled_variability(groups: list[list[ScoreRecord]], metric: Metric) -> Model
 
 
 def variability_by_judge(
-    groups_by_judge: dict[str, list[list[ScoreRecord]]],
+    groups_by_judge: dict[str, list[list[ScoredRun]]],
     metric: Metric,
 ) -> tuple[list[str], list[tuple[str, list[ModelVariability | None]]]]:
     all_models: set[str] = set()
     per_judge: dict[str, dict[str, ModelVariability]] = {}
-    groups_by_judge_key: dict[str, list[list[ScoreRecord]]] = {}
+    groups_by_judge_key: dict[str, list[list[ScoredRun]]] = {}
 
     for judge in all_judges():
         groups = groups_by_judge.get(judge.key)

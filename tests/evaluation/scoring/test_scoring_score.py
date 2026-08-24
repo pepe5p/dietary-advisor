@@ -8,7 +8,6 @@ import pytest
 from pydantic_ai.models.test import TestModel
 
 from dietary_advisor.config.llm import LlmSpec
-from dietary_advisor.food_db import FoodDb
 from dietary_advisor.planning.pipeline import VariantConfig
 from dietary_advisor.totaller.nutrition import MacroTargets
 from evaluation.case_runner.grid import RunSpec
@@ -45,6 +44,9 @@ def _seed_run(tmp_path: Path, spec: RunSpec, *, any_code: str) -> None:
             query="",
             agent_plan=agent_plan_single(any_code, grams=200.0, user_id="regular"),
             targets=MacroTargets(energy_kcal=2000, protein_g=100, carbs_g=200, fat_g=70),
+            mae_pct=0.0,
+            mse_pct=0.0,
+            per_nutrient_pct={},
             iterations=1,
             telemetry={"requests": 1},
             elapsed_s=1.0,
@@ -78,7 +80,6 @@ def _patch_judges(monkeypatch: pytest.MonkeyPatch, *, j1: float = 0.9, j2: float
 @pytest.mark.asyncio()
 async def test_score_runs_writes_all_reps_and_skips_existing(
     tmp_path: Path,
-    food_db: FoodDb,
     any_code: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -86,13 +87,13 @@ async def test_score_runs_writes_all_reps_and_skips_existing(
     spec = _run_spec()
     _seed_run(tmp_path, spec, any_code=any_code)
 
-    first = await score_runs([spec], judges=all_judges(), output_dir=tmp_path, lookup=food_db)
+    first = await score_runs([spec], judges=all_judges(), output_dir=tmp_path)
     assert first[JUDGE_A.key].succeeded == JUDGE_REPS
     assert first[JUDGE_B.key].succeeded == JUDGE_REPS
     assert is_fully_scored(spec, judge=JUDGE_A, output_dir=tmp_path)
     assert is_fully_scored(spec, judge=JUDGE_B, output_dir=tmp_path)
 
-    second = await score_runs([spec], judges=all_judges(), output_dir=tmp_path, lookup=food_db)
+    second = await score_runs([spec], judges=all_judges(), output_dir=tmp_path)
     assert second[JUDGE_A.key].already_scored == JUDGE_REPS
     assert second[JUDGE_B.key].already_scored == JUDGE_REPS
     assert second[JUDGE_A.key].attempted == 0
@@ -101,7 +102,6 @@ async def test_score_runs_writes_all_reps_and_skips_existing(
 @pytest.mark.asyncio()
 async def test_score_runs_tops_up_missing_reps(
     tmp_path: Path,
-    food_db: FoodDb,
     any_code: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -115,9 +115,6 @@ async def test_score_runs_tops_up_missing_reps(
             variant=spec.variant.label,
             scenario_id=spec.scenario_id,
             judge_model=JUDGE_A.model_id,
-            mae_pct=1.0,
-            mse_pct=1.0,
-            per_nutrient_pct={"energy_kcal": 1.0},
             qualitative=_qualitative(0.9),
             iterations=1,
             elapsed_s=1.0,
@@ -127,7 +124,7 @@ async def test_score_runs_tops_up_missing_reps(
         output_dir=tmp_path,
     )
 
-    summary = await score_runs([spec], judges=(JUDGE_A,), output_dir=tmp_path, lookup=food_db)
+    summary = await score_runs([spec], judges=(JUDGE_A,), output_dir=tmp_path)
     assert summary[JUDGE_A.key].attempted == JUDGE_REPS - 1
     assert summary[JUDGE_A.key].succeeded == JUDGE_REPS - 1
     assert scored_reps(spec, judge=JUDGE_A, output_dir=tmp_path) == list(range(JUDGE_REPS))
@@ -136,7 +133,6 @@ async def test_score_runs_tops_up_missing_reps(
 @pytest.mark.asyncio()
 async def test_score_runs_force_rescores_all_reps(
     tmp_path: Path,
-    food_db: FoodDb,
     any_code: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -144,11 +140,11 @@ async def test_score_runs_force_rescores_all_reps(
     spec = _run_spec()
     _seed_run(tmp_path, spec, any_code=any_code)
 
-    await score_runs([spec], judges=(JUDGE_A,), output_dir=tmp_path, lookup=food_db)
+    await score_runs([spec], judges=(JUDGE_A,), output_dir=tmp_path)
     assert load(spec, judge=JUDGE_A, output_dir=tmp_path).qualitative.aggregate == pytest.approx(0.9)
 
     _patch_judges(monkeypatch, j1=0.5, j2=0.3)
-    forced = await score_runs([spec], judges=(JUDGE_A,), output_dir=tmp_path, lookup=food_db, force=True)
+    forced = await score_runs([spec], judges=(JUDGE_A,), output_dir=tmp_path, force=True)
     assert forced[JUDGE_A.key].attempted == JUDGE_REPS
     assert forced[JUDGE_A.key].succeeded == JUDGE_REPS
     assert load(spec, judge=JUDGE_A, output_dir=tmp_path).qualitative.aggregate == pytest.approx(0.5)
@@ -157,7 +153,6 @@ async def test_score_runs_force_rescores_all_reps(
 @pytest.mark.asyncio()
 async def test_score_runs_single_judge_only_writes_one_folder(
     tmp_path: Path,
-    food_db: FoodDb,
     any_code: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -165,16 +160,16 @@ async def test_score_runs_single_judge_only_writes_one_folder(
     spec = _run_spec()
     _seed_run(tmp_path, spec, any_code=any_code)
 
-    await score_runs([spec], judges=(JUDGE_B,), output_dir=tmp_path, lookup=food_db)
+    await score_runs([spec], judges=(JUDGE_B,), output_dir=tmp_path)
     assert is_scored(spec, judge=JUDGE_B, output_dir=tmp_path)
     assert not is_scored(spec, judge=JUDGE_A, output_dir=tmp_path)
     assert all(has_rep(spec, judge=JUDGE_B, rep=rep, output_dir=tmp_path) for rep in range(JUDGE_REPS))
 
 
 @pytest.mark.asyncio()
-async def test_score_runs_counts_missing_runs(tmp_path: Path, food_db: FoodDb) -> None:
+async def test_score_runs_counts_missing_runs(tmp_path: Path) -> None:
     spec = _run_spec()
-    summaries = await score_runs([spec], judges=all_judges(), output_dir=tmp_path, lookup=food_db)
+    summaries = await score_runs([spec], judges=all_judges(), output_dir=tmp_path)
     assert summaries[JUDGE_A.key].missing == 1
     assert summaries[JUDGE_A.key].attempted == 0
     assert not is_scored(spec, judge=JUDGE_A, output_dir=tmp_path)
@@ -183,7 +178,6 @@ async def test_score_runs_counts_missing_runs(tmp_path: Path, food_db: FoodDb) -
 @pytest.mark.asyncio()
 async def test_score_runs_failure_leaves_no_file(
     tmp_path: Path,
-    food_db: FoodDb,
     any_code: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -195,7 +189,7 @@ async def test_score_runs_failure_leaves_no_file(
 
     monkeypatch.setattr("evaluation.scoring.score.score_soft_preferences", boom)
 
-    summaries = await score_runs([spec], judges=(JUDGE_A,), output_dir=tmp_path, lookup=food_db)
+    summaries = await score_runs([spec], judges=(JUDGE_A,), output_dir=tmp_path)
     assert summaries[JUDGE_A.key].failed == JUDGE_REPS
     assert summaries[JUDGE_A.key].succeeded == 0
     assert not is_scored(spec, judge=JUDGE_A, output_dir=tmp_path)

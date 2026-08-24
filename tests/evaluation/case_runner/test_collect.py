@@ -56,12 +56,12 @@ async def test_collect_runs_skips_existing_and_saves_new(tmp_path: Path, food_db
         )
 
     # Pre-seed regular so it is skipped.
-    first = await collect_runs([specs[0]], output_dir=tmp_path, run_fn=fake_run)
+    first = await collect_runs([specs[0]], output_dir=tmp_path, run_fn=fake_run, lookup=food_db)
     assert first.succeeded == 1
     assert is_done(specs[0], output_dir=tmp_path)
     assert len(calls) == 1
 
-    summary = await collect_runs(specs, output_dir=tmp_path, run_fn=fake_run)
+    summary = await collect_runs(specs, output_dir=tmp_path, run_fn=fake_run, lookup=food_db)
     assert summary.planned == 2
     assert summary.already_done == 1
     assert summary.attempted == 1
@@ -71,6 +71,8 @@ async def test_collect_runs_skips_existing_and_saves_new(tmp_path: Path, food_db
     assert is_done(specs[1], output_dir=tmp_path)
     loaded = load(specs[1], output_dir=tmp_path)
     assert loaded.scenario_id == "preferences"
+    assert loaded.mae_pct >= 0.0
+    assert "energy_kcal" in loaded.per_nutrient_pct
     assert loaded.targets == MacroTargets(
         energy_kcal=targets.energy_kcal,
         protein_g=targets.protein_g,
@@ -81,14 +83,14 @@ async def test_collect_runs_skips_existing_and_saves_new(tmp_path: Path, food_db
 
 
 @pytest.mark.asyncio()
-async def test_collect_runs_failure_leaves_no_file(tmp_path: Path) -> None:
+async def test_collect_runs_failure_leaves_no_file(tmp_path: Path, food_db: FoodDb) -> None:
     variant = VariantConfig()
     spec = RunSpec(llm=LlmSpec(model="test-model"), variant=variant, scenario_id="regular")
 
     async def boom(profile: object, query: str) -> PipelineResult:  # noqa: ARG001
         raise RuntimeError("llm down")
 
-    summary = await collect_runs([spec], output_dir=tmp_path, run_fn=boom)
+    summary = await collect_runs([spec], output_dir=tmp_path, run_fn=boom, lookup=food_db)
     assert summary.failed == 1
     assert summary.succeeded == 0
     assert not is_done(spec, output_dir=tmp_path)

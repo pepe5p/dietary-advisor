@@ -20,9 +20,6 @@ class ScoreRecord(BaseModel):
     variant: str
     scenario_id: str
     judge_model: str
-    mae_pct: float
-    mse_pct: float
-    per_nutrient_pct: dict[str, float]
     qualitative: QualitativeResult
     iterations: int
     elapsed_s: float
