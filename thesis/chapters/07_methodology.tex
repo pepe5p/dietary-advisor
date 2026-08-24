@@ -11,8 +11,8 @@ Repetition happens on two independent axes, and keeping them apart matters for r
 The hypotheses in \Cref{sec:introduction-goal} translate into three concrete research questions.
 
 \begin{description}
-    \item[RQ1] By how much does enabling the deterministic totaller reduce macronutrient error?
-    \item[RQ2] By how much does enabling the critique-and-refine loop reduce macronutrient error and improve adherence to the stated constraints and preferences, on its own and on top of the totaller?
+    \item[RQ1] By how much does enabling the deterministic totaller reduce energy and macronutrient error?
+    \item[RQ2] By how much does enabling the critique-and-refine loop reduce energy and macronutrient error and improve adherence to the stated constraints and preferences, on its own and on top of the totaller?
     \item[RQ3] How does plan quality vary with the choice of language model and with its reasoning-effort level, and can raising the effort level substitute for a stronger model?
 \end{description}
 
@@ -72,12 +72,12 @@ Each evaluated run pairs a fixed user profile with a scenario: an optional free-
     \label{tab:methodology-scenarios}
 \end{table}
 
-Each scenario's underlying profile is frozen ahead of time -- age, sex, body measurements, activity level, dietary goal, allergies, diagnosed conditions and standing preferences are all fixed -- and each profile carries a frozen set of macronutrient targets computed independently of the pipeline under test, so that every run's reported error is measured against the same target regardless of which variant or model produced the plan.
+Each scenario's underlying profile is frozen ahead of time -- age, sex, body measurements, activity level, dietary goal, allergies, diagnosed conditions and standing preferences are all fixed -- and each profile carries a frozen set of energy and macronutrient targets computed independently of the pipeline under test, so that every run's reported error is measured against the same target regardless of which variant or model produced the plan.
 
-\section{Quantitative scoring: macronutrient error}
+\section{Quantitative scoring: energy and macronutrient error}
 \label{sec:methodology-quantitative}
 
-The quantitative scoring stage measures how closely a plan's delivered energy and macronutrients - match its target, using the same deterministic aggregator described in \Cref{sec:design-totaller} to compute the delivered values -- independently of whether the totaller tool was available to the model during generation, so that even a baseline-variant plan's accuracy is judged by a real, exactly computed total rather than by anything the model claimed.
+The quantitative scoring stage measures how closely a plan's delivered energy and macronutrient totals match their targets, using the same deterministic aggregator described in \Cref{sec:design-totaller} to compute the delivered values -- independently of whether the totaller tool was available to the model during generation, so that even a baseline-variant plan's accuracy is judged by a real, exactly computed total rather than by anything the model claimed.
 
 For each tracked nutrient $n$ (energy, protein, carbohydrates, and fat) with a positive target, a signed relative error is computed as
 \[
@@ -90,7 +90,7 @@ Expressing the error relative to its target rather than in absolute nutrient uni
 \section{Qualitative scoring: the judge protocol}
 \label{sec:methodology-qualitative}
 
-Everything not captured by a macronutrient number -- whether a recipe is physically coherent, whether a stated allergen was actually avoided, whether an explicit session request was honoured without violating a harder constraint -- is scored by an LLM-as-a-judge stage following the G-Eval pattern described in \Cref{sec:background-evaluation}: a judge model is given an explicit natural-language rubric per criterion and asked to produce both a score and a short justification, rather than a bare number with no accompanying reasoning.
+Everything not captured by an energy or macronutrient number -- whether a recipe is physically coherent, whether a stated allergen was actually avoided, whether an explicit session request was honoured without violating a harder constraint -- is scored by an LLM-as-a-judge stage following the G-Eval pattern described in \Cref{sec:background-evaluation}: a judge model is given an explicit natural-language rubric per criterion and asked to produce both a score and a short justification, rather than a bare number with no accompanying reasoning.
 
 Every run is scored on one criterion present in all scenarios (whether the generated recipes are physically and logically coherent) plus every scenario-specific soft criterion listed for it in \Cref{sec:methodology-scenarios} -- for instance, whether a DASH-appropriate sodium-to-potassium balance was targeted, or whether a stated food preference was honoured without including a disliked food. Each criterion is scored on a continuous $[0, 1]$ scale, and a per-run \emph{soft aggregate} is reported as the mean of all criterion scores for that run. Two further, always-scored fields report \emph{safety adherence} -- a $[0, 1]$ score specifically for whether the plan's allergen exclusions and diet pattern were respected -- and a list of concrete \emph{safety violations} in free text where a judge identifies one, kept separate from the aggregate so that a single serious safety failure cannot be diluted into an otherwise unremarkable average. The judges are explicitly instructed not to penalise a plan for a missing micronutrient figure that the underlying food data itself does not cover, so that the coverage gaps described in \Cref{sec:impl-missing-nutrients} are not double-counted as a plan-quality failure on top of being flagged by the totaller's own coverage warnings.
 

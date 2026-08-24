@@ -16,7 +16,7 @@ The intended interaction is short and self-contained. A user's profile -- age, s
     \item[FR2] Every meal in the plan shall include a named recipe with preparation instructions detailed enough for a home cook to follow, and a list of ingredients with their exact quantities in grams.
     \item[FR3] Every ingredient quantity in the plan shall correspond to a real entry in a food composition database rather than to a value invented by the system; the system shall never report a nutrient figure that cannot be traced to a database entry and a specific quantity.
     \item[FR4] The plan shall respect hard exclusions stated in the user's profile (allergens, a diet pattern such as vegetarianism) without exception, and shall take reasonable account of soft preferences (liked and disliked foods, a session request) where doing so does not conflict with a hard exclusion or a medical constraint.
-    \item[FR5] The plan shall target the macronutrient and calorie levels implied by the user's profile and dietary goal, computed independently of the language model's own claims about them.
+    \item[FR5] The plan shall target the energy and macronutrient levels implied by the user's profile and dietary goal, computed independently of the language model's own claims about them.
     \item[FR6] The system shall aggregate the ingredient quantities across the full day's meals into a single shopping list.
 \end{description}
 
@@ -38,4 +38,4 @@ An early design question was whether the ablation study should also test a varia
 \section{Success criteria}
 \label{sec:vision-success-criteria}
 
-The vision above is considered satisfied if the resulting system, evaluated as described in \Cref{cha:methodology}: produces plans whose delivered macronutrient totals are measurably closer to their targets when the deterministic totaller is available than when it is not; produces plans that are judged, by an independent automated rubric, to respect the stated hard exclusions and to reasonably satisfy the soft preferences and session request for profiles ranging from an unremarkable healthy adult to a user managing two interacting chronic conditions; and does so within a runtime that remains compatible with NFR4~across every evaluated configuration.
+The vision above is considered satisfied if the resulting system, evaluated as described in \Cref{cha:methodology}: produces plans whose delivered energy and macronutrient totals are measurably closer to their targets when the deterministic totaller is available than when it is not; produces plans that are judged, by an independent automated rubric, to respect the stated hard exclusions and to reasonably satisfy the soft preferences and session request for profiles ranging from an unremarkable healthy adult to a user managing two interacting chronic conditions; and does so within a runtime that remains compatible with NFR4~across every evaluated configuration.

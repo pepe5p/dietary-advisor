@@ -87,7 +87,7 @@ def _has_reflection(record: ScoredRun) -> bool:
     return record.variant in _REFLECTION_LABELS
 
 
-MAE_METRIC = Metric("mae_pct", "Macro MAE %", "MAE %", lambda record: record.mae_pct)
+MAE_METRIC = Metric("mae_pct", "Energy and macronutrient MAE %", "MAE %", lambda record: record.mae_pct)
 SOFT_METRIC = Metric(
     "soft_aggregate",
     "Soft preference aggregate",

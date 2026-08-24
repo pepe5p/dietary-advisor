@@ -3,21 +3,21 @@
 
 This chapter reports what the two experiments defined in \Cref{cha:methodology} measured, and what those measurements do and do not license as conclusions. It proceeds from the component ablation to the model comparison and then to reasoning effort, turns to what the mechanisms cost in time and to how reliable the measurements themselves are, and closes with the residual failure modes and the limits that should be attached to everything before them.
 
-One principle governs how every comparison below is read. The problem this system addresses is two-dimensional: a plan must hit a numeric target and it must satisfy what the user actually asked for, and \Cref{cha:methodology} deliberately measures those separately because neither is recoverable from the other. A configuration that hits its macronutrient targets while ignoring a stated preference is no more usable than one that reads well and is nutritionally wrong. Neither dimension is therefore reported on its own here, and where the two disagree -- which happens in the model comparison and again for reasoning effort -- the disagreement is the finding rather than an inconvenience to be averaged away.
+One principle governs how every comparison below is read. The problem this system addresses is two-dimensional: a plan must hit a numeric target and it must satisfy what the user actually asked for, and \Cref{cha:methodology} deliberately measures those separately because neither is recoverable from the other. A configuration that hits its energy and macronutrient targets while ignoring a stated preference is no more usable than one that reads well and is nutritionally wrong. Neither dimension is therefore reported on its own here, and where the two disagree -- which happens in the model comparison and again for reasoning effort -- the disagreement is the finding rather than an inconvenience to be averaged away.
 
 \section{Experimental setup}
 \label{sec:results-setup}
 
 Both grids of \Cref{cha:methodology} ran to completion, the ablation with \texttt{gpt-5.6-luna} as its fixed model and the comparison with the system fixed at the full variant, so every mean reported below rests on the full complement of repetitions and no cell is missing.
 
-Every plan was scored by both judges of \Cref{sec:methodology-qualitative}: \texttt{gpt-5.6-luna} as Judge~1 and \texttt{deepseek-v4-flash-0731} as Judge~2. Judge~1 therefore shares a model family with one of the twelve compared configurations, which is the overlap the second judge exists to expose rather than an oversight; \Cref{sec:results-stability} reports whether it distorted anything. Judge-independent metrics -- macronutrient error, iteration count and elapsed time -- are identical whichever judge's records they are read from, and are quoted without a judge attribution throughout.
+Every plan was scored by both judges of \Cref{sec:methodology-qualitative}: \texttt{gpt-5.6-luna} as Judge~1 and \texttt{deepseek-v4-flash-0731} as Judge~2. Judge~1 therefore shares a model family with one of the twelve compared configurations, which is the overlap the second judge exists to expose rather than an oversight; \Cref{sec:results-stability} reports whether it distorted anything. Judge-independent metrics -- energy and macronutrient error, iteration count and elapsed time -- are identical whichever judge's records they are read from, and are quoted without a judge attribution throughout.
 
 Two conventions apply to every number and figure below. A figure quoted for a variant, a model or an effort level is an arithmetic mean over the runs in that group. Error bars on the figures show the standard error of that mean, since what the figures are used to decide is whether two group means differ; where the variation between individual runs is the point instead, the population standard deviation is quoted in the text.
 
 \section{Component ablation}
 \label{sec:results-ablation}
 
-\Cref{tab:results-ablation-summary} reports the four-variant comparison and \Cref{fig:results-ablation-mae} shows its headline column. Enabling the totaller alone reduces macronutrient MAE from \qty{13.46}{\percent} to \qty{3.02}{\percent}, a reduction of more than a factor of four, and cuts MSE from \num{496} to \num{17}. Enabling the reflection loop alone reaches \qty{5.56}{\percent}, a real improvement over the baseline but a considerably smaller one than the totaller achieves, and bought at roughly three times the wall-clock time.
+\Cref{tab:results-ablation-summary} reports the four-variant comparison and \Cref{fig:results-ablation-mae} shows its headline column. Enabling the totaller alone reduces energy and macronutrient MAE from \qty{13.46}{\percent} to \qty{3.02}{\percent}, a reduction of more than a factor of four, and cuts MSE from \num{496} to \num{17}. Enabling the reflection loop alone reaches \qty{5.56}{\percent}, a real improvement over the baseline but a considerably smaller one than the totaller achieves, and bought at roughly three times the wall-clock time.
 
 Enabling both is where the interesting result lies: at \qty{3.25}{\percent} MAE the full variant is not measurably different from the totaller alone. The gap between them is \qty{0.23}{\percent}, against standard errors of the two means of \qty{0.35}{\percent} and \qty{0.73}{\percent} respectively, and their MSE figures run the other way, \num{25} against \num{17}. Once a deterministic aggregator is checking the numbers, in other words, the critique-and-refine loop has no accuracy left to contribute, and the two mechanisms cannot be described as complementary on this evidence. What the loop costs to reach that outcome, and what its own behaviour still reveals, is taken up in \Cref{sec:results-overhead}.
 
@@ -25,20 +25,20 @@ Enabling both is where the interesting result lies: at \qty{3.25}{\percent} MAE 
     \centering
     \small
     \input{tables/ablation_variant_summary.tex}
-    \caption{Component ablation on \texttt{gpt-5.6-luna}: mean macro error, soft-preference aggregate from each judge, Judge~1's safety adherence, reflection iterations and wall-clock time.}
+    \caption{Component ablation on \texttt{gpt-5.6-luna}: mean energy and macronutrient error, soft-preference aggregate from each judge, Judge~1's safety adherence, reflection iterations and wall-clock time.}
     \label{tab:results-ablation-summary}
 \end{table}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{images/generated/ablation/mae_pct.pdf}
-    \caption{Macronutrient MAE by ablation variant.}
+    \caption{Energy and macronutrient MAE by ablation variant.}
     \label{fig:results-ablation-mae}
 \end{figure}
 
 The variation between runs matters as much as the mean here. The baseline's population standard deviation is \qty{14.76}{\percent} -- larger than its own mean error, and larger than the entire mean error of any other variant -- while the three remaining variants sit between \qty{1.34}{\percent} and \qty{4.32}{\percent}. An ungrounded plan is therefore not merely worse on average but substantially less predictable, which for a system whose failures are silent is arguably the more serious property. \Cref{sec:results-error-analysis} traces most of that deviation to a single scenario.
 
-On the second dimension the ablation is a null result, and \Cref{fig:results-ablation-soft} shows it as one. Both judges place all four variants within a narrow band -- roughly \numrange{0.79}{0.81} for Judge~1 and \numrange{0.80}{0.84} for Judge~2 -- so neither registers the fourfold difference in macronutrient accuracy visible in \Cref{fig:results-ablation-mae}. Neither mechanism, on this evidence, changes how well a plan satisfies what the user asked for; both of the accuracy findings above are therefore claims about one dimension only, and the whole ablation is silent on the other. What the two series also show is a consistent offset: Judge~2 rates essentially every variant higher than Judge~1 does, by a margin comparable to the differences between the variants themselves. That is the central caution of this chapter's qualitative results, and \Cref{sec:results-stability} takes it up properly.
+On the second dimension the ablation is a null result, and \Cref{fig:results-ablation-soft} shows it as one. Both judges place all four variants within a narrow band -- roughly \numrange{0.79}{0.81} for Judge~1 and \numrange{0.80}{0.84} for Judge~2 -- so neither registers the fourfold difference in energy and macronutrient accuracy visible in \Cref{fig:results-ablation-mae}. Neither mechanism, on this evidence, changes how well a plan satisfies what the user asked for; both of the accuracy findings above are therefore claims about one dimension only, and the whole ablation is silent on the other. What the two series also show is a consistent offset: Judge~2 rates essentially every variant higher than Judge~1 does, by a margin comparable to the differences between the variants themselves. That is the central caution of this chapter's qualitative results, and \Cref{sec:results-stability} takes it up properly.
 
 \begin{figure}[htbp]
     \centering
@@ -60,20 +60,20 @@ On the second dimension the ablation is a null result, and \Cref{fig:results-abl
 \section{Model comparison}
 \label{sec:results-model-comparison}
 
-\Cref{tab:results-model-summary} lists all twelve configurations, \Cref{fig:results-models-mae} plots their macronutrient error and \Cref{fig:results-models-soft} their soft-preference aggregate. Taken on accuracy alone the grid spans more than a factor of twenty, from \qty{1.08}{\percent} to \qty{24.47}{\percent} -- a range far wider than the entire component ablation produced -- so the choice of generating model and how hard it is allowed to think matters more than which grounding mechanisms are switched on.
+\Cref{tab:results-model-summary} lists all twelve configurations, \Cref{fig:results-models-mae} plots their energy and macronutrient error and \Cref{fig:results-models-soft} their soft-preference aggregate. Taken on accuracy alone the grid spans more than a factor of twenty, from \qty{1.08}{\percent} to \qty{24.47}{\percent} -- a range far wider than the entire component ablation produced -- so the choice of generating model and how hard it is allowed to think matters more than which grounding mechanisms are switched on.
 
 \begin{table}[htbp]
     \centering
     \small
     \input{tables/model_comparison_summary.tex}
-    \caption{The twelve model-and-effort configurations under the full variant: mean macro error, per-judge soft-preference aggregate, reflection iterations and wall-clock time.}
+    \caption{The twelve model-and-effort configurations under the full variant: mean energy and macronutrient error, per-judge soft-preference aggregate, reflection iterations and wall-clock time.}
     \label{tab:results-model-summary}
 \end{table}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{images/generated/models/mae_pct.pdf}
-    \caption{Macronutrient MAE for each of the twelve model-and-effort configurations under the full variant.}
+    \caption{Energy and macronutrient MAE for each of the twelve model-and-effort configurations under the full variant.}
     \label{fig:results-models-mae}
 \end{figure}
 
@@ -84,7 +84,7 @@ On the second dimension the ablation is a null result, and \Cref{fig:results-abl
     \label{fig:results-models-soft}
 \end{figure}
 
-Read on its own, however, accuracy identifies the wrong winner. Two configurations tie for the lowest error in the grid at \qty{1.08}{\percent}: \texttt{gemini-3.7-flash} at high effort and \texttt{gpt-5.6-luna} at its highest. On the preference dimension they are not close -- \num{0.813} against \num{0.774} under Judge~1, the latter fourth from last in the whole grid -- and they are not close on latency either, at \qty{118}{\second} against \qty{277}{\second}. An evaluation that stopped at macronutrient error would have declared these two equivalent, when in fact one of them takes more than twice as long to produce plans the judges like measurably less.
+Read on its own, however, accuracy identifies the wrong winner. Two configurations tie for the lowest error in the grid at \qty{1.08}{\percent}: \texttt{gemini-3.7-flash} at high effort and \texttt{gpt-5.6-luna} at its highest. On the preference dimension they are not close -- \num{0.813} against \num{0.774} under Judge~1, the latter fourth from last in the whole grid -- and they are not close on latency either, at \qty{118}{\second} against \qty{277}{\second}. An evaluation that stopped at energy and macronutrient error would have declared these two equivalent, when in fact one of them takes more than twice as long to produce plans the judges like measurably less.
 
 Requiring both dimensions at once narrows the field considerably. \texttt{gemini-3.7-flash} at medium effort comes within \qty{0.45}{\percent} of the best error in the grid at \qty{1.53}{\percent} while earning the joint-highest soft aggregate from Judge~1 (\num{0.822}) and the second-highest from Judge~2 (\num{0.839}), at \qty{81}{\second} per plan. No configuration is better than it on both dimensions simultaneously. At the other end, \texttt{gemini-3.5-flash-lite} at its provider default is last on both, at \qty{24.47}{\percent} and \num{0.694}, which is at least a consistent verdict.
 
@@ -93,7 +93,7 @@ Collapsing the effort levels, as \Cref{fig:results-models-by-model,fig:results-m
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{images/generated/models/mae_pct_by_model.pdf}
-    \caption{Macronutrient MAE aggregated over the three effort levels of each base model.}
+    \caption{Energy and macronutrient MAE aggregated over the three effort levels of each base model.}
     \label{fig:results-models-by-model}
 \end{figure}
 
@@ -114,7 +114,7 @@ On the accuracy dimension, reasoning effort produces the most regular trend in t
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{images/generated/models/mae_pct_by_effort.pdf}
-    \caption{Macronutrient MAE aggregated by reasoning-effort bucket across all four base models.}
+    \caption{Energy and macronutrient MAE aggregated by reasoning-effort bucket across all four base models.}
     \label{fig:results-effort-mae}
 \end{figure}
 
@@ -182,16 +182,16 @@ Three patterns merit closer examination than the summary statistics allow.
 
 \textbf{The baseline's worst case is a failure it repeats.} The lactose-intolerant-athlete scenario's baseline MAE of \qty{34.1}{\percent} in \Cref{tab:results-per-scenario} comes from two of its three repetitions, at \qty{48.8}{\percent} and \qty{46.3}{\percent} against \qty{7.2}{\percent} for the third. In both, the ungrounded model was fitting a calorie-dense dessert into an athlete's already high energy target with nothing checking the result, and overshot across the board -- fat by \qty{75}{\percent} in one, protein by \qty{86}{\percent} in the other. The interesting part is not the size of the miss but its inconsistency: the same request, the same model and the same prompt produced one acceptable plan and two badly wrong ones. This is what the baseline's \qty{14.76}{\percent} standard deviation is made of, and why an ungrounded system is better described as unpredictable than as inaccurate.
 
-\textbf{Fibre is the nutrient the food data cannot support, which is why it is reported and not scored.} The per-nutrient breakdown recorded with each run (\Cref{sec:methodology-quantitative}) shows fibre error far above that of any of the four aggregated macronutrients -- in the outlier discussed above it reached \qty{174}{\percent}, against \qty{75}{\percent} for the worst of the others. This follows directly from the partial nutrient coverage of \Cref{sec:impl-missing-nutrients}: fibre is among the fields most often missing from a crowd-sourced product record, so for a meaningful share of plans a fibre total is summing an incomplete picture, and no amount of arithmetic rigour recovers a value the database never recorded. Excluding it from the error aggregate keeps that data gap from being counted as a planning failure, but the gap itself does not go away: fibre targets are the part of a profile this system cannot currently promise to meet, and closing that would require better source data rather than a better planner.
+\textbf{Fibre is the nutrient the food data cannot support, which is why it is reported and not scored.} The per-nutrient breakdown recorded with each run (\Cref{sec:methodology-quantitative}) shows fibre error far above that of any of the four aggregated nutrients -- in the outlier discussed above it reached \qty{174}{\percent}, against \qty{75}{\percent} for the worst of the others. This follows directly from the partial nutrient coverage of \Cref{sec:impl-missing-nutrients}: fibre is among the fields most often missing from a crowd-sourced product record, so for a meaningful share of plans a fibre total is summing an incomplete picture, and no amount of arithmetic rigour recovers a value the database never recorded. Excluding it from the error aggregate keeps that data gap from being counted as a planning failure, but the gap itself does not go away: fibre targets are the part of a profile this system cannot currently promise to meet, and closing that would require better source data rather than a better planner.
 
 \textbf{Safety adherence is high but no longer uniformly perfect, and the judges disagree about where it slips.} Judge~1 records perfect adherence across all four ablation variants; Judge~2 does not, dropping to \num{0.928} on the totaller-only variant and \num{0.978} on the full variant. In the model comparison both judges flag \texttt{gemini-3.5-flash-lite} at default effort as the weakest configuration for safety (\num{0.966} and \num{0.963} respectively), which is consistent with it being the weakest configuration on every other axis. But the two disagree about the rest: Judge~1 finds only two further configurations short of perfect, Judge~2 finds five, and only three of those overlap. Since a safety judgement is a claim about whether a specific allergen or diet-pattern rule was broken -- something that ought to be objectively checkable from the plan -- this disagreement is harder to discount than the offset in soft-preference scores. It suggests that allergen compliance is currently being assessed at a level of reliability well below what a deployed system would require, and argues for moving hard exclusions out of the judge's hands and into a deterministic checker, in the same spirit as the no-invented-foods contract.
 
 \section{Discussion of the hypotheses}
 \label{sec:results-discussion}
 
-\textbf{H1}~(the deterministic totaller reduces macronutrient error) is supported, and more strongly than the hypothesis asks. Enabling the totaller, with the model and every other flag fixed, cuts MAE from \qty{13.46}{\percent} to \qty{3.02}{\percent} and MSE from \num{496} to \num{17}, the improvement holds in every one of the five scenarios rather than resting on one, and it also compresses the run-to-run standard deviation from \qty{14.76}{\percent} to \qty{1.34}{\percent}. It is the cheaper of the two mechanisms in time as well, adding about a third to run time against the roughly threefold increase reflection brings. H1~says nothing about the qualitative dimension, and the measurements say nothing either: no judge separates this variant from the baseline.
+\textbf{H1}~(the deterministic totaller reduces energy and macronutrient error) is supported, and more strongly than the hypothesis asks. Enabling the totaller, with the model and every other flag fixed, cuts MAE from \qty{13.46}{\percent} to \qty{3.02}{\percent} and MSE from \num{496} to \num{17}, the improvement holds in every one of the five scenarios rather than resting on one, and it also compresses the run-to-run standard deviation from \qty{14.76}{\percent} to \qty{1.34}{\percent}. It is the cheaper of the two mechanisms in time as well, adding about a third to run time against the roughly threefold increase reflection brings. H1~says nothing about the qualitative dimension, and the measurements say nothing either: no judge separates this variant from the baseline.
 
-\textbf{H2}~(the critique-and-refine loop improves macronutrient accuracy and adherence) is unsupported on both counts as an addition to the assembled system. Reflection does improve on the ungrounded baseline in isolation, reaching \qty{5.56}{\percent}, but that is the comparison H2~does not need: added to the totaller it moves MAE by \qty{0.23}{\percent}, less than the standard error of either mean, and worsens MSE. On adherence it fails as before: neither judge detects a soft-preference or safety improvement from enabling reflection, and \Cref{sec:results-stability} shows any such effect would be smaller than the run-to-run noise in any case. The loop costs roughly triple the wall-clock time and more than triple the requests to produce no measurable gain on either dimension. What remains in its favour is what \Cref{sec:results-overhead} observes about its own behaviour and what individual critiques visibly correct, neither of which the aggregate metrics reward.
+\textbf{H2}~(the critique-and-refine loop improves energy and macronutrient accuracy and adherence) is unsupported on both counts as an addition to the assembled system. Reflection does improve on the ungrounded baseline in isolation, reaching \qty{5.56}{\percent}, but that is the comparison H2~does not need: added to the totaller it moves MAE by \qty{0.23}{\percent}, less than the standard error of either mean, and worsens MSE. On adherence it fails as before: neither judge detects a soft-preference or safety improvement from enabling reflection, and \Cref{sec:results-stability} shows any such effect would be smaller than the run-to-run noise in any case. The loop costs roughly triple the wall-clock time and more than triple the requests to produce no measurable gain on either dimension. What remains in its favour is what \Cref{sec:results-overhead} observes about its own behaviour and what individual critiques visibly correct, neither of which the aggregate metrics reward.
 
 \textbf{H3}~(plan quality depends on both model choice and reasoning-effort level, which are partly interchangeable) is supported in all three of its parts, with one qualification that matters more than the verdict. Model choice matters on both dimensions: aggregated over effort levels, mean MAE ranges from \qty{1.87}{\percent} for \texttt{gemini-3.7-flash} to \qty{13.39}{\percent} for \texttt{gemini-3.5-flash-lite}, and the soft aggregate from \num{0.808} to \num{0.730} in the same order. Effort matters too, moving pooled MAE monotonically from \qty{8.66}{\percent} to \qty{2.64}{\percent} and doing so within every model taken individually -- though only the accuracy dimension responds this way, as the preference dimension stops improving past the middle setting. And the substitution claim holds as stated: raising the weakest model's effort recovers about three quarters of its accuracy deficit and half of its preference deficit. The qualification is that recovering most of a gap is not the same as being a reasonable choice. The stronger model at its \emph{lowest} effort still beats the effort-boosted weak model on both dimensions for \qty{14}{\second} more per plan, so effort is best understood as a way to rescue a model already fixed by other constraints rather than as an alternative to choosing a capable one.
 
@@ -200,7 +200,7 @@ Three patterns merit closer examination than the summary statistics allow.
 
 Several limitations bound how far these results generalise.
 
-The headline accuracy metric covers four nutrients, not five. Fibre is excluded from MAE and MSE for the reason \Cref{sec:methodology-quantitative} gives, and that exclusion is defensible as a measurement decision but it does narrow what the reported error figures certify. A variant described here as reducing macronutrient error by a factor of four has been shown to do so for energy, protein, carbohydrate and fat; \Cref{sec:results-error-analysis} shows that the same plans can still miss their fibre target badly, and nothing in the ablation demonstrates otherwise.
+The headline accuracy metric covers four nutrients, not five. Fibre is excluded from MAE and MSE for the reason \Cref{sec:methodology-quantitative} gives, and that exclusion is defensible as a measurement decision but it does narrow what the reported error figures certify. A variant described here as reducing energy and macronutrient error by a factor of four has been shown to do so for energy, protein, carbohydrate and fat; \Cref{sec:results-error-analysis} shows that the same plans can still miss their fibre target badly, and nothing in the ablation demonstrates otherwise.
 
 The scenario set is five profiles. They were chosen to vary in what they demand -- an unconstrained day, a hard exclusion against a conflicting request, interacting chronic conditions -- but five is too few to support claims about dietary planning in general, and the high safety-adherence scores may reflect that none of these scenarios is adversarial in the way a determined user could be.
 
