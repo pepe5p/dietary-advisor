@@ -35,20 +35,32 @@ def _group_by(records: list[ScoredRun], key: str) -> dict[str, list[ScoredRun]]:
     return groups
 
 
-def _soft_by_key(records: list[ScoredRun], key: str) -> dict[str, float]:
+# Trailing backslash is LaTeX's escaped inter-word space, keeping "agg." from being read as a sentence end.
+_SOFT_METRIC = ("Soft agg.\\", "aggregate")
+_SAFETY_METRIC = ("Safety", "safety_adherence")
+
+
+def _judge_means(records: list[ScoredRun], key: str, attribute: str) -> dict[str, float]:
     groups = _group_by(records, key)
-    return {label: statistics.fmean(r.qualitative.aggregate for r in group) for label, group in groups.items()}
+    return {
+        label: statistics.fmean(getattr(r.qualitative, attribute) for r in group) for label, group in groups.items()
+    }
 
 
-def _soft_columns(records_by_judge: dict[str, list[ScoredRun]], key: str) -> list[tuple[str, dict[str, float]]]:
-    """One (header, per-group mean) column per registered judge, in registry order."""
+def _judge_columns(
+    records_by_judge: dict[str, list[ScoredRun]],
+    key: str,
+    metrics: tuple[tuple[str, str], ...],
+) -> list[tuple[str, dict[str, float]]]:
+    """One (header, per-group mean) column per judge and metric, judges in registry order."""
     return [
-        (rf"Soft agg.\ {_escape(judge.label)}", _soft_by_key(records_by_judge.get(judge.key, []), key))
+        (f"{header} {_escape(judge.label)}", _judge_means(records_by_judge.get(judge.key, []), key, attribute))
         for judge in all_judges()
+        for header, attribute in metrics
     ]
 
 
-def _soft_cells(columns: list[tuple[str, dict[str, float]]], group_key: str) -> list[str]:
+def _judge_cells(columns: list[tuple[str, dict[str, float]]], group_key: str) -> list[str]:
     cells = []
     for _, means in columns:
         value = means.get(group_key)
@@ -60,10 +72,10 @@ def variant_summary_table(records_by_judge: dict[str, list[ScoredRun]]) -> str:
     """One row per ablation variant: error, preference and operational metrics, averaged over all runs."""
     groups = _group_by(primary_records(records_by_judge), "variant")
     order = _variant_order(set(groups))
-    soft_columns = _soft_columns(records_by_judge, "variant")
+    judge_columns = _judge_columns(records_by_judge, "variant", (_SOFT_METRIC, _SAFETY_METRIC))
 
-    headers = ["Variant", r"MAE~[\%]", r"MSE~[\%]", *(head for head, _ in soft_columns)]
-    headers += ["Safety", "Iter.", r"Elapsed~[s]"]
+    headers = ["Variant", r"MAE~[\%]", r"MSE~[\%]", "Iter.", r"Elapsed~[s]"]
+    headers += [head for head, _ in judge_columns]
     lines = [
         rf"\begin{{tabular}}{{{'l' + 'r' * (len(headers) - 1)}}}",
         r"\toprule",
@@ -76,10 +88,9 @@ def variant_summary_table(records_by_judge: dict[str, list[ScoredRun]]) -> str:
             _escape(label),
             f"{statistics.fmean(r.mae_pct for r in group):.2f}",
             f"{statistics.fmean(r.mse_pct for r in group):.2f}",
-            *_soft_cells(soft_columns, label),
-            f"{statistics.fmean(r.qualitative.safety_adherence for r in group):.3f}",
             f"{statistics.fmean(r.iterations for r in group):.2f}",
             f"{statistics.fmean(r.elapsed_s for r in group):.1f}",
+            *_judge_cells(judge_columns, label),
         ]
         lines.append(" & ".join(cells) + r" \\")
     lines += [r"\bottomrule", r"\end{tabular}"]
@@ -89,7 +100,7 @@ def variant_summary_table(records_by_judge: dict[str, list[ScoredRun]]) -> str:
 def model_summary_table(records_by_judge: dict[str, list[ScoredRun]]) -> str:
     """One row per model under the full variant: error, preference and operational metrics."""
     groups = _group_by(primary_records(records_by_judge), "llm_model")
-    soft_columns = _soft_columns(records_by_judge, "llm_model")
+    soft_columns = _judge_columns(records_by_judge, "llm_model", (_SOFT_METRIC,))
 
     headers = ["Model", r"MAE~[\%]", *(head for head, _ in soft_columns), "Iter.", r"Elapsed~[s]"]
     lines = [
@@ -103,7 +114,7 @@ def model_summary_table(records_by_judge: dict[str, list[ScoredRun]]) -> str:
         cells = [
             _escape(_short_model_name(model)),
             f"{statistics.fmean(r.mae_pct for r in group):.2f}",
-            *_soft_cells(soft_columns, model),
+            *_judge_cells(soft_columns, model),
             f"{statistics.fmean(r.iterations for r in group):.2f}",
             f"{statistics.fmean(r.elapsed_s for r in group):.1f}",
         ]

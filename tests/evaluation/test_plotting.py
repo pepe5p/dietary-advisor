@@ -125,6 +125,7 @@ def test_render_experiment_writes_one_png_per_plot_metric(tmp_path: Path) -> Non
     png_names = {path.name for path in paths if path.suffix == ".png"}
     assert png_names == {metric.filename for metric in PLOT_METRICS}
     assert "safety_adherence.png" not in png_names
+    assert "tradeoff_judge_1.png" not in png_names
     for path in paths:
         if path.suffix == ".png":
             assert path.parent == tmp_path / "figures" / "ablation"
@@ -158,6 +159,12 @@ def test_render_experiment_writes_extra_model_groupings(tmp_path: Path) -> None:
     dest = tmp_path / "figures" / "models"
     assert (dest / "mae_pct_by_model.png").stat().st_size > 0
     assert (dest / "mae_pct_by_effort.png").stat().st_size > 0
+    tradeoff = dest / "tradeoff_judge_1.png"
+    assert tradeoff in paths
+    assert tradeoff.stat().st_size > 0
+    assert tradeoff.with_suffix(".pdf").is_file()
+    assert "tradeoff_judge_2.png" not in png_names
+    assert "tradeoff_judge_mean.png" not in png_names
 
 
 def test_grouped_metric_stats_by_model_combines_efforts() -> None:
@@ -443,3 +450,21 @@ def test_error_bounds_uses_sem_when_above_floor() -> None:
 
 def test_soft_metric_uses_three_decimal_places() -> None:
     assert SOFT_METRIC.decimals == 3
+
+
+def test_render_experiment_writes_tradeoff_per_judge(tmp_path: Path) -> None:
+    records = [
+        _score_record(llm_model="openrouter:google/gemini-3.6-flash#low", variant="totaller+reflective-loop"),
+        _score_record(llm_model="openrouter:openai/gpt-5.6-luna#xhigh", variant="totaller+reflective-loop"),
+    ]
+    paths = render_experiment(
+        "models",
+        {JUDGE_A.key: records, JUDGE_B.key: records},
+        output_dir=tmp_path,
+    )
+    dest = tmp_path / "figures" / "models"
+    for name in (f"tradeoff_{JUDGE_A.key}", f"tradeoff_{JUDGE_B.key}", "tradeoff_judge_mean"):
+        png = dest / f"{name}.png"
+        assert png in paths
+        assert png.stat().st_size > 0
+        assert png.with_suffix(".pdf").is_file()

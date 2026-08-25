@@ -1,4 +1,4 @@
-from evaluation.plotting.figures import render_experiment, render_run_variability
+from evaluation.plotting.figures import render_experiment, render_run_variability, render_tradeoff
 from evaluation.plotting.stats import (
     BY_EFFORT,
     BY_MODEL,
@@ -46,5 +46,6 @@ __all__ = [
     "primary_records",
     "render_experiment",
     "render_run_variability",
+    "render_tradeoff",
     "variability_by_judge",
 ]

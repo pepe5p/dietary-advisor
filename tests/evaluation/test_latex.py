@@ -22,6 +22,19 @@ def test_variant_summary_table_has_one_soft_column_per_judge() -> None:
     assert "0.600" in table
 
 
+def test_variant_summary_table_has_one_safety_column_per_judge() -> None:
+    records_by_judge = {
+        JUDGE_A.key: [make_scored_run(variant="baseline", safety=1.0)],
+        JUDGE_B.key: [make_scored_run(variant="baseline", safety=0.5)],
+    }
+    table = variant_summary_table(records_by_judge)
+
+    for judge in all_judges():
+        assert f"Safety {judge.label}" in table
+    assert "1.000" in table
+    assert "0.500" in table
+
+
 def test_variant_summary_table_shows_dash_for_unscored_judge() -> None:
     table = variant_summary_table({JUDGE_A.key: [make_scored_run(variant="baseline", soft=0.8)]})
 

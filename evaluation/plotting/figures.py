@@ -1,18 +1,25 @@
 from __future__ import annotations
 
 import math
+import statistics
 import textwrap
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FixedLocator, FuncFormatter, NullLocator
 
+from evaluation.judges import all_judges
 from evaluation.persistence import resolve_output_dir
 from evaluation.plotting.stats import (
+    _bare_model_order,
+    _bare_short_model_name,
+    _default_grouping,
     _group_records,
+    _resolved_effort,
     _short_model_name,
     BY_EFFORT,
     BY_MODEL,
@@ -21,6 +28,7 @@ from evaluation.plotting.stats import (
     grouped_metric_stats,
     Grouping,
     GroupStats,
+    MAE_METRIC,
     Metric,
     ModelVariability,
     PLOT_METRICS,
@@ -34,6 +42,10 @@ from evaluation.records import ScoredRun
 _DPI = 150
 _SERIES_COLORS = ("#4472C4", "#ED7D31", "#70AD47", "#A5A5A5")
 _EXTRA_GROUPINGS = (BY_MODEL, BY_EFFORT)
+_TRADEOFF_HEIGHT_IN = 4.6
+_X_TICK_CANDIDATES = (0.5, 1, 2, 3, 5, 7, 10, 20, 30, 50, 100)
+# Scatter series carry a shape as well as a colour, so they stay distinguishable in greyscale.
+_MARKERS = ("o", "s", "^", "D", "v", "P")
 
 # A4 with the aghdpl margins (30mm left, 20mm right) leaves a 160mm text block.
 # Every figure is drawn exactly that wide so the thesis can include it at
@@ -264,6 +276,145 @@ def _write_metric_figure(
     return [path, path.with_suffix(".pdf")]
 
 
+@dataclass(frozen=True)
+class _TradeoffPoint:
+    label: str
+    model: str
+    effort: str
+    mae: float
+    soft: float
+
+
+def _tradeoff_points(records: list[ScoredRun]) -> list[_TradeoffPoint]:
+    """Join MAE and soft-aggregate stats by group label; the two metrics sort independently."""
+    grouping = _default_grouping(records)
+    mae_by_label = {group.label: group for group in grouped_metric_stats(records, MAE_METRIC, grouping)}
+    soft_by_label = {group.label: group for group in grouped_metric_stats(records, SOFT_METRIC, grouping)}
+    sample: dict[str, ScoredRun] = {}
+    for record in records:
+        sample.setdefault(grouping.label(record), record)
+
+    points: list[_TradeoffPoint] = []
+    for label, mae in mae_by_label.items():
+        if label not in soft_by_label or label not in sample:
+            continue
+        record = sample[label]
+        points.append(
+            _TradeoffPoint(
+                label=label,
+                model=_bare_short_model_name(record.llm_model),
+                effort=_resolved_effort(record.llm_model),
+                mae=mae.mean,
+                soft=soft_by_label[label].mean,
+            ),
+        )
+    return points
+
+
+def _mean_tradeoff_points(points_by_judge: list[list[_TradeoffPoint]]) -> list[_TradeoffPoint]:
+    """Per-configuration soft aggregate averaged over the judges; MAE is judge-independent."""
+    soft_by_label: dict[str, list[float]] = {}
+    for points in points_by_judge:
+        for point in points:
+            soft_by_label.setdefault(point.label, []).append(point.soft)
+
+    shared = [point for point in points_by_judge[0] if len(soft_by_label[point.label]) == len(points_by_judge)]
+    return [replace(point, soft=statistics.fmean(soft_by_label[point.label])) for point in shared]
+
+
+def _render_tradeoff_figure(
+    experiment: str,
+    judge_label: str,
+    points: list[_TradeoffPoint],
+    path: Path,
+) -> None:
+    fig, ax = plt.subplots(figsize=(_TEXT_WIDTH_IN, _TRADEOFF_HEIGHT_IN))
+    models = _bare_model_order({point.model for point in points})
+
+    for idx, model in enumerate(models):
+        group = [point for point in points if point.model == model]
+        ax.scatter(
+            [point.mae for point in group],
+            [point.soft for point in group],
+            color=_SERIES_COLORS[idx % len(_SERIES_COLORS)],
+            marker=_MARKERS[idx % len(_MARKERS)],
+            s=30,
+            zorder=3,
+            label=model,
+        )
+    for point in points:
+        ax.annotate(
+            point.effort,
+            (point.mae, point.soft),
+            textcoords="offset points",
+            xytext=(5, 5),
+            fontsize=_VALUE_SIZE,
+        )
+
+    ax.set_xscale("log")
+    xs = [point.mae for point in points]
+    x_low, x_high = min(xs) / 1.3, max(xs) * 1.3
+    ax.set_xlim(x_low, x_high)
+    # Matplotlib's own log ticks mix decade and subdecade labels at two different
+    # sizes and collide once the span is under two decades, so place them by hand.
+    ax.xaxis.set_major_locator(FixedLocator([tick for tick in _X_TICK_CANDIDATES if x_low <= tick <= x_high]))
+    ax.xaxis.set_minor_locator(NullLocator())
+    ax.xaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:g}"))
+    ax.set_xlabel(f"{MAE_METRIC.ylabel} ($\\log_{{10}}$ scale)", fontsize=_AXIS_LABEL_SIZE)
+    ax.set_ylabel(SOFT_METRIC.title, fontsize=_AXIS_LABEL_SIZE)
+    ax.tick_params(labelsize=_TICK_SIZE)
+    title = textwrap.fill(
+        f"{experiment}: MAE vs soft preference ({judge_label})",
+        width=int(_TEXT_WIDTH_IN / (_TITLE_SIZE * _CHAR_IN_PER_PT)),
+    )
+    ax.set_title(title, fontsize=_TITLE_SIZE, pad=16)
+    ax.grid(True, linestyle="--", alpha=0.4)
+    ax.legend(fontsize=_LEGEND_SIZE, loc="best")
+
+    ys = [point.soft for point in points]
+    y_low, y_high = min(ys), max(ys)
+    pad = max((y_high - y_low) * 0.15, 0.01)
+    ax.set_ylim(y_low - pad, y_high + pad)
+
+    fig.tight_layout()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=_DPI)
+    fig.savefig(path.with_suffix(".pdf"))
+    plt.close(fig)
+
+
+def render_tradeoff(
+    experiment: str,
+    records_by_judge: dict[str, list[ScoredRun]],
+    *,
+    output_dir: Path | None = None,
+) -> list[Path]:
+    dest = figures_dir(experiment, output_dir=output_dir)
+    paths: list[Path] = []
+    per_judge: list[list[_TradeoffPoint]] = []
+    judge_labels: list[str] = []
+    for judge in all_judges():
+        records = records_by_judge.get(judge.key)
+        if not records:
+            continue
+        points = _tradeoff_points(records)
+        if not points:
+            continue
+        per_judge.append(points)
+        judge_labels.append(judge.label)
+        path = dest / f"tradeoff_{judge.key}.png"
+        _render_tradeoff_figure(experiment, judge.label, points, path)
+        paths.extend([path, path.with_suffix(".pdf")])
+
+    if len(per_judge) > 1:
+        mean_points = _mean_tradeoff_points(per_judge)
+        if mean_points:
+            path = dest / "tradeoff_judge_mean.png"
+            _render_tradeoff_figure(experiment, f"mean of {' and '.join(judge_labels)}", mean_points, path)
+            paths.extend([path, path.with_suffix(".pdf")])
+    return paths
+
+
 def render_experiment(
     name: str,
     records_by_judge: dict[str, list[ScoredRun]],
@@ -285,6 +436,8 @@ def render_experiment(
         for grouping in extra_groupings:
             extra_path = dest / f"{metric.key}_{grouping.key}.png"
             paths.extend(_write_metric_figure(name, filtered, metric, extra_path, grouping=grouping))
+    if extra_groupings:
+        paths.extend(render_tradeoff(name, records_by_judge, output_dir=output_dir))
     return paths
 
 
