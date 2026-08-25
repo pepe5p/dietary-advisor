@@ -8,11 +8,12 @@ numbers are generated here.
 from __future__ import annotations
 
 import statistics
+from collections.abc import Callable
 from pathlib import Path
 
 from evaluation.case_runner.grid import experiment_runs, EXPERIMENTS
 from evaluation.judges import all_judges
-from evaluation.plotting.stats import _short_model_name, _variant_order, primary_records
+from evaluation.plotting.stats import _short_model_name, _variant_order, primary_records, variant_display_label
 from evaluation.records import scored_runs, ScoredRun
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -35,8 +36,7 @@ def _group_by(records: list[ScoredRun], key: str) -> dict[str, list[ScoredRun]]:
     return groups
 
 
-# Trailing backslash is LaTeX's escaped inter-word space, keeping "agg." from being read as a sentence end.
-_SOFT_METRIC = ("Soft agg.\\", "aggregate")
+_SOFT_METRIC = ("Soft", "aggregate")
 _SAFETY_METRIC = ("Safety", "safety_adherence")
 
 
@@ -68,13 +68,19 @@ def _judge_cells(columns: list[tuple[str, dict[str, float]]], group_key: str) ->
     return cells
 
 
-def variant_summary_table(records_by_judge: dict[str, list[ScoredRun]]) -> str:
-    """One row per ablation variant: error, preference and operational metrics, averaged over all runs."""
-    groups = _group_by(primary_records(records_by_judge), "variant")
-    order = _variant_order(set(groups))
-    judge_columns = _judge_columns(records_by_judge, "variant", (_SOFT_METRIC, _SAFETY_METRIC))
+def _summary_table(
+    records_by_judge: dict[str, list[ScoredRun]],
+    *,
+    key: str,
+    first_header: str,
+    order: Callable[[set[str]], list[str]],
+    row_label: Callable[[str], str],
+) -> str:
+    """Both summary tables carry the same metrics in the same order; only the grouping differs."""
+    groups = _group_by(primary_records(records_by_judge), key)
+    judge_columns = _judge_columns(records_by_judge, key, (_SOFT_METRIC, _SAFETY_METRIC))
 
-    headers = ["Variant", r"MAE~[\%]", r"MSE~[\%]", "Iter.", r"Elapsed~[s]"]
+    headers = [first_header, r"MAE~[\%]", r"MSE~[\%]", "Iter.", "Calls", r"Elapsed~[s]"]
     headers += [head for head, _ in judge_columns]
     lines = [
         rf"\begin{{tabular}}{{{'l' + 'r' * (len(headers) - 1)}}}",
@@ -82,13 +88,14 @@ def variant_summary_table(records_by_judge: dict[str, list[ScoredRun]]) -> str:
         " & ".join(headers) + r" \\",
         r"\midrule",
     ]
-    for label in order:
+    for label in order(set(groups)):
         group = groups[label]
         cells = [
-            _escape(label),
+            row_label(label),
             f"{statistics.fmean(r.mae_pct for r in group):.2f}",
             f"{statistics.fmean(r.mse_pct for r in group):.2f}",
             f"{statistics.fmean(r.iterations for r in group):.2f}",
+            f"{statistics.fmean(r.totaller_calls for r in group):.2f}",
             f"{statistics.fmean(r.elapsed_s for r in group):.1f}",
             *_judge_cells(judge_columns, label),
         ]
@@ -97,34 +104,30 @@ def variant_summary_table(records_by_judge: dict[str, list[ScoredRun]]) -> str:
     return "\n".join(lines)
 
 
-def model_summary_table(records_by_judge: dict[str, list[ScoredRun]]) -> str:
-    """One row per model under the full variant: error, preference and operational metrics."""
-    groups = _group_by(primary_records(records_by_judge), "llm_model")
-    soft_columns = _judge_columns(records_by_judge, "llm_model", (_SOFT_METRIC,))
+def variant_summary_table(records_by_judge: dict[str, list[ScoredRun]]) -> str:
+    """One row per ablation variant, averaged over all runs."""
+    return _summary_table(
+        records_by_judge,
+        key="variant",
+        first_header="Variant",
+        order=_variant_order,
+        row_label=lambda label: _escape(variant_display_label(label)),
+    )
 
-    headers = ["Model", r"MAE~[\%]", *(head for head, _ in soft_columns), "Iter.", r"Elapsed~[s]"]
-    lines = [
-        rf"\begin{{tabular}}{{{'l' + 'r' * (len(headers) - 1)}}}",
-        r"\toprule",
-        " & ".join(headers) + r" \\",
-        r"\midrule",
-    ]
-    for model in sorted(groups):
-        group = groups[model]
-        cells = [
-            _escape(_short_model_name(model)),
-            f"{statistics.fmean(r.mae_pct for r in group):.2f}",
-            *_judge_cells(soft_columns, model),
-            f"{statistics.fmean(r.iterations for r in group):.2f}",
-            f"{statistics.fmean(r.elapsed_s for r in group):.1f}",
-        ]
-        lines.append(" & ".join(cells) + r" \\")
-    lines += [r"\bottomrule", r"\end{tabular}"]
-    return "\n".join(lines)
+
+def model_summary_table(records_by_judge: dict[str, list[ScoredRun]]) -> str:
+    """One row per model-and-effort configuration under the full variant."""
+    return _summary_table(
+        records_by_judge,
+        key="llm_model",
+        first_header="Model",
+        order=sorted,
+        row_label=lambda model: _escape(_short_model_name(model)),
+    )
 
 
 def per_scenario_mae_table(records: list[ScoredRun]) -> str:
-    """Mean MAE% for every (scenario, variant) pair of a single-model ablation grid."""
+    """Mean macro error for every (scenario, variant) pair of a single-model ablation grid."""
     variants = _variant_order({r.variant for r in records})
     scenarios = sorted({r.scenario_id for r in records})
 
@@ -133,7 +136,7 @@ def per_scenario_mae_table(records: list[ScoredRun]) -> str:
         by_pair.setdefault((record.scenario_id, record.variant), []).append(record.mae_pct)
 
     col_spec = "l" + "r" * len(variants)
-    header = "Scenario & " + " & ".join(_escape(v) for v in variants) + r" \\"
+    header = "Scenario & " + " & ".join(_escape(variant_display_label(v)) for v in variants) + r" \\"
     lines = [
         rf"\begin{{tabular}}{{{col_spec}}}",
         r"\toprule",

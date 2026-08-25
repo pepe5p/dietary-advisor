@@ -18,11 +18,10 @@ from evaluation.plotting.stats import (
     _bare_model_order,
     _bare_short_model_name,
     _default_grouping,
-    _group_records,
     _resolved_effort,
-    _short_model_name,
     BY_EFFORT,
     BY_MODEL,
+    experiment_display_label,
     group_metric_stats,
     group_metric_stats_by_judge,
     grouped_metric_stats,
@@ -35,6 +34,9 @@ from evaluation.plotting.stats import (
     primary_records,
     SOFT_METRIC,
     SPREAD_COLUMN_LABEL,
+    stacked_group_stats,
+    StackedMetric,
+    TOKEN_STACK,
     variability_by_judge,
 )
 from evaluation.records import ScoredRun
@@ -109,25 +111,11 @@ def figures_dir(experiment: str, *, output_dir: Path | None = None) -> Path:
     return resolve_output_dir(output_dir) / "figures" / experiment
 
 
-def _figure_title(
-    experiment: str,
-    records: list[ScoredRun],
-    metric: Metric,
-    grouping: Grouping | None = None,
-) -> str:
-    groups = _group_records(records)
-    models = {model for model, _ in groups}
-    variants = {variant for _, variant in groups}
-    extras: list[str] = []
-    if len(models) == 1:
-        extras.append(_short_model_name(next(iter(models))))
-    elif len(variants) == 1:
-        extras.append(next(iter(variants)))
+def _figure_title(experiment: str, metric: Metric, grouping: Grouping | None = None) -> str:
+    prefix = experiment_display_label(experiment)
     if grouping is not None and grouping.title:
-        extras.append(grouping.title)
-    if extras:
-        return f"{experiment}: {metric.title} ({', '.join(extras)})"
-    return f"{experiment}: {metric.title}"
+        return f"{prefix}: {metric.title} ({grouping.title})"
+    return f"{prefix}: {metric.title}"
 
 
 def _filter_records(
@@ -142,6 +130,9 @@ def _filter_records(
 
 
 def _error_bounds(stats: list[GroupStats], metric: Metric) -> tuple[list[float], list[float]]:
+    if not metric.error_bars:
+        zeros = [0.0] * len(stats)
+        return zeros, zeros
     upper = [group.sem for group in stats]
     if metric.floor is None:
         return upper, upper
@@ -199,7 +190,7 @@ def _render_metric_figure(
     n_groups = len(labels)
     n_series = len(series)
     bar_width = 0.8 / n_series
-    show_error_bars = any(group.n > 1 for _, stats in series for group in stats)
+    show_error_bars = metric.error_bars and any(group.n > 1 for _, stats in series for group in stats)
     value_texts = [f"{group.mean:.{metric.decimals}f}" for _, stats in series for group in stats]
     layout = _plan_layout(labels, value_texts, n_series)
 
@@ -236,7 +227,7 @@ def _render_metric_figure(
     ax.set_xticklabels(labels, rotation=layout.tick_rotation, ha=layout.tick_alignment)
     ax.tick_params(labelsize=_TICK_SIZE)
     ax.set_ylabel(metric.ylabel, fontsize=_AXIS_LABEL_SIZE)
-    title = textwrap.fill(_figure_title(experiment, records, metric, grouping), width=layout.title_wrap)
+    title = textwrap.fill(_figure_title(experiment, metric, grouping), width=layout.title_wrap)
     ax.set_title(title, fontsize=_TITLE_SIZE, pad=16)
     if show_error_bars:
         ax.text(
@@ -276,6 +267,86 @@ def _write_metric_figure(
     return [path, path.with_suffix(".pdf")]
 
 
+def _format_tokens(value: float) -> str:
+    if value >= 1000:
+        thousands = value / 1000
+        if thousands >= 10 or thousands == int(thousands):
+            return f"{thousands:.0f}k"
+        return f"{thousands:.1f}k"
+    return f"{value:.0f}"
+
+
+def _render_stacked_figure(
+    experiment: str,
+    records: list[ScoredRun],
+    stack: StackedMetric,
+    path: Path,
+    *,
+    grouping: Grouping | None = None,
+) -> None:
+    # Four stacked SEMs are unreadable; the bar total is labelled instead.
+    labels, series = stacked_group_stats(records, stack, grouping)
+    n_groups = len(labels)
+    totals = [sum(stats[idx].mean for _, stats in series) for idx in range(n_groups)]
+    value_texts = [_format_tokens(total) for total in totals]
+    layout = _plan_layout(labels, value_texts, 1)
+
+    fig, ax = plt.subplots(figsize=layout.figsize)
+    x = range(n_groups)
+    bottom = [0.0] * n_groups
+    for series_idx, (series_label, stats) in enumerate(series):
+        heights = [group.mean for group in stats]
+        ax.bar(
+            list(x),
+            heights,
+            width=0.6,
+            bottom=bottom,
+            color=_SERIES_COLORS[series_idx % len(_SERIES_COLORS)],
+            label=series_label,
+        )
+        bottom = [base + height for base, height in zip(bottom, heights, strict=True)]
+
+    for idx, total in enumerate(totals):
+        ax.text(
+            idx,
+            total,
+            _format_tokens(total),
+            ha="center",
+            va="bottom",
+            fontsize=_VALUE_SIZE,
+            rotation=layout.value_rotation,
+        )
+
+    ax.set_xticks(list(x))
+    ax.set_xticklabels(labels, rotation=layout.tick_rotation, ha=layout.tick_alignment)
+    ax.tick_params(labelsize=_TICK_SIZE)
+    ax.set_ylabel(stack.ylabel, fontsize=_AXIS_LABEL_SIZE)
+    title = textwrap.fill(_figure_title(experiment, stack.total, grouping), width=layout.title_wrap)
+    ax.set_title(title, fontsize=_TITLE_SIZE, pad=16)
+    ax.grid(axis="y", linestyle="--", alpha=0.4)
+    ax.legend(fontsize=_LEGEND_SIZE)
+    high = max(totals, default=0.0)
+    top = high * 1.1 if high else 1.0
+    ax.set_ylim(0.0, top + top * layout.headroom)
+
+    fig.tight_layout()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=_DPI)
+    fig.savefig(path.with_suffix(".pdf"))
+    plt.close(fig)
+
+
+def _write_stacked_figure(
+    name: str,
+    records: list[ScoredRun],
+    stack: StackedMetric,
+    path: Path,
+    grouping: Grouping | None = None,
+) -> list[Path]:
+    _render_stacked_figure(name, records, stack, path, grouping=grouping)
+    return [path, path.with_suffix(".pdf")]
+
+
 @dataclass(frozen=True)
 class _TradeoffPoint:
     label: str
@@ -312,7 +383,7 @@ def _tradeoff_points(records: list[ScoredRun]) -> list[_TradeoffPoint]:
 
 
 def _mean_tradeoff_points(points_by_judge: list[list[_TradeoffPoint]]) -> list[_TradeoffPoint]:
-    """Per-configuration soft aggregate averaged over the judges; MAE is judge-independent."""
+    """Per-configuration soft score averaged over the judges; macro error is judge-independent."""
     soft_by_label: dict[str, list[float]] = {}
     for points in points_by_judge:
         for point in points:
@@ -361,10 +432,10 @@ def _render_tradeoff_figure(
     ax.xaxis.set_minor_locator(NullLocator())
     ax.xaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:g}"))
     ax.set_xlabel(f"{MAE_METRIC.ylabel} ($\\log_{{10}}$ scale)", fontsize=_AXIS_LABEL_SIZE)
-    ax.set_ylabel(SOFT_METRIC.title, fontsize=_AXIS_LABEL_SIZE)
+    ax.set_ylabel(SOFT_METRIC.ylabel, fontsize=_AXIS_LABEL_SIZE)
     ax.tick_params(labelsize=_TICK_SIZE)
     title = textwrap.fill(
-        f"{experiment}: MAE vs soft preference ({judge_label})",
+        f"{experiment_display_label(experiment)}: {MAE_METRIC.title} vs {SOFT_METRIC.title.lower()} ({judge_label})",
         width=int(_TEXT_WIDTH_IN / (_TITLE_SIZE * _CHAR_IN_PER_PT)),
     )
     ax.set_title(title, fontsize=_TITLE_SIZE, pad=16)
@@ -436,6 +507,10 @@ def render_experiment(
         for grouping in extra_groupings:
             extra_path = dest / f"{metric.key}_{grouping.key}.png"
             paths.extend(_write_metric_figure(name, filtered, metric, extra_path, grouping=grouping))
+    paths.extend(_write_stacked_figure(name, primary, TOKEN_STACK, dest / TOKEN_STACK.filename))
+    for grouping in extra_groupings:
+        extra_path = dest / f"{TOKEN_STACK.key}_{grouping.key}.png"
+        paths.extend(_write_stacked_figure(name, primary, TOKEN_STACK, extra_path, grouping=grouping))
     if extra_groupings:
         paths.extend(render_tradeoff(name, records_by_judge, output_dir=output_dir))
     return paths
@@ -491,7 +566,6 @@ def render_run_variability(
     groups_by_judge: dict[str, list[list[ScoredRun]]],
     *,
     output_dir: Path | None = None,
-    reps: int = 3,
 ) -> list[Path]:
     label_order, series = variability_by_judge(groups_by_judge, SOFT_METRIC)
     if not series:
@@ -506,7 +580,7 @@ def render_run_variability(
     fig, ax = plt.subplots(figsize=layout.figsize)
     _render_variability_subplot(ax, label_order, series, layout)
 
-    title = f"Run-to-run variability: {SOFT_METRIC.title} ({reps} reps per spec)"
+    title = f"Variability of {SOFT_METRIC.title.lower()}"
     ax.set_title(textwrap.fill(title, width=layout.title_wrap), fontsize=_TITLE_SIZE)
     fig.tight_layout()
     path.parent.mkdir(parents=True, exist_ok=True)

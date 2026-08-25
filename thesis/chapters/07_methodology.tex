@@ -1,7 +1,7 @@
 \chapter{Experimental methodology}
 \label{cha:methodology}
 
-This chapter defines exactly how the three hypotheses from \Cref{sec:introduction-goal} are tested. Because the claims this thesis makes are comparative -- one configuration is more accurate than another -- almost all of the methodological effort goes into making sure that a measured difference can only be attributed to the thing that was deliberately changed. That concern shapes three decisions described below: the grid varies one factor at a time from a fixed baseline, everything is repeated because neither the system nor the instrument measuring it is deterministic, and the qualitative scoring stage is replicated across two independent judges precisely because that instrument is another language model and cannot be assumed neutral.
+This chapter defines exactly how the three hypotheses from \Cref{sec:introduction-goal} are tested. Because the claims this thesis makes are comparative -- one configuration is more accurate than another -- almost all of the methodological effort goes into making sure that a measured difference can only be attributed to the thing that was deliberately changed. That concern shapes three decisions described in this chapter: the grid varies one factor at a time from a fixed baseline, everything is repeated because neither the system nor the instrument measuring it is deterministic, and the qualitative scoring stage is replicated across two independent judges precisely because that instrument is another language model and cannot be assumed neutral.
 
 Repetition happens on two independent axes, and keeping them apart matters for reading the numbers that follow. Every cell of both experimental grids -- one combination of model, system variant and scenario -- is planned three times, which samples the generating model's own nondeterminism. Each of those runs is then scored three times by each judge, which samples the judge's. The first axis is what \Cref{sec:methodology-stability} quantifies as run-to-run variability; the second is averaged away as described in \Cref{sec:methodology-qualitative}. With that established, the chapter states the research questions, defines the two grids and the scenarios they run against, and specifies every metric reported in \Cref{cha:results}.
 
@@ -16,9 +16,9 @@ The hypotheses in \Cref{sec:introduction-goal} translate into three concrete res
     \item[RQ3] How does plan quality vary with the choice of language model and with its reasoning-effort level, and can raising the effort level substitute for a stronger model?
 \end{description}
 
-RQ1~and RQ2~are answered by a single \emph{component ablation} experiment (\Cref{sec:methodology-variants}) that holds the language model fixed and varies only the totaller and reflection flags. RQ3~is answered by a separate \emph{model comparison} experiment that holds the system configuration fixed at its strongest setting and varies the model and its reasoning-effort level together, as described in \Cref{sec:methodology-model-grid}.
+RQ1~and RQ2~are answered by a single \emph{component ablation} experiment, referred to throughout this thesis as \textbf{Experiment~1} (\Cref{sec:methodology-variants}), which holds the language model fixed and varies only the totaller and reflection flags. RQ3~is answered by a separate \emph{model comparison} experiment, \textbf{Experiment~2} (\Cref{sec:methodology-model-grid}), which holds the system configuration fixed at its strongest setting and varies the model and its reasoning-effort level together. These two names label every result and every generated figure in \Cref{cha:results}.
 
-\section{Ablation variants}
+\section{Experiment 1: component ablation}
 \label{sec:methodology-variants}
 
 The component ablation experiment uses the four-way grid implied by the two independent flags in \Cref{sec:design-variant-config}, summarised in \Cref{tab:methodology-variants}. As established in \Cref{sec:vision-food-lookup-baseline}, food knowledge base access is not one of the varied flags: it is present, identically configured, in every one of the four variants, so that \emph{baseline} in this experiment denotes a system that already looks up real foods and simply lacks the two optional grounding and review mechanisms under study, not a system reasoning about nutrition from the language model's own memory.
@@ -30,9 +30,9 @@ The component ablation experiment uses the four-way grid implied by the two inde
         Variant & Totaller & Reflection \\
         \midrule
         baseline & off & off \\
-        totaller & on & off \\
-        reflective-loop & off & on \\
-        totaller+reflective-loop (\emph{full}) & on & on \\
+        totaller-only & on & off \\
+        reflection-only & off & on \\
+        full & on & on \\
         \bottomrule
     \end{tabular}
     \caption{The four-way component ablation grid. Food knowledge base access is present, unchanged, in every variant.}
@@ -41,7 +41,7 @@ The component ablation experiment uses the four-way grid implied by the two inde
 
 Each of the four variants is run against every scenario in \Cref{sec:methodology-scenarios} with one fixed language model, giving 60 runs in total for this experiment.
 
-\section{Model and reasoning-effort grid}
+\section{Experiment 2: model and reasoning-effort grid}
 \label{sec:methodology-model-grid}
 
 The model comparison experiment fixes the system at the full variant and varies the generating model instead. Two things are varied at once, deliberately: the base model, and the reasoning-effort level that model is asked to run at. Four base models are compared, each at three effort levels, giving twelve configurations. Where a provider's default effort already falls at one of the three levels being compared, that default is used as the level rather than re-requesting it explicitly, so a configuration is identified by a model together with the effort it actually ran at.
@@ -83,7 +83,18 @@ For each tracked nutrient $n$ (energy, protein, carbohydrates, and fat) with a p
 \[
     \mathrm{rel}_n = \frac{\mathrm{actual}_n - \mathrm{target}_n}{\mathrm{target}_n} \times 100\%,
 \]
-where $\mathrm{actual}_n$ is the deterministically computed total for a hydrated plan and $\mathrm{target}_n$ is the profile's frozen target for that nutrient. Each run is summarised by the mean absolute and the mean squared value of $\mathrm{rel}_n$, referred to below as $\mathrm{MAE\%}$ and $\mathrm{MSE\%}$.
+where $\mathrm{actual}_n$ is the deterministically computed total for a hydrated plan and $\mathrm{target}_n$ is the profile's frozen target for that nutrient. Each run is then summarised by the mean absolute and the mean squared value of $\mathrm{rel}_n$.
+
+\begin{definition}[Macro error]
+    \label{def:macro-error}
+    Let $N = \{\text{energy}, \text{protein}, \text{carbohydrate}, \text{fat}\}$ be the aggregated nutrients with a positive target for the run's profile. The \emph{macro error} of a run is
+    \[
+        \mathrm{MAE\%} = \frac{1}{\left| N \right|} \sum_{n \in N} \left| \mathrm{rel}_n \right|,
+        \qquad
+        \mathrm{MSE\%} = \frac{1}{\left| N \right|} \sum_{n \in N} \mathrm{rel}_n^2 .
+    \]
+    Both are non-negative and unbounded above, and both are zero exactly when every aggregated nutrient meets its target, so lower is better. Written without qualification, \emph{macro error} means $\mathrm{MAE\%}$; $\mathrm{MSE\%}$ is always named explicitly. Fibre is recorded per nutrient but is not a member of $N$, for the reason given in \Cref{sec:impl-missing-nutrients}. Neither statistic depends on a judge.
+\end{definition}
 
 Expressing the error relative to its target rather than in absolute nutrient units is what keeps a single figure comparable across nutrients measured on very different scales -- kilocalories against grams of fat, for instance. Both statistics are reported because the failure this evaluation is most interested in is the occasional badly wrong plan rather than a uniform drift away from target, and the two separate those cases. Because both are computed from the stored plan by a deterministic routine, they do not depend on the judges at all, and are identical no matter which judge's records they are read from.
 
@@ -92,14 +103,30 @@ Expressing the error relative to its target rather than in absolute nutrient uni
 
 Everything not captured by an energy or macronutrient number -- whether a recipe is physically coherent, whether a stated allergen was actually avoided, whether an explicit session request was honoured without violating a harder constraint -- is scored by an LLM-as-a-judge stage following the G-Eval pattern described in \Cref{sec:background-evaluation}: a judge model is given an explicit natural-language rubric per criterion and asked to produce both a score and a short justification, rather than a bare number with no accompanying reasoning.
 
-Every run is scored on one criterion present in all scenarios (whether the generated recipes are physically and logically coherent) plus every scenario-specific soft criterion listed for it in \Cref{sec:methodology-scenarios} -- for instance, whether a DASH-appropriate sodium-to-potassium balance was targeted, or whether a stated food preference was honoured without including a disliked food. Each criterion is scored on a continuous $[0, 1]$ scale, and a per-run \emph{soft aggregate} is reported as the mean of all criterion scores for that run. Two further, always-scored fields report \emph{safety adherence} -- a $[0, 1]$ score specifically for whether the plan's allergen exclusions and diet pattern were respected -- and a list of concrete \emph{safety violations} in free text where a judge identifies one, kept separate from the aggregate so that a single serious safety failure cannot be diluted into an otherwise unremarkable average. The judges are explicitly instructed not to penalise a plan for a missing micronutrient figure that the underlying food data itself does not cover, so that the coverage gaps described in \Cref{sec:impl-missing-nutrients} are not double-counted as a plan-quality failure on top of being flagged by the totaller's own coverage warnings.
+Every run is scored on one criterion present in all scenarios (whether the generated recipes are physically and logically coherent) plus every scenario-specific soft criterion listed for it in \Cref{sec:methodology-scenarios} -- for instance, whether a DASH-appropriate sodium-to-potassium balance was targeted, or whether a stated food preference was honoured without including a disliked food. Each criterion is scored on a continuous $[0, 1]$ scale, and the two judged metrics reported in \Cref{cha:results} are built from those scores as follows.
+
+\begin{definition}[Soft score]
+    \label{def:soft-score}
+    Let $K$ be the set of soft criteria applying to a run: the recipe-coherence criterion present in every scenario, plus that scenario's own criteria (\Cref{sec:methodology-scenarios}). A judge scores each $k \in K$ with $s_k \in [0, 1]$, and the \emph{soft score} of one verdict is
+    \[
+        \mathrm{soft} = \frac{1}{\left| K \right|} \sum_{k \in K} s_k .
+    \]
+    The value carried into every figure and table is the mean of this over the three verdicts that judge returned for the run. It lies in $[0, 1]$, higher is better, and it is judge-dependent: it is reported once per judge and never averaged across judges.
+\end{definition}
+
+\begin{definition}[Safety score]
+    \label{def:safety-score}
+    The \emph{safety score} is a single always-scored rubric field in $[0, 1]$ recording whether the plan respected the profile's allergen exclusions and diet pattern, averaged over a judge's three verdicts exactly as the soft score is. It is deliberately not a member of $K$, so a serious safety failure cannot be diluted by the soft-score average. Each verdict also returns a list of the concrete \emph{safety violations} the judge identified, in free text. Higher is better, and it is judge-dependent.
+\end{definition}
+
+The judges are explicitly instructed not to penalise a plan for a missing micronutrient figure that the underlying food data itself does not cover, so that the coverage gaps described in \Cref{sec:impl-missing-nutrients} are not double-counted as a plan-quality failure on top of being flagged by the totaller's own coverage warnings.
 
 An LLM judge is subject to well-documented biases -- a tendency to favour longer or more elaborately reasoned responses, and a self-preference bias when the judge shares a model family with the response under evaluation~\cite{zheng2023judging} -- and it is also a stochastic sampler, so it need not return the same verdict twice on an unchanged plan. Rather than assume either problem away, the protocol is built so that both become measurable, as motivated in \Cref{sec:impl-judges}:
 
 \begin{itemize}
     \item \emph{Two judges, from different vendors.} Every plan is scored independently by both. One of them belongs to the same family as one of the compared configurations, which is exactly the situation self-preference bias would exploit; the other has no such overlap with any compared configuration. A family-specific bias therefore cannot hide, because it would appear as a divergence between two judges reading the same plans against the same rubric.
     \item \emph{Repeated scoring.} On the second of the two repetition axes, the verdicts a judge returns for a run are averaged before its qualitative score is used anywhere, which suppresses judge sampling noise without concealing how large it was.
-    \item \emph{No averaging across judges.} Judge-dependent metrics -- the soft aggregate and safety adherence -- are carried through the whole reporting pipeline as two parallel series and always reported side by side. Collapsing them into one number would destroy precisely the disagreement the second judge exists to reveal.
+    \item \emph{No averaging across judges.} Judge-dependent metrics -- the soft score and safety score -- are carried through the whole reporting pipeline as two parallel series and always reported side by side. Collapsing them into one number would destroy precisely the disagreement the second judge exists to reveal.
 \end{itemize}
 
 \section{Stability metrics}
@@ -107,34 +134,44 @@ An LLM judge is subject to well-documented biases -- a tendency to favour longer
 
 Two further quantities describe how repeatable a result is, rather than how good it is, and both are reported per judge.
 
-The first is \emph{run-to-run variability}: how much the same configuration's soft aggregate moves when the identical request is planned again from scratch. Because the repetitions of one cell differ only in the language model's sampling, the \emph{spread} of that cell is defined as the mean absolute deviation of its soft aggregate about the cell's own mean:
-\[
-    \bar{s}_c = \frac{1}{R} \sum_{r=1}^{R} s_{c,r},
-    \qquad
-    d_c = \frac{1}{R} \sum_{r=1}^{R} \left| s_{c,r} - \bar{s}_c \right|,
-\]
-where:
-\begin{itemize}
-    \item \( c \) -- a cell, that is one combination of language model, system variant and scenario,
-    \item \( R \) -- the number of repetitions of a cell,
-    \item \( s_{c,r} \) -- the soft aggregate one judge awarded to repetition \( r \) of cell \( c \),
-    \item \( \bar{s}_c \) -- the mean soft aggregate of cell \( c \),
-    \item \( d_c \) -- the spread of cell \( c \).
-\end{itemize}
+The first is \emph{run-to-run variability}: how much the same configuration's soft score moves when the identical request is planned again from scratch. Because the repetitions of one cell differ only in the language model's sampling, the dispersion within a cell isolates that sampling noise.
 
-Cell spreads are then averaged over the cells of a single model and over every cell of an experiment:
-\[
-    V_m = \frac{1}{\left| C_m \right|} \sum_{c \in C_m} d_c,
-    \qquad
-    V = \frac{1}{\left| C \right|} \sum_{c \in C} d_c,
-\]
-where:
-\begin{itemize}
-    \item \( C_m \) -- the set of cells whose language model is \( m \),
-    \item \( C \) -- the set of all cells of the experiment,
-    \item \( V_m \) -- the variability reported for model \( m \),
-    \item \( V \) -- the pooled variability of the experiment.
-\end{itemize}
+\begin{definition}[Cell spread]
+    \label{def:spread}
+    The \emph{spread} of a cell is the mean absolute deviation of its soft score about the cell's own mean:
+    \[
+        \bar{s}_c = \frac{1}{R} \sum_{r=1}^{R} s_{c,r},
+        \qquad
+        d_c = \frac{1}{R} \sum_{r=1}^{R} \left| s_{c,r} - \bar{s}_c \right|,
+    \]
+    where:
+    \begin{itemize}
+        \item \( c \) -- a cell, that is one combination of language model, system variant and scenario,
+        \item \( R \) -- the number of repetitions of a cell,
+        \item \( s_{c,r} \) -- the soft score one judge awarded to repetition \( r \) of cell \( c \),
+        \item \( \bar{s}_c \) -- the mean soft score of cell \( c \),
+        \item \( d_c \) -- the spread of cell \( c \).
+    \end{itemize}
+    It is non-negative, expressed on the same $[0, 1]$ scale as the soft score, and lower means more repeatable. Like the soft score it is reported per judge.
+\end{definition}
+
+\begin{definition}[Run-to-run variability]
+    \label{def:variability}
+    The \emph{run-to-run variability} of a model, and of an experiment as a whole, is the mean cell spread over the relevant cells:
+    \[
+        V_m = \frac{1}{\left| C_m \right|} \sum_{c \in C_m} d_c,
+        \qquad
+        V = \frac{1}{\left| C \right|} \sum_{c \in C} d_c,
+    \]
+    where:
+    \begin{itemize}
+        \item \( C_m \) -- the set of cells whose language model is \( m \),
+        \item \( C \) -- the set of all cells of the experiment,
+        \item \( V_m \) -- the variability reported for model \( m \),
+        \item \( V \) -- the pooled variability of the experiment.
+    \end{itemize}
+    Only cells with all of their repetitions scored contribute, so that no cell's spread is computed from a partial sample.
+\end{definition}
 
 The size of $V$ relative to the differences between configurations is what matters for this thesis: a spread of the same order as those differences means they cannot be read as real.
 
@@ -143,4 +180,24 @@ The second is the agreement between the two judges. Because both score every pla
 \section{Operational metrics}
 \label{sec:methodology-operational}
 
-Two further figures are recorded per run without requiring any scoring step: the number of \emph{iterations} the critique-and-refine loop actually performed (zero when reflection is disabled, or when the critic approved the first draft outright) and the run's wall-clock \emph{elapsed time}. Token usage -- input, output and total tokens, and the number of separate model requests a run made -- is recorded alongside these to characterise the computational overhead of each mechanism in \Cref{sec:results-overhead}, though it plays no role in scoring a plan's quality. No monetary cost is reported anywhere in this thesis: converting tokens into money requires per-model prices that change without notice and differ by routing provider, which would make any figure quoted here both unverifiable and quickly wrong.
+Four further figures are recorded per run without requiring any scoring step.
+
+\begin{definition}[Iterations]
+    \label{def:iterations}
+    The \emph{iterations} of a run is the number of refinement passes the critique-and-refine loop completed. It is zero when reflection is disabled for the variant and also when the critic approved the first draft outright, and it is capped at the configured loop budget, three throughout this evaluation. It does not depend on a judge.
+\end{definition}
+
+\begin{definition}[Totaller calls]
+    \label{def:totaller-calls}
+    The \emph{totaller calls} of a run is the number of times the model invoked the deterministic totaller tool of \Cref{sec:design-totaller} while planning, counted across the nutrition agent and the refiner. It is zero when the totaller is disabled for the variant, and it counts only model-initiated invocations: the totals the critic is handed automatically (\Cref{sec:design-reflection}) and the aggregation the scoring stage performs itself (\Cref{sec:methodology-quantitative}) are not model decisions and are excluded. It is unbounded above and does not depend on a judge.
+\end{definition}
+
+\begin{definition}[Elapsed time]
+    \label{def:elapsed-time}
+    The \emph{elapsed time} of a run is its wall-clock duration in seconds, from the start of the planning pipeline to the delivered plan, including every model request and tool call the run made along the way. It does not depend on a judge.
+\end{definition}
+
+\begin{definition}[Token spend]
+    \label{def:token-spend}
+    The \emph{token spend} of a run is the number of tokens billed across every model request the run made, split into four additive categories matching the provider usage fields: cache read, which the provider served from a prompt cache rather than recomputing; input, the remainder of the billed input; output, the remainder of the billed output after reasoning tokens are set aside; and reasoning, the thinking tokens already included in the billed output. It does not depend on a judge and plays no role in scoring a plan's quality. No monetary cost is reported anywhere in this thesis: converting tokens into money requires per-model prices that change without notice and differ by routing provider, which would make any figure quoted here both unverifiable and quickly wrong.
+\end{definition}

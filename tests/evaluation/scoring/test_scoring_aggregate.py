@@ -23,6 +23,7 @@ def test_summarize_averages_within_variant() -> None:
         soft_aggregate=0.7,
         safety_adherence=1.0,
         iterations=1.0,
+        totaller_calls=0.0,
         elapsed_s=3.0,
         n_safety_violations=0,
     )

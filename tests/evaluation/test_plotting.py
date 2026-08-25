@@ -8,14 +8,20 @@ import pytest
 
 from dietary_advisor.config.llm import LlmSpec
 from dietary_advisor.planning.pipeline import VariantConfig
-from evaluation.case_runner.grid import RunSpec
+from evaluation.case_runner.grid import FULL_VARIANT, RunSpec
 from evaluation.judges import all_judges
-from evaluation.plotting.figures import _error_bounds, render_experiment, render_run_variability
+from evaluation.plotting.figures import (
+    _error_bounds,
+    _figure_title,
+    render_experiment,
+    render_run_variability,
+)
 from evaluation.plotting.stats import (
     _short_model_name,
     BY_EFFORT,
     BY_MODEL,
     complete_spec_groups,
+    experiment_display_label,
     group_metric_stats,
     group_metric_stats_by_judge,
     grouped_metric_stats,
@@ -28,7 +34,10 @@ from evaluation.plotting.stats import (
     pooled_variability,
     POOLED_VARIABILITY_LABEL,
     SOFT_METRIC,
+    stacked_group_stats,
+    TOKEN_STACK,
     variability_by_judge,
+    variant_display_label,
 )
 from evaluation.records import ScoredRun
 from tests.evaluation.conftest import make_scored_run
@@ -45,6 +54,7 @@ def _score_record(
     soft: float = 0.8,
     safety: float = 1.0,
     iterations: int = 1,
+    totaller_calls: int = 0,
     elapsed_s: float = 2.0,
 ) -> ScoredRun:
     return make_scored_run(
@@ -55,6 +65,7 @@ def _score_record(
         soft=soft,
         safety=safety,
         iterations=iterations,
+        totaller_calls=totaller_calls,
         elapsed_s=elapsed_s,
     )
 
@@ -62,6 +73,32 @@ def _score_record(
 def test_short_model_name_renders_effort_suffix() -> None:
     assert _short_model_name("openrouter:openai/gpt-5.6-luna") == "gpt-5.6-luna"
     assert _short_model_name("openrouter:openai/gpt-5.6-luna#xhigh") == "gpt-5.6-luna (xhigh)"
+
+
+def test_variant_display_label_maps_full_variant() -> None:
+    assert variant_display_label(FULL_VARIANT.label) == "full"
+    assert variant_display_label("baseline") == "baseline"
+    assert variant_display_label("totaller") == "totaller-only"
+    assert variant_display_label("reflective-loop") == "reflection-only"
+
+
+def test_metric_display_names() -> None:
+    assert MAE_METRIC.title == "Macro error"
+    assert MAE_METRIC.ylabel == "Macro error [%]"
+    assert SOFT_METRIC.title == "Soft score"
+    assert SOFT_METRIC.ylabel == "Soft score"
+
+
+def test_experiment_display_label_numbers_the_grids() -> None:
+    assert experiment_display_label("ablation") == "Experiment 1"
+    assert experiment_display_label("models") == "Experiment 2"
+    assert experiment_display_label("stability") == "stability"
+
+
+def test_figure_title_carries_experiment_number_and_grouping() -> None:
+    assert _figure_title("ablation", MAE_METRIC) == "Experiment 1: Macro error"
+    assert _figure_title("models", MAE_METRIC) == "Experiment 2: Macro error"
+    assert _figure_title("models", MAE_METRIC, BY_MODEL) == "Experiment 2: Macro error (grouped by model)"
 
 
 def test_group_metric_stats_computes_mean_and_std_for_reps() -> None:
@@ -72,7 +109,7 @@ def test_group_metric_stats_computes_mean_and_std_for_reps() -> None:
     ]
     stats = group_metric_stats(records, MAE_METRIC)
 
-    assert [group.label for group in stats] == ["baseline", "totaller"]
+    assert [group.label for group in stats] == ["baseline", "totaller-only"]
     baseline = stats[0]
     assert baseline.n == 2
     assert baseline.mean == pytest.approx(10.0)
@@ -89,9 +126,9 @@ def test_group_metric_stats_orders_variants_by_grid_definition() -> None:
     stats = group_metric_stats(records, MAE_METRIC)
     assert [group.label for group in stats] == [
         "baseline",
-        "totaller",
-        "reflective-loop",
-        "totaller+reflective-loop",
+        "totaller-only",
+        "reflection-only",
+        "full",
     ]
 
 
@@ -115,7 +152,7 @@ def test_group_metric_stats_by_judge_aligns_labels() -> None:
 
 
 def test_render_experiment_writes_one_png_per_plot_metric(tmp_path: Path) -> None:
-    variant = VariantConfig(totaller_enabled=False, reflection_enabled=True)
+    variant = VariantConfig(totaller_enabled=True, reflection_enabled=True)
     records = [
         _score_record(variant=variant.label, scenario_id="regular", mae_pct=5.0),
         _score_record(variant=variant.label, scenario_id="vegetarian-allergic", mae_pct=7.0),
@@ -123,7 +160,7 @@ def test_render_experiment_writes_one_png_per_plot_metric(tmp_path: Path) -> Non
     paths = render_experiment("ablation", {JUDGE_A.key: records}, output_dir=tmp_path)
 
     png_names = {path.name for path in paths if path.suffix == ".png"}
-    assert png_names == {metric.filename for metric in PLOT_METRICS}
+    assert png_names == {metric.filename for metric in PLOT_METRICS} | {TOKEN_STACK.filename}
     assert "safety_adherence.png" not in png_names
     assert "tradeoff_judge_1.png" not in png_names
     for path in paths:
@@ -143,6 +180,20 @@ def test_render_experiment_skips_iterations_without_reflection(tmp_path: Path) -
 
     png_names = {path.name for path in paths if path.suffix == ".png"}
     assert "iterations.png" not in png_names
+    assert "totaller_calls.png" not in png_names
+    assert "safety_adherence.png" not in png_names
+
+
+def test_render_experiment_skips_totaller_calls_without_totaller(tmp_path: Path) -> None:
+    variant = VariantConfig(totaller_enabled=False, reflection_enabled=True)
+    records = [
+        _score_record(variant=variant.label, scenario_id="regular", mae_pct=5.0),
+        _score_record(variant=variant.label, scenario_id="vegetarian-allergic", mae_pct=7.0),
+    ]
+    paths = render_experiment("ablation", {JUDGE_A.key: records}, output_dir=tmp_path)
+
+    png_names = {path.name for path in paths if path.suffix == ".png"}
+    assert "totaller_calls.png" not in png_names
     assert "safety_adherence.png" not in png_names
 
 
@@ -156,6 +207,9 @@ def test_render_experiment_writes_extra_model_groupings(tmp_path: Path) -> None:
     png_names = {path.name for path in paths if path.suffix == ".png"}
     assert "mae_pct_by_model.png" in png_names
     assert "mae_pct_by_effort.png" in png_names
+    assert "tokens.png" in png_names
+    assert "tokens_by_model.png" in png_names
+    assert "tokens_by_effort.png" in png_names
     dest = tmp_path / "figures" / "models"
     assert (dest / "mae_pct_by_model.png").stat().st_size > 0
     assert (dest / "mae_pct_by_effort.png").stat().st_size > 0
@@ -448,8 +502,80 @@ def test_error_bounds_uses_sem_when_above_floor() -> None:
     assert lower == [pytest.approx(0.2)]
 
 
+def test_error_bounds_are_zero_for_a_metric_without_error_bars() -> None:
+    stats = [GroupStats(label="soft", mean=0.8, std=0.1, n=4)]
+    lower, upper = _error_bounds(stats, SOFT_METRIC)
+
+    assert lower == [0.0]
+    assert upper == [0.0]
+
+
 def test_soft_metric_uses_three_decimal_places() -> None:
     assert SOFT_METRIC.decimals == 3
+
+
+def test_token_segments_sum_to_the_total() -> None:
+    records = [
+        make_scored_run(
+            variant="baseline",
+            input_tokens=100,
+            output_tokens=40,
+            cache_read_tokens=30,
+            reasoning_tokens=10,
+        ),
+        make_scored_run(
+            variant="totaller",
+            input_tokens=200,
+            output_tokens=80,
+            cache_read_tokens=120,
+            reasoning_tokens=20,
+        ),
+    ]
+    labels, series = stacked_group_stats(records, TOKEN_STACK)
+    assert labels == ["baseline", "totaller-only"]
+    for idx in range(len(labels)):
+        segment_sum = sum(stats[idx].mean for _, stats in series)
+        total = records[idx].input_tokens + records[idx].output_tokens
+        assert segment_sum == pytest.approx(total)
+
+
+def test_stacked_group_stats_orders_by_the_total_under_sort_desc() -> None:
+    records = [
+        make_scored_run(
+            llm_model="openrouter:google/gemini-3.6-flash",
+            variant="totaller+reflective-loop",
+            input_tokens=50,
+            output_tokens=5,
+            cache_read_tokens=40,
+            reasoning_tokens=0,
+        ),
+        make_scored_run(
+            llm_model="openrouter:openai/gpt-5.6-luna",
+            variant="totaller+reflective-loop",
+            input_tokens=100,
+            output_tokens=10,
+            cache_read_tokens=10,
+            reasoning_tokens=0,
+        ),
+    ]
+    labels, series = stacked_group_stats(records, TOKEN_STACK)
+    assert labels == ["gpt-5.6-luna", "gemini-3.6-flash"]
+    cached = next(stats for title, stats in series if title == "Cache read")
+    assert [group.mean for group in cached] == [pytest.approx(10.0), pytest.approx(40.0)]
+
+
+def test_missing_reasoning_tokens_yield_non_negative_segments() -> None:
+    record = make_scored_run(
+        input_tokens=50,
+        output_tokens=100,
+        cache_read_tokens=80,
+        reasoning_tokens=None,
+    )
+    assert record.reasoning_tokens == 0
+    assert record.visible_output_tokens == 100
+    assert record.fresh_input_tokens == 0
+    _, series = stacked_group_stats([record], TOKEN_STACK)
+    assert all(group.mean >= 0 for _, stats in series for group in stats)
 
 
 def test_render_experiment_writes_tradeoff_per_judge(tmp_path: Path) -> None:

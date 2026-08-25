@@ -60,7 +60,7 @@ def evaluate(
     _configure_logging(verbose)
     from evaluation.case_runner import is_done, planned_runs
     from evaluation.judges import all_judges, JUDGE_REPS
-    from evaluation.plotting import primary_records
+    from evaluation.plotting import primary_records, variant_display_label
     from evaluation.records import scored_runs
     from evaluation.scoring import score_runs, scored_reps, summarize
 
@@ -118,12 +118,13 @@ def evaluate(
     table.add_column("Model")
     table.add_column("Variant")
     table.add_column("No. Runs", justify="right")
-    table.add_column("Avg. MAE %", justify="right")
+    table.add_column("Avg. macro error %", justify="right")
     table.add_column("Avg. Elapsed s", justify="right")
     table.add_column("Avg. Iterations", justify="right")
+    table.add_column("Avg. Totaller calls", justify="right")
     for judge in all_judges():
-        table.add_column(f"Avg. Soft {judge.label}", justify="right")
-        table.add_column(f"Avg. Safety {judge.label}", justify="right")
+        table.add_column(f"Avg. soft score {judge.label}", justify="right")
+        table.add_column(f"Avg. safety score {judge.label}", justify="right")
         table.add_column(f"No. Violations {judge.label}", justify="right")
 
     for row in summarize(primary):
@@ -142,11 +143,12 @@ def evaluate(
             )
         table.add_row(
             row.llm_model,
-            row.variant,
+            variant_display_label(row.variant),
             str(row.n_runs),
             f"{row.mae_pct:.2f}",
             f"{row.elapsed_s:.2f}",
             f"{row.iterations:.2f}",
+            f"{row.totaller_calls:.2f}",
             *judge_cells,
         )
     console.print(table)

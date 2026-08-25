@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from dietary_advisor.agents.nutrition.agent import total_meal_plan
 from evaluation.case_runner.grid import RunSpec
 from evaluation.case_runner.store import load as load_run
 from evaluation.case_runner.store import RunRecord
@@ -17,6 +18,8 @@ from evaluation.judges import Judge
 from evaluation.scoring.store import is_scored, ScoreRecord
 from evaluation.scoring.store import load as load_score
 from evaluation.validation.qualitative import QualitativeResult
+
+_TOTALLER_TOOL = total_meal_plan.__name__
 
 
 @dataclass(frozen=True)
@@ -43,6 +46,45 @@ class ScoredRun:
     @property
     def elapsed_s(self) -> float:
         return self.score.elapsed_s
+
+    @property
+    def totaller_enabled(self) -> bool:
+        return self.run.totaller_enabled
+
+    @property
+    def totaller_calls(self) -> int:
+        tool_calls = self.run.telemetry.get("tool_calls", {})
+        return int(tool_calls.get(_TOTALLER_TOOL, 0))
+
+    def _telemetry_int(self, key: str) -> int:
+        value = self.run.telemetry.get(key)
+        return 0 if value is None else int(value)
+
+    @property
+    def input_tokens(self) -> int:
+        return self._telemetry_int("input_tokens")
+
+    @property
+    def output_tokens(self) -> int:
+        return self._telemetry_int("output_tokens")
+
+    @property
+    def cache_read_tokens(self) -> int:
+        return self._telemetry_int("cache_read_tokens")
+
+    @property
+    def reasoning_tokens(self) -> int:
+        return self._telemetry_int("reasoning_tokens")
+
+    # Subtractions are clamped: cache-read can exceed input, and reasoning
+    # can be missing or exceed output.
+    @property
+    def fresh_input_tokens(self) -> int:
+        return max(self.input_tokens - self.cache_read_tokens, 0)
+
+    @property
+    def visible_output_tokens(self) -> int:
+        return max(self.output_tokens - self.reasoning_tokens, 0)
 
     @property
     def qualitative(self) -> QualitativeResult:

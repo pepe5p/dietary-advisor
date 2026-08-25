@@ -9,7 +9,15 @@ from pydantic import BaseModel, ConfigDict
 
 from dietary_advisor.config.llm import LlmSpec
 from dietary_advisor.planning.pipeline import VariantConfig
-from evaluation.case_runner.grid import DEFAULT_EFFORT, MODEL_COMPARISON_MODELS, RunSpec, VARIANTS
+from evaluation.case_runner.grid import (
+    BASELINE,
+    DEFAULT_EFFORT,
+    EXPERIMENTS,
+    FULL_VARIANT,
+    MODEL_COMPARISON_MODELS,
+    RunSpec,
+    VARIANTS,
+)
 from evaluation.judges import all_judges
 from evaluation.records import ScoredRun
 
@@ -42,6 +50,7 @@ class Metric:
     # at this value rather than implying impossible readings.
     floor: float | None = 0.0
     decimals: int = 2
+    error_bars: bool = True
 
     @property
     def filename(self) -> str:
@@ -79,7 +88,7 @@ class ModelVariability(BaseModel):
     n_specs: int
 
 
-SPREAD_COLUMN_LABEL = "Spread (mean |run - spec mean|)"
+SPREAD_COLUMN_LABEL = "Spread"
 POOLED_VARIABILITY_LABEL = "all"
 
 
@@ -87,20 +96,23 @@ def _has_reflection(record: ScoredRun) -> bool:
     return record.variant in _REFLECTION_LABELS
 
 
-MAE_METRIC = Metric("mae_pct", "Energy and macronutrient MAE %", "MAE %", lambda record: record.mae_pct)
+MAE_METRIC = Metric("mae_pct", "Macro error", "Macro error [%]", lambda record: record.mae_pct)
 SOFT_METRIC = Metric(
     "soft_aggregate",
-    "Soft preference aggregate",
-    "Score",
+    "Soft score",
+    "Soft score",
     lambda record: record.qualitative.aggregate,
     judge_dependent=True,
     zoom_ylim=True,
     decimals=3,
+    # Soft-score SEMs are far smaller than the zoomed axis makes them look,
+    # and the run-to-run variability figure is what the text reasons about.
+    error_bars=False,
 )
 SAFETY_METRIC = Metric(
     "safety_adherence",
-    "Safety adherence",
-    "Score",
+    "Safety score",
+    "Safety score",
     lambda record: record.qualitative.safety_adherence,
     judge_dependent=True,
 )
@@ -111,19 +123,95 @@ ITERATIONS_METRIC = Metric(
     lambda record: float(record.iterations),
     applies_to=_has_reflection,
 )
+TOTALLER_CALLS_METRIC = Metric(
+    "totaller_calls",
+    "Totaller calls",
+    "Count",
+    lambda record: float(record.totaller_calls),
+    applies_to=lambda record: record.totaller_enabled,
+)
 ELAPSED_METRIC = Metric("elapsed_s", "Elapsed time", "Seconds", lambda record: record.elapsed_s)
+TOKENS_METRIC = Metric(
+    "tokens",
+    "Token spend",
+    "Mean tokens per run",
+    lambda record: float(record.input_tokens + record.output_tokens),
+    decimals=0,
+    error_bars=False,
+)
+CACHED_INPUT_METRIC = Metric(
+    "cache_read_tokens",
+    "Cache read",
+    "Mean tokens per run",
+    lambda record: float(record.cache_read_tokens),
+    decimals=0,
+    error_bars=False,
+)
+FRESH_INPUT_METRIC = Metric(
+    "fresh_input_tokens",
+    "Input",
+    "Mean tokens per run",
+    lambda record: float(record.fresh_input_tokens),
+    decimals=0,
+    error_bars=False,
+)
+VISIBLE_OUTPUT_METRIC = Metric(
+    "visible_output_tokens",
+    "Output",
+    "Mean tokens per run",
+    lambda record: float(record.visible_output_tokens),
+    decimals=0,
+    error_bars=False,
+)
+REASONING_METRIC = Metric(
+    "reasoning_tokens",
+    "Reasoning",
+    "Mean tokens per run",
+    lambda record: float(record.reasoning_tokens),
+    decimals=0,
+    error_bars=False,
+)
+
+
+@dataclass(frozen=True)
+class StackedMetric:
+    key: str
+    title: str
+    ylabel: str
+    total: Metric
+    components: tuple[Metric, ...]
+
+    @property
+    def filename(self) -> str:
+        return f"{self.key}.png"
+
+
+TOKEN_STACK = StackedMetric(
+    "tokens",
+    "Token spend",
+    "Mean tokens per run",
+    TOKENS_METRIC,
+    (CACHED_INPUT_METRIC, FRESH_INPUT_METRIC, VISIBLE_OUTPUT_METRIC, REASONING_METRIC),
+)
 
 METRICS: tuple[Metric, ...] = (
     MAE_METRIC,
     SOFT_METRIC,
     SAFETY_METRIC,
     ITERATIONS_METRIC,
+    TOTALLER_CALLS_METRIC,
     ELAPSED_METRIC,
+    TOKENS_METRIC,
+    CACHED_INPUT_METRIC,
+    FRESH_INPUT_METRIC,
+    VISIBLE_OUTPUT_METRIC,
+    REASONING_METRIC,
 )
 PLOT_METRICS: tuple[Metric, ...] = (
     MAE_METRIC,
     SOFT_METRIC,
     ITERATIONS_METRIC,
+    TOTALLER_CALLS_METRIC,
     ELAPSED_METRIC,
 )
 
@@ -147,6 +235,33 @@ def _ordered(labels: set[str], preferred: list[str]) -> list[str]:
 
 def _variant_order(variants: set[str]) -> list[str]:
     return _ordered(variants, [variant.label for variant in VARIANTS])
+
+
+_VARIANT_DISPLAY = {
+    BASELINE.label: "baseline",
+    VariantConfig(totaller_enabled=True, reflection_enabled=False).label: "totaller-only",
+    VariantConfig(totaller_enabled=False, reflection_enabled=True).label: "reflection-only",
+    FULL_VARIANT.label: "full",
+}
+
+
+def variant_display_label(variant: str) -> str:
+    """Map a stored variant identifier to the name used in figures, tables and prose."""
+    return _VARIANT_DISPLAY.get(variant, variant)
+
+
+def _variant_display_order(labels: set[str]) -> list[str]:
+    return _ordered(labels, [variant_display_label(variant.label) for variant in VARIANTS])
+
+
+# The order of EXPERIMENTS is what assigns the numbers, matching the
+# create_experiment_N_specs factories it maps to; reordering it renumbers the figures.
+_EXPERIMENT_DISPLAY = {name: f"Experiment {n}" for n, name in enumerate(EXPERIMENTS, start=1)}
+
+
+def experiment_display_label(experiment: str) -> str:
+    """Map an experiment key to the name used in figure titles and the thesis."""
+    return _EXPERIMENT_DISPLAY.get(experiment, experiment)
 
 
 def _model_order(models: set[str]) -> list[str]:
@@ -182,20 +297,17 @@ def _effort_bucket(model: str) -> str:
         raise ValueError(f"Unknown effort {effort!r} for {model}") from None
 
 
-def _group_records(records: list[ScoredRun]) -> dict[tuple[str, str], list[ScoredRun]]:
-    groups: dict[tuple[str, str], list[ScoredRun]] = {}
-    for record in records:
-        key = (record.llm_model, record.variant)
-        groups.setdefault(key, []).append(record)
-    return groups
-
-
 def _default_grouping(records: list[ScoredRun]) -> Grouping:
     models = {record.llm_model for record in records}
     variants = {record.variant for record in records}
 
     if len(models) == 1:
-        return Grouping(key="", title="", label=lambda record: record.variant, order=_variant_order)
+        return Grouping(
+            key="",
+            title="",
+            label=lambda record: variant_display_label(record.variant),
+            order=_variant_display_order,
+        )
 
     if len(variants) == 1:
         preferred = [_short_model_name(model) for model in _model_order(models)]
@@ -208,11 +320,11 @@ def _default_grouping(records: list[ScoredRun]) -> Grouping:
         )
 
     pairs = sorted({(record.llm_model, record.variant) for record in records})
-    preferred = [f"{_short_model_name(model)} / {variant}" for model, variant in pairs]
+    preferred = [f"{_short_model_name(model)} / {variant_display_label(variant)}" for model, variant in pairs]
     return Grouping(
         key="",
         title="",
-        label=lambda record: f"{_short_model_name(record.llm_model)} / {record.variant}",
+        label=lambda record: f"{_short_model_name(record.llm_model)} / {variant_display_label(record.variant)}",
         order=lambda labels: _ordered(labels, preferred),
         sort_desc=True,
     )
@@ -256,6 +368,25 @@ def grouped_metric_stats(records: list[ScoredRun], metric: Metric, grouping: Gro
 
 def group_metric_stats(records: list[ScoredRun], metric: Metric) -> list[GroupStats]:
     return grouped_metric_stats(records, metric, _default_grouping(records))
+
+
+def stacked_group_stats(
+    records: list[ScoredRun],
+    stack: StackedMetric,
+    grouping: Grouping | None = None,
+) -> tuple[list[str], list[tuple[str, list[GroupStats]]]]:
+    """Component means aligned to the total's group order.
+
+    The models experiment sorts groups by the plotted mean. Each component
+    would pick a different order, so the x-axis is taken from the total.
+    """
+    grouping = grouping or _default_grouping(records)
+    labels = [group.label for group in grouped_metric_stats(records, stack.total, grouping)]
+    series: list[tuple[str, list[GroupStats]]] = []
+    for component in stack.components:
+        by_label = {group.label: group for group in grouped_metric_stats(records, component, grouping)}
+        series.append((component.title, [by_label[label] for label in labels if label in by_label]))
+    return labels, series
 
 
 def primary_records(records_by_judge: dict[str, list[ScoredRun]]) -> list[ScoredRun]:

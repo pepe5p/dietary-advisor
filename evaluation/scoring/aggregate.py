@@ -21,6 +21,7 @@ class VariantSummary(BaseModel):
     soft_aggregate: float
     safety_adherence: float
     iterations: float
+    totaller_calls: float
     elapsed_s: float
     n_safety_violations: int
 
@@ -43,6 +44,7 @@ def summarize(records: list[ScoredRun]) -> list[VariantSummary]:
                 soft_aggregate=round(_mean([r.qualitative.aggregate for r in group]), 4),
                 safety_adherence=round(_mean([r.qualitative.safety_adherence for r in group]), 4),
                 iterations=round(_mean([float(r.iterations) for r in group]), 2),
+                totaller_calls=round(_mean([float(r.totaller_calls) for r in group]), 2),
                 elapsed_s=round(_mean([r.elapsed_s for r in group]), 2),
                 n_safety_violations=sum(len(r.qualitative.safety_violations) for r in group),
             ),

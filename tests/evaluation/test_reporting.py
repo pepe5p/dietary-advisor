@@ -24,6 +24,7 @@ def _score_record(
     soft: float = 0.8,
     safety: float = 1.0,
     iterations: int = 1,
+    totaller_calls: int = 0,
     elapsed_s: float = 2.0,
 ) -> ScoredRun:
     return make_scored_run(
@@ -34,6 +35,7 @@ def _score_record(
         soft=soft,
         safety=safety,
         iterations=iterations,
+        totaller_calls=totaller_calls,
         elapsed_s=elapsed_s,
     )
 
@@ -63,6 +65,8 @@ def test_write_experiment_metrics_round_trips_and_matches_group_stats(tmp_path: 
     assert report.n_runs == 3
     assert "mae_pct" in report.metrics
     assert "soft_aggregate_judge_1" in report.metrics
+    assert "tokens" in report.metrics
+    assert "cache_read_tokens" in report.metrics
 
     mae_metric = next(metric for metric in METRICS if metric.key == "mae_pct")
     expected_groups = group_metric_stats(records, mae_metric)

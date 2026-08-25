@@ -92,7 +92,12 @@ def make_scored_run(
     safety: float = 1.0,
     safety_violations: list[str] | None = None,
     iterations: int = 1,
+    totaller_calls: int = 0,
     elapsed_s: float = 2.0,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+    cache_read_tokens: int = 0,
+    reasoning_tokens: int | None = 0,
     judge_model: str = "test-judge",
     query: str = "",
 ) -> ScoredRun:
@@ -111,7 +116,13 @@ def make_scored_run(
             mse_pct=mae_pct**2 if mse_pct is None else mse_pct,
             per_nutrient_pct=per_nutrient_pct if per_nutrient_pct is not None else {"energy_kcal": mae_pct},
             iterations=iterations,
-            telemetry={},
+            telemetry={
+                "tool_calls": {"total_meal_plan": totaller_calls},
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "cache_read_tokens": cache_read_tokens,
+                "reasoning_tokens": reasoning_tokens,
+            },
             elapsed_s=elapsed_s,
         ),
         score=ScoreRecord(

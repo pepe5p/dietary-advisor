@@ -1,10 +1,10 @@
-\begin{tabular}{lrrrrrrrr}
+\begin{tabular}{lrrrrrrrrr}
 \toprule
-Variant & MAE~[\%] & MSE~[\%] & Iter. & Elapsed~[s] & Soft agg.\ J1 & Safety J1 & Soft agg.\ J2 & Safety J2 \\
+Variant & MAE~[\%] & MSE~[\%] & Iter. & Calls & Elapsed~[s] & Soft J1 & Safety J1 & Soft J2 & Safety J2 \\
 \midrule
-baseline & 13.46 & 495.87 & 0.00 & 29.8 & 0.799 & 1.000 & 0.827 & 0.998 \\
-totaller & 3.02 & 17.15 & 0.00 & 39.2 & 0.794 & 1.000 & 0.798 & 0.928 \\
-reflective-loop & 5.56 & 78.51 & 1.93 & 101.8 & 0.805 & 1.000 & 0.815 & 1.000 \\
-totaller+reflective-loop & 3.25 & 25.17 & 1.67 & 105.2 & 0.802 & 1.000 & 0.837 & 0.978 \\
+baseline & 13.46 & 495.87 & 0.00 & 0.00 & 29.8 & 0.799 & 1.000 & 0.827 & 0.998 \\
+totaller-only & 3.02 & 17.15 & 0.00 & 1.47 & 39.2 & 0.794 & 1.000 & 0.798 & 0.928 \\
+reflection-only & 5.56 & 78.51 & 1.93 & 0.00 & 101.8 & 0.805 & 1.000 & 0.815 & 1.000 \\
+full & 3.25 & 25.17 & 1.67 & 2.80 & 105.2 & 0.802 & 1.000 & 0.837 & 0.978 \\
 \bottomrule
 \end{tabular}

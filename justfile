@@ -129,9 +129,15 @@ thesis_clean:
 
 [group("thesis")]
 [doc("Regenerate thesis figures and tables from scored runs")]
-thesis_assets:
+thesis_assets: && thesis_sync
 	uv run python -m evaluation plot
 	uv run python -m evaluation tables
+
+[group("thesis")]
+[doc("Copy freshly generated figure PDFs from outputs/ into thesis/images/generated")]
+thesis_sync:
+	rsync -a --prune-empty-dirs --include='*/' --include='*.pdf' --exclude='*' \
+		outputs/figures/ thesis/images/generated/
 
 [group("development")]
 [doc("Open bash console (useful when prefixed with dc, as it opens bash inside docker)")]
