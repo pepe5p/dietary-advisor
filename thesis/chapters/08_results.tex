@@ -134,7 +134,7 @@ The preference dimension does not follow it, and \Cref{fig:results-effort-soft} 
     \label{fig:results-effort-soft}
 \end{figure}
 
-Effort beyond the middle setting therefore buys accuracy and nothing else, while reliably costing time. \Cref{fig:results-effort-elapsed} shows mean elapsed time rising from \qty{52.0}{\second} to \qty{76.6}{\second} to \qty{142.6}{\second} across the three buckets, and the individual extremes span a wider range still: \texttt{gemini-3.5-flash-lite} at default effort completes a plan in \qty{21.2}{\second}, while \texttt{gpt-5.6-luna} at its highest setting takes \qty{276.8}{\second}. NFR4's requirement of an interactive session is met at the low end of this range and not at the top, which makes the top bucket a defensible choice only where the numeric target is what matters and the wait is acceptable.
+Effort beyond the middle setting therefore buys accuracy and nothing else, while reliably costing time. \Cref{fig:results-effort-elapsed} shows mean elapsed time rising from \qty{52.0}{\second} to \qty{76.6}{\second} to \qty{142.6}{\second} across the three buckets, and the individual extremes span a wider range still: \texttt{gemini-3.5-flash-lite} at default effort completes a plan in \qty{21.2}{\second}, while \texttt{gpt-5.6-luna} at its highest setting takes \qty{276.8}{\second}. \ref{req:interactive-runtime}'s requirement of an interactive session is met at the low end of this range and not at the top, which makes the top bucket a defensible choice only where the numeric target is what matters and the wait is acceptable.
 
 \begin{figure}[htbp]
     \centering

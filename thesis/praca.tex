@@ -64,6 +64,13 @@
 \usepackage[hidelinks]{hyperref}
 \usepackage{cleveref}
 
+% Requirement labels are generated, so reordering or removing a requirement
+% renumbers every cross-reference in the thesis automatically.
+\newcounter{frcnt}\renewcommand{\thefrcnt}{FR\arabic{frcnt}}
+\newcounter{nfrcnt}\renewcommand{\thenfrcnt}{NFR\arabic{nfrcnt}}
+\newcommand{\freq}[1]{\refstepcounter{frcnt}\item[\thefrcnt]\label{#1}}
+\newcommand{\nfreq}[1]{\refstepcounter{nfrcnt}\item[\thenfrcnt]\label{#1}}
+
 %---------------------------------------------------------------------------
 
 \author{Piotr Karaś}
