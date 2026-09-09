@@ -3,7 +3,7 @@
 
 This chapter defines exactly how the three hypotheses from \Cref{sec:introduction-goal} are tested. Because the claims this thesis makes are comparative -- one configuration is more accurate than another -- almost all of the methodological effort goes into making sure that a measured difference can only be attributed to the thing that was deliberately changed. That concern shapes three decisions described in this chapter: the grid varies one factor at a time from a fixed baseline, everything is repeated because neither the system nor the instrument measuring it is deterministic, and the qualitative scoring stage is replicated across two independent judges precisely because that instrument is another language model and cannot be assumed neutral.
 
-Repetition happens on two independent axes, and keeping them apart matters for reading the numbers that follow. Every cell of both experimental grids -- one combination of model, system variant and scenario -- is planned three times, which samples the generating model's own nondeterminism. Each of those runs is then scored three times by each judge, which samples the judge's. The first axis is what \Cref{sec:methodology-stability} quantifies as run-to-run variability; the second is averaged away as described in \Cref{sec:methodology-qualitative}. With that established, the chapter states the research questions, defines the two grids and the scenarios they run against, and specifies every metric reported in \Cref{cha:results}.
+Repetition happens on two independent axes, and keeping them apart matters for reading the numbers that follow. Every combination of language model, system variant and scenario is planned three times, which samples the generating model's own nondeterminism. Each of those runs is then scored three times by each judge, which samples the judge's. The first axis is what \Cref{sec:methodology-stability} quantifies as run-to-run variability; the second is averaged away as described in \Cref{sec:methodology-qualitative}. With that established, the chapter states the research questions, defines the two grids and the scenarios they run against, and specifies every metric reported in \Cref{cha:results}.
 
 \section{Research questions}
 \label{sec:methodology-research-questions}
@@ -39,7 +39,12 @@ The component ablation experiment uses the four-way grid implied by the two inde
     \label{tab:methodology-variants}
 \end{table}
 
-Each of the four variants is run against every scenario in \Cref{sec:methodology-scenarios} with one fixed language model, giving 60 runs in total for this experiment.
+\begin{definition}[Cell]
+    \label{def:cell}
+    A \emph{cell} of an experimental grid is one combination of language model, system variant and scenario.
+\end{definition}
+
+Each of the four variants is run against every scenario in \Cref{sec:methodology-scenarios} with one fixed language model, giving 60 runs in total for this experiment. The following parameters are held constant across both experiments: three repetitions per cell, three scoring passes per judge per run, and a critique-and-refine loop budget of three refinement passes (\Cref{def:iterations}).
 
 \section{Experiment 2: model and reasoning-effort grid}
 \label{sec:methodology-model-grid}
@@ -74,6 +79,8 @@ Each evaluated run pairs a fixed user profile with a scenario: an optional free-
 
 Each scenario's underlying profile is frozen ahead of time -- age, sex, body measurements, activity level, dietary goal, allergies, diagnosed conditions and standing preferences are all fixed -- and each profile carries a frozen set of energy and macronutrient targets computed independently of the pipeline under test, so that every run's reported error is measured against the same target regardless of which variant or model produced the plan.
 
+The five scenarios were chosen to stress different parts of the system rather than to sample a population. \emph{regular} isolates baseline planning quality with no competing constraint. The two conflicting-request scenarios (\emph{lactose-intolerant-athlete-wants-cheesecake} and \emph{vegetarian-allergic}) test whether a hard exclusion survives a direct user request that would violate it, in two different forms (a single allergen against a high-energy target, and a diet pattern plus a second allergen at once). The two chronic-condition scenarios (\emph{diabetes-hypertension} and \emph{dyslipidemia-obesity}) test whether the system can satisfy interacting medical constraints, one without a session request and one with the conflicting-request pattern layered on top. Five is fewer than would be needed to support claims about dietary planning in general (\Cref{sec:results-threats} returns to this), but each additional scenario would multiply the grid cost and exceed the budget.
+
 \section{Quantitative scoring: energy and macronutrient error}
 \label{sec:methodology-quantitative}
 
@@ -87,13 +94,20 @@ where $\mathrm{actual}_n$ is the deterministically computed total for a hydrated
 
 \begin{definition}[Macro error]
     \label{def:macro-error}
-    Let $N = \{\text{energy}, \text{protein}, \text{carbohydrate}, \text{fat}\}$ be the aggregated nutrients with a positive target for the run's profile. The \emph{macro error} of a run is
+    Let $N = \{\text{energy}, \text{protein}, \text{carbohydrate}, \text{fat}\}$ be the aggregated nutrients with a positive target for the run's profile. The \emph{macro error} of a run is the mean absolute relative error
     \[
-        \mathrm{MAE\%} = \frac{1}{\left| N \right|} \sum_{n \in N} \left| \mathrm{rel}_n \right|,
-        \qquad
+        \mathrm{MAE\%} = \frac{1}{\left| N \right|} \sum_{n \in N} \left| \mathrm{rel}_n \right| .
+    \]
+    It is non-negative and unbounded above, and is zero exactly when every aggregated nutrient meets its target, so lower is better. It does not depend on a judge.
+\end{definition}
+
+\begin{definition}[Squared macro error]
+    \label{def:macro-error-squared}
+    With $N$ as in \Cref{def:macro-error}, the \emph{squared macro error} of a run is the mean squared relative error
+    \[
         \mathrm{MSE\%} = \frac{1}{\left| N \right|} \sum_{n \in N} \mathrm{rel}_n^2 .
     \]
-    Both are non-negative and unbounded above, and both are zero exactly when every aggregated nutrient meets its target, so lower is better. Written without qualification, \emph{macro error} means $\mathrm{MAE\%}$; $\mathrm{MSE\%}$ is always named explicitly. Fibre is recorded per nutrient but is not a member of $N$, for the reason given in \Cref{sec:impl-missing-nutrients}. Neither statistic depends on a judge.
+    It shares the properties above, but weights a single badly missed nutrient far more heavily than an even spread of small misses. It is always named explicitly where it is used, and likewise does not depend on a judge.
 \end{definition}
 
 Expressing the error relative to its target rather than in absolute nutrient units is what keeps a single figure comparable across nutrients measured on very different scales -- kilocalories against grams of fat, for instance. Both statistics are reported because the failure this evaluation is most interested in is the occasional badly wrong plan rather than a uniform drift away from target, and the two separate those cases. Because both are computed from the stored plan by a deterministic routine, they do not depend on the judges at all, and are identical no matter which judge's records they are read from.
@@ -134,7 +148,7 @@ An LLM judge is subject to documented biases -- a tendency to favour longer or m
 
 Two further quantities describe how repeatable a result is, rather than how good it is, and both are reported per judge.
 
-The first is \emph{run-to-run variability}: how much the same configuration's soft score moves when the identical request is planned again from scratch. Because the repetitions of one cell differ only in the language model's sampling, the dispersion within a cell isolates that sampling noise.
+The first is \emph{run-to-run variability}: how much the same configuration's soft score moves when the identical request is planned again from scratch. Because the repetitions of one cell (\Cref{def:cell}) differ only in the language model's sampling, the dispersion within a cell isolates that sampling noise.
 
 \begin{definition}[Cell spread]
     \label{def:spread}
@@ -146,7 +160,7 @@ The first is \emph{run-to-run variability}: how much the same configuration's so
     \]
     where:
     \begin{itemize}
-        \item \( c \) -- a cell, that is one combination of language model, system variant and scenario,
+        \item \( c \) -- a cell (\Cref{def:cell}),
         \item \( R \) -- the number of repetitions of a cell,
         \item \( s_{c,r} \) -- the soft score one judge awarded to repetition \( r \) of cell \( c \),
         \item \( \bar{s}_c \) -- the mean soft score of cell \( c \),
@@ -199,5 +213,5 @@ Four further figures are recorded per run without requiring any scoring step.
 
 \begin{definition}[Token spend]
     \label{def:token-spend}
-    The \emph{token spend} of a run is the number of tokens billed across every model request the run made, split into four additive categories matching the provider usage fields: cache read, which the provider served from a prompt cache rather than recomputing; input, the remainder of the billed input; output, the remainder of the billed output after reasoning tokens are set aside; and reasoning, the thinking tokens already included in the billed output. It does not depend on a judge and plays no role in scoring a plan's quality. No monetary cost is reported anywhere in this thesis: converting tokens into money requires per-model prices that change without notice and differ by routing provider, which would make any figure quoted here both unverifiable and quickly wrong.
+    The \emph{token spend} of a run is the number of tokens billed across every model request the run made, split into four additive categories matching the provider usage fields: cache read, which the provider served from a prompt cache rather than recomputing; input, the remainder of the billed input; output, the remainder of the billed output after reasoning tokens are set aside; and reasoning, the thinking tokens already included in the billed output. It does not depend on a judge and plays no role in scoring a plan's quality. No monetary cost is reported anywhere in this thesis: converting tokens into money requires per-model prices that change without notice and differ by routing provider, which would make any figure quoted here both unverifiable and out of date within months.
 \end{definition}

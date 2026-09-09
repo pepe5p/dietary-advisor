@@ -54,12 +54,6 @@
 % wraps onto a line of its own. Just wide enough for the longest label used here.
 \setlist[description]{labelwidth=2.6em}
 
-% The class appends an en-dash to every description label, so a short label must stay
-% on the same line as its text; otherwise the line ends on "H1 --". Lists whose labels
-% are sentence-length request style=nextline locally instead.
-\newlist{longdescription}{description}{1}
-\setlist[longdescription]{style=nextline, leftmargin=0pt, topsep=10pt}
-
 % hyperref last, after biblatex; cleveref right after hyperref.
 \usepackage[hidelinks]{hyperref}
 \usepackage{cleveref}

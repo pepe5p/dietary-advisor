@@ -9,12 +9,12 @@
 \node[box, below=of input] (idea) {Meal-idea agent};
 \node[box, below=of idea] (nutrition) {Nutrition agent};
 \node[tool, right=of nutrition] (lookup) {Food knowledge\\ base lookup};
-\node[tool, below=4mm of lookup] (totaller_tool) {Totaller tool\\ (if enabled)};
+\node[tool, below=4mm of lookup] (totaller_tool) {Totaller tool\\ (hydrates internally,\\ if enabled)};
 \node[box, below=of nutrition] (plan) {AgentMealPlan\\ (codes and grams only)};
 \node[box, below=of plan] (validator) {Output validator\\ (every code resolves)};
 \node[box, below=of validator] (reflection) {Critique-and-refine loop\\ (if enabled, \Cref{fig:diagram-reflection})};
-\node[box, below=of reflection] (hydration) {Hydration to\\ verified food items};
-\node[box, below=of hydration] (output) {Meal plan\\ + shopping list};
+\node[box, below=of reflection] (hydration) {Code resolution\\ (hydration)};
+\node[box, below=of hydration] (output) {Meal plan};
 
 \draw[arr] (input) -- (idea);
 \draw[arr] (idea) -- (nutrition);
