@@ -1,0 +1,63 @@
+\begin{tikzpicture}[
+    list/.style={draw, rounded corners, align=left, inner sep=2mm, font=\small},
+    box/.style={draw, rounded corners, align=center, inner sep=2mm, font=\small},
+    title/.style={font=\small\bfseries, align=center},
+    arr/.style={-{Latex[length=2mm]}},
+]
+
+\node[list, anchor=north west] (lex) at (0mm, 0mm) {
+    \begin{tabular}{@{}r@{~~}l@{~~}r@{}}
+        \toprule
+        rank & catalogue entry & \textcolor{black!40}{\makecell{BM25\\ score}}\\
+        \midrule
+        1 & mozzarella, \qty{125}{\gram}  & \textcolor{black!40}{9.1}\\
+        2 & buffalo mozzarella, fresh     & \textcolor{black!40}{7.4}\\
+        3 & mozzarella pizza topping      & \textcolor{black!40}{6.2}\\
+        4 & low-moisture mozzarella       & \textcolor{black!40}{5.5}\\
+        \bottomrule
+    \end{tabular}
+};
+
+\node[list, anchor=north west] (dense) at ($(lex.north east) + (14mm, 0mm)$) {
+    \begin{tabular}{@{}r@{~~}l@{~~}r@{}}
+        \toprule
+        rank & catalogue entry & \textcolor{black!40}{\makecell{cosine\\ distance}}\\
+        \midrule
+        1 & fresh cheese in brine         & \textcolor{black!40}{0.18}\\
+        2 & buffalo mozzarella, fresh     & \textcolor{black!40}{0.22}\\
+        3 & low-moisture mozzarella       & \textcolor{black!40}{0.29}\\
+        4 & mozzarella, \qty{125}{\gram}  & \textcolor{black!40}{0.34}\\
+        \bottomrule
+    \end{tabular}
+};
+
+\node[title, anchor=south] at ($(lex.north) + (0mm, 1.5mm)$) {Lexical channel};
+\node[title, anchor=south] at ($(dense.north) + (0mm, 1.5mm)$) {Dense channel};
+\node[font=\small, anchor=south] at ($(lex.north)!0.5!(dense.north) + (0mm, 9mm)$)
+    {query: \texttt{mozzarella}};
+
+\node[box, anchor=north] (rrf) at ($(lex.south)!0.5!(dense.south) + (0mm, -14mm)$)
+    {$\sum_i \frac{1}{60 + \mathrm{rank}_i(d)}$};
+\node[title, anchor=south] at ($(rrf.north) + (0mm, 1.5mm)$) {Reciprocal rank fusion};
+
+\draw[arr] (lex.south) |- (rrf.west);
+\draw[arr] (dense.south) |- (rrf.east);
+
+\node[list, anchor=north] (fused) at ($(rrf.south) + (0mm, -10mm)$) {
+    \begin{tabular}{@{}r@{~~}l@{~~}c@{~~}r@{}}
+        \toprule
+        rank & catalogue entry & \makecell{ranks\\ (lex., dense)} & \makecell{fused\\ score}\\
+        \midrule
+        1 & buffalo mozzarella, fresh    & 2,\,2   & 0.0323\\
+        2 & mozzarella, \qty{125}{\gram} & 1,\,4   & 0.0320\\
+        3 & low-moisture mozzarella      & 4,\,3   & 0.0315\\
+        4 & fresh cheese in brine        & --,\,1  & 0.0164\\
+        5 & mozzarella pizza topping     & 3,\,--  & 0.0159\\
+        \bottomrule
+    \end{tabular}
+};
+\node[title, anchor=south] at ($(fused.north) + (0mm, 1.5mm)$) {Fused ranking};
+
+\draw[arr] (rrf.south) -- (fused.north);
+
+\end{tikzpicture}

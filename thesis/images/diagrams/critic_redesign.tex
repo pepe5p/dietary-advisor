@@ -1,0 +1,40 @@
+\begin{tikzpicture}[
+    node distance=5mm and 12mm,
+    box/.style={draw, rounded corners, align=center, text width=32mm, minimum height=10mm, inner sep=1.5mm, font=\scriptsize},
+    tool/.style={draw, dashed, align=center, text width=26mm, minimum height=7mm, inner sep=1.2mm, font=\scriptsize},
+    frame/.style={draw, rounded corners, draw=black!35, inner sep=3.5mm},
+    title/.style={font=\small\bfseries, align=center},
+    note/.style={font=\scriptsize, text=black!60, align=center, text width=34mm},
+    arr/.style={-{Latex[length=2mm]}},
+]
+
+% --- rejected: critic with tools and edit rights ---
+\node[box] (a_draft) {Draft plan};
+\node[box, right=of a_draft] (a_critic) {Critic\\ (own tools, may rewrite)};
+\node[tool, above=7mm of a_critic] (a_tools) {Food lookup, totaller};
+\node[box, right=of a_critic] (a_out) {Revised plan};
+\draw[arr] (a_draft) -- (a_critic);
+\draw[arr, dashed] (a_critic) -- (a_tools);
+\draw[arr] (a_critic) -- (a_out);
+\node[note, below=4mm of a_critic] (a_note) {re-plans meals from scratch: a second, less carefully prompted planner};
+\node[frame, fit=(a_draft)(a_tools)(a_out)(a_note)] (a_frame) {};
+\node[title, above=1.5mm of a_frame.north] {first design, rejected};
+
+% --- adopted: tool-less critic plus refiner ---
+\node[box, below=54mm of a_draft, xshift=-22mm] (b_draft) {Draft plan};
+\node[box, right=of b_draft] (b_critic) {Critic\\ (tool-less, read-only)};
+\node[tool, above=7mm of b_critic] (b_totals) {Totals and coverage warnings, handed in};
+\node[box, right=of b_critic] (b_issues) {List of concrete issues};
+\node[box, right=of b_issues] (b_refiner) {Refiner\\ (nutrition agent's tools)};
+\node[tool, above=7mm of b_refiner] (b_tools) {Food lookup, totaller};
+\draw[arr] (b_draft) -- (b_critic);
+\draw[arr, dashed] (b_totals) -- (b_critic);
+\draw[arr] (b_critic) -- (b_issues);
+\draw[arr] (b_issues) -- (b_refiner);
+\draw[arr, dashed] (b_refiner) -- (b_tools);
+\node[note, below=4mm of b_critic] (b_note) {states objections; cannot act on them};
+\node[note, below=4mm of b_refiner] (b_note2) {edits only what was listed};
+\node[frame, fit=(b_draft)(b_totals)(b_refiner)(b_note)(b_note2)] (b_frame) {};
+\node[title, above=1.5mm of b_frame.north] {adopted};
+
+\end{tikzpicture}

@@ -1,0 +1,77 @@
+\begin{tabularx}{\textwidth}{@{}
+    >{\raggedright\arraybackslash}p{0.24\textwidth}
+    >{\raggedright\arraybackslash}X
+    >{\raggedright\arraybackslash}p{0.28\textwidth}
+    @{}}
+    \toprule
+    Name and section & Rejected alternatives & Chosen \\
+    \midrule
+    Implementation platform\newline
+    \textit{\scriptsize\Cref{sec:tools-platform}}
+        & Statically typed, compiled language
+        & Python \\
+    \addlinespace
+    Agent framework\newline
+    \textit{\scriptsize\Cref{sec:tools-agent-framework}}
+        & Raw provider SDKs\newline
+          General-purpose orchestration framework
+        & Schema-first agent library \\
+    \addlinespace
+    Model access\newline
+    \textit{\scriptsize\Cref{sec:tools-model-access}}
+        & Direct per-provider API\newline
+          Self-hosted open-weight inference
+        & Routing service over many providers \\
+    \addlinespace
+    Food data access\newline
+    \textit{\scriptsize\Cref{sec:tools-food-data}}
+        & Live query APIs\newline
+          Commercial nutrition data API
+        & Bulk, version-pinned offline exports \\
+    \addlinespace
+    Storage engine\newline
+    \textit{\scriptsize\Cref{sec:tools-storage}}
+        & SQLite with FTS5\newline
+          PostgreSQL with pgvector
+        & DuckDB, embedded, full-text and vector \\
+    \addlinespace
+    Retrieval channel\newline
+    \textit{\scriptsize\Cref{sec:tools-retrieval}}
+        & Lexical ranking alone (BM25)\newline
+          Dense ranking alone
+        & Both channels, in parallel \\
+    \addlinespace
+    Fusion strategy\newline
+    \textit{\scriptsize\Cref{sec:tools-retrieval}}
+        & Weighted sum of raw scores
+        & Reciprocal rank fusion \\
+    \addlinespace
+    Embedding model\newline
+    \textit{\scriptsize\Cref{sec:tools-embeddings}}
+        & Hosted embedding API\newline
+          Small, English-only local model
+        & Multilingual local model \\
+    \addlinespace
+    Vector index\newline
+    \textit{\scriptsize\Cref{sec:tools-embeddings}}
+        & Exact brute-force scan
+        & HNSW proximity graph \\
+    \addlinespace
+    Nutrient aggregation\newline
+    \textit{\scriptsize\Cref{sec:tools-aggregation}}
+        & Floating-point arithmetic\newline
+          Mixed-integer programming solver
+        & Exact rational arithmetic \\
+    \addlinespace
+    Self-correction\newline
+    \textit{\scriptsize\Cref{sec:tools-self-correction}}
+        & Critic re-reading its own output only\newline
+          Critic issuing its own tool calls
+        & Tool-less critic shown computed totals \\
+    \addlinespace
+    Judge protocol\newline
+    \textit{\scriptsize\Cref{sec:tools-evaluation}}
+        & One judge, one call per plan
+        & Two vendors' judges, repeated scoring \\
+    \bottomrule
+\end{tabularx}

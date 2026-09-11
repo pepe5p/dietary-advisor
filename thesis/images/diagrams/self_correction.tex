@@ -1,0 +1,105 @@
+\begin{tikzpicture}[
+    x=1mm, y=1mm,
+    toollane/.style={draw, rounded corners=1mm, anchor=west, text width=150.4mm,
+                     minimum height=5mm, inner sep=1mm, font=\scriptsize, align=center},
+    toolcall/.style={{Latex[length=1.6mm]}-{Latex[length=1.6mm]}, draw=black!55, dashed},
+    toolcallensured/.style={{Latex[length=1.6mm]}-{Latex[length=1.6mm]}},
+    box/.style={draw, rounded corners, anchor=west, text width=24mm,
+                minimum height=11mm, inner sep=1.2mm, font=\scriptsize, align=center},
+    edgelab/.style={font=\scriptsize, text=black!60},
+    note/.style={font=\scriptsize, text=black!60, align=center, text width=80mm},
+    title/.style={font=\small\bfseries, anchor=south west},
+    frame/.style={draw=black!35, rounded corners},
+    arr/.style={-{Latex[length=2mm]}},
+]
+
+% Shared local coordinates in every panel:
+%   tool bar at y = 0 spanning x = 0..152
+%   Agent (0, -15), Critic (42, -15), Revise / Refiner (84, -15), Plan (126, -15)
+%   boxes are 26.4 wide, so the 15.6 gaps hold the edge labels
+
+% ===== panel 1: CRITIC =====
+\begin{scope}[yshift=0mm]
+    \draw[frame] (-4, 6) rectangle (158, -35);
+    \node[title] at (-4, 8) {CRITIC, the reference design};
+
+    \node[toollane] at (0, 0) {External verification tool};
+    \node[box] (c_agent) at (0, -15) {Agent};
+    \node[box] (c_critic) at (42, -15) {Critic};
+    \node[box] (c_revise) at (84, -15) {Refiner};
+    \node[box] (c_plan) at (126, -15) {Result};
+    \draw[arr] (c_agent.east) -- node[edgelab, above] {draft plan} (c_critic.west);
+    \draw[arr] (c_critic.east) -- node[edgelab, above] {feedback} (c_revise.west);
+    \draw[toolcallensured] (55, -2.5) -- node[edgelab, right, pos=0.45] {ensured} (55, -9.5);
+
+    \draw[arr] (97.2, -20.5) -- (97.2, -24) -- (54, -24) -- (54, -20.5);
+    \node[edgelab, anchor=south] at (75.6, -23.5) {revised plan};
+
+    \draw[arr] (46, -20.5) -- (46, -29) -- (139.2, -29) -- (139.2, -20.5);
+    \node[edgelab, anchor=north] at (92.6, -29.5) {no issues};
+\end{scope}
+
+% ===== panel 2: totaller-only =====
+\begin{scope}[yshift=-54mm]
+    \draw[frame] (-4, 6) rectangle (158, -24);
+    \node[title] at (-4, 8) {totaller-only};
+
+    \node[toollane] at (0, 0) {Totaller};
+    \node[box] (t_agent) at (0, -15) {Nutrition Agent};
+    \node[box] (t_plan) at (126, -15) {Plan};
+    \draw[arr] (t_agent.east) -- node[edgelab, above] {plan} (t_plan.west);
+    \draw[toolcall] (6, -9.5) -- (6, -2.5);
+    \draw[toolcall] (13, -9.5) -- (13, -2.5);
+    \draw[toolcall] (21, -9.5) -- (21, -2.5);
+\end{scope}
+
+% ===== panel 3: reflection-only =====
+\begin{scope}[yshift=-97mm]
+    \draw[frame] (-4, 6) rectangle (158, -35);
+    \node[title] at (-4, 8) {reflection-only};
+
+    \node[note] at (76, 0) {no computed totals available to any role};
+
+    \node[box] (r_agent) at (0, -15) {Nutrition Agent};
+    \node[box] (r_critic) at (42, -15) {Critic};
+    \node[box] (r_refiner) at (84, -15) {Refiner};
+    \node[box] (r_plan) at (126, -15) {Plan};
+    \draw[arr] (r_agent.east) -- node[edgelab, above] {draft plan} (r_critic.west);
+    \draw[arr] (r_critic.east) -- node[edgelab, above] {feedback} (r_refiner.west);
+
+    \draw[arr] (97.2, -20.5) -- (97.2, -24) -- (54, -24) -- (54, -20.5);
+    \node[edgelab, anchor=south] at (75.6, -23.5) {revised plan};
+
+    \draw[arr] (46, -20.5) -- (46, -29) -- (139.2, -29) -- (139.2, -20.5);
+    \node[edgelab, anchor=north] at (92.6, -29.5) {no issues};
+\end{scope}
+
+% ===== panel 4: full =====
+\begin{scope}[yshift=-151mm]
+    \draw[frame] (-4, 6) rectangle (158, -35);
+    \node[title] at (-4, 8) {full};
+
+    \node[toollane] at (0, 0) {Totaller};
+    \node[box] (f_agent) at (0, -15) {Nutrition Agent};
+    \node[box] (f_critic) at (42, -15) {Critic};
+    \node[box] (f_refiner) at (84, -15) {Refiner};
+    \node[box] (f_plan) at (126, -15) {Plan};
+    \draw[arr] (f_agent.east) -- node[edgelab, above] {draft plan} (f_critic.west);
+    \draw[arr] (f_critic.east) -- node[edgelab, above] {feedback} (f_refiner.west);
+
+    \draw[toolcall] (6, -9.5) -- (6, -2.5);
+    \draw[toolcall] (13, -9.5) -- (13, -2.5);
+    \draw[toolcall] (21, -9.5) -- (21, -2.5);
+    \draw[toolcall] (104, -9.5) -- (104, -2.5);
+
+    \draw[toolcallensured] (55, -2.5) -- node[edgelab, right, pos=0.45] {ensured} (55, -9.5);
+    \draw[toolcallensured] (90, -2.5) -- node[edgelab, left, pos=0.45] {ensured} (90, -9.5);
+
+    \draw[arr] (97.2, -20.5) -- (97.2, -24) -- (54, -24) -- (54, -20.5);
+    \node[edgelab, anchor=south] at (75.6, -23.5) {revised plan};
+
+    \draw[arr] (46, -20.5) -- (46, -29) -- (139.2, -29) -- (139.2, -20.5);
+    \node[edgelab, anchor=north] at (92.6, -29.5) {no issues};
+\end{scope}
+
+\end{tikzpicture}

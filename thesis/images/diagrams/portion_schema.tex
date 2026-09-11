@@ -1,0 +1,35 @@
+\begin{tikzpicture}[
+    rec/.style={draw, rectangle split, align=left, text width=42mm, inner sep=1.8mm, font=\scriptsize},
+    title/.style={font=\small\bfseries, align=center, text width=46mm},
+    strike/.style={draw=black!45, line width=0.6pt},
+]
+
+\node[rec, rectangle split parts=8] (before) {
+    \textbf{portion}
+    \nodepart{two} code
+    \nodepart{three} display name
+    \nodepart{four} grams
+    \nodepart{five} \textcolor{black!40}{energy\_kcal}
+    \nodepart{six} \textcolor{black!40}{protein\_g}
+    \nodepart{seven} \textcolor{black!40}{carbohydrate\_g}
+    \nodepart{eight} \textcolor{black!40}{fat\_g}
+};
+\node[title, above=3mm of before.north] {first design, rejected};
+
+\draw[strike] (before.five west) -- (before.five east);
+\draw[strike] (before.six west) -- (before.six east);
+\draw[strike] (before.seven west) -- (before.seven east);
+\draw[strike] (before.eight west) -- (before.eight east);
+
+\node[rec, rectangle split parts=4, right=34mm of before.north east, anchor=north west] (after) {
+    \textbf{portion}
+    \nodepart{two} code
+    \nodepart{three} display name
+    \nodepart{four} grams
+};
+\node[title, above=3mm of after.north] {adopted};
+
+\draw[-{Latex[length=2mm]}] (before.four east)
+    -- node[above, font=\scriptsize, align=center] {every nutrient\\ field deleted} (after.west |- before.four east);
+
+\end{tikzpicture}

@@ -53,7 +53,16 @@ Searching the food knowledge base for, say, ``mozzarella'' needs to succeed whet
 
 Lexical ranking (in particular the BM25 scoring function, a term-frequency and inverse-document-frequency-based ranking algorithm refined over decades of information-retrieval research~\cite{robertson2009probabilistic}) is fast, requires no learned model, and excels at exact or near-exact term matches, but is blind to synonymy: a query for ``courgette'' will not match a product labelled only ``zucchini''. Dense retrieval, in which both the query and every catalogue entry are embedded into the same vector space and ranked by similarity, captures exactly this kind of semantic relationship, but can under-rank an entry that is a close lexical match yet embeds slightly off-distribution, and is more expensive to compute and index than a lexical score.
 
-Combining the two rankings requires a fusion strategy. Score-based fusion (a weighted sum of the two raw similarity scores) requires the two scores to be normalised onto a comparable scale, which is fragile because BM25 and cosine-similarity scores have different, corpus-dependent distributions with no natural shared unit. Reciprocal rank fusion sidesteps this by discarding the raw scores entirely and combining only each result's \emph{rank} within its own list, using the formula $\mathrm{RRF}(d) = \sum_i \frac{1}{k + \mathrm{rank}_i(d)}$ summed over each ranking list $i$ a document $d$ appears in, with $k$ a small constant (conventionally 60) that discounts the influence of very low ranks; this method was shown to consistently outperform both individual rankings and a more complex, ranking-committee alternative across several retrieval benchmarks, without requiring any training data or score calibration~\cite{cormack2009reciprocal}. Reciprocal rank fusion over a lexical (BM25) and a dense-embedding ranking was chosen for exactly this rank-only, calibration-free property, and is described in operation in \Cref{sec:design-hybrid-search}.
+Combining the two rankings requires a fusion strategy. Score-based fusion (a weighted sum of the two raw similarity scores) requires the two scores to be normalised onto a comparable scale, which is fragile because BM25 and cosine-similarity scores have different, corpus-dependent distributions with no natural shared unit. Reciprocal rank fusion sidesteps this by discarding the raw scores entirely and combining only each result's \emph{rank} within its own list, using the formula $\mathrm{RRF}(d) = \sum_i \frac{1}{k + \mathrm{rank}_i(d)}$ summed over each ranking list $i$ a document $d$ appears in, with $k$ a small constant (conventionally 60) that discounts the influence of very low ranks; this method was shown to consistently outperform both individual rankings and a more complex, ranking-committee alternative across several retrieval benchmarks, without requiring any training data or score calibration~\cite{cormack2009reciprocal}. Reciprocal rank fusion over a lexical (BM25) and a dense-embedding ranking was chosen for exactly this rank-only, calibration-free property.
+
+\Cref{fig:diagram-rrf-example} works the formula through on a single query. The behaviour it exposes is what recommends the scheme beyond calibration-freedom: a candidate both channels rank highly, rather than one a single channel ranks first, is the one most likely to be the food the query meant, and a rank-only fusion prefers it without being told to. \Cref{sec:design-hybrid-search} describes the scheme as it is wired into the lookup tool.
+
+\begin{figure}[htbp]
+    \centering
+    \resizebox{\textwidth}{!}{\input{images/diagrams/rrf_example.tex}}
+    \caption{Reciprocal rank fusion worked through on one illustrative query. Each channel returns its own ranked list, scored on its own incomparable scale. The winning entry tops neither channel: two second places contribute $\frac{1}{62} + \frac{1}{62}$, which outweighs the single term $\frac{1}{61}$ that either channel's own best hit can contribute on its own.}
+    \label{fig:diagram-rrf-example}
+\end{figure}
 
 \section{Embedding model and vector index}
 \label{sec:tools-embeddings}
@@ -70,7 +79,16 @@ Once a set of food quantities has been resolved to real database entries, their 
 \section{Self-correction scheme}
 \label{sec:tools-self-correction}
 
-\Cref{sec:background-self-correction} identified two points on a spectrum of self-correction designs: a critique-and-refine loop grounded purely in a model's own re-reading of its output, and one grounded in feedback from an external tool. A fully tool-grounded critic, in the style of \textsc{CRITIC}, was considered for this system's reflection loop, with the critic itself able to issue further food-database lookups; it was set aside in favour of a narrower design in which the critic is tool-less but is still shown the deterministic totaller's output when the totaller is enabled, combining most of the grounding benefit of an external tool with a simpler, more predictable critic role that reviews a fixed set of inputs rather than one that can itself trigger further, potentially unbounded retrieval. \Cref{sec:design-reflection} describes the resulting critique-and-refine loop, and \Cref{cha:results} reports how much of the accuracy gain attributed to grounding survives when the critic, rather than only the generator, is given access to the computed totals.
+\Cref{sec:background-self-correction} identified two points on a spectrum of self-correction designs: a critique-and-refine loop grounded purely in a model's own re-reading of its output, and one grounded in feedback from an external tool. A fully tool-grounded critic, in the style of \textsc{CRITIC}~\cite{gou2024critic}, was considered for this system's reflection loop, with the critic itself able to issue further food-database lookups; it was set aside in favour of a narrower design in which the critic is tool-less but is still shown the deterministic totaller's output when the totaller is enabled, combining most of the grounding benefit of an external tool with a simpler, more predictable critic role that reviews a fixed set of inputs rather than one that can itself trigger further, potentially unbounded retrieval. \Cref{sec:design-reflection} describes the resulting critique-and-refine loop, and \Cref{cha:results} reports how much of the accuracy gain attributed to grounding survives when the critic, rather than only the generator, is given access to the computed totals.
+
+\Cref{fig:diagram-self-correction} traces each self-correcting configuration over the course of a single run, beside the reference design it was weighed against.
+
+\begin{figure}[htbp]
+    \centering
+    \resizebox{0.92\textwidth}{!}{\input{images/diagrams/self_correction.tex}}
+    \caption{Each self-correcting configuration over one run, beside the reference design. A dashed double arrow is a totaller call the model may or may not make; a solid arrow is a certain step (a critic edge, or a total the pipeline always hands in).}
+    \label{fig:diagram-self-correction}
+\end{figure}
 
 \section{Evaluation tooling}
 \label{sec:tools-evaluation}
@@ -79,4 +97,15 @@ The evaluation harness needs three capabilities distinct from the runtime system
 
 One choice in the scoring stage deserves to be argued rather than assumed. A single judge model, called once per plan, is the cheapest possible arrangement and the one most commonly used, but it makes the measuring instrument a single point of failure in two distinct ways: the judge is itself a stochastic sampler, so two calls on the same plan need not agree, and it carries the documented biases of its family, including a preference for output from models like itself~\cite{zheng2023judging}. Neither problem is detectable from within a single-judge protocol, because there is nothing to compare the judge against. The harness therefore runs two judge models drawn from different vendors and has each of them score every plan several times. The repetitions expose the sampling noise, which is averaged out per judge; the second vendor exposes family-specific bias, which would show up as a systematic offset between two judges applying an identical rubric to identical plans. \Cref{sec:methodology-qualitative} specifies the protocol and \Cref{sec:results-stability} reports what it revealed.
 
-Summary tables and bar charts are produced with a standard scientific plotting library, exported as vector graphics so that they can be embedded directly into this document without rasterisation artefacts, and sized to the exact width of the text block so that they need no scaling and their labels print at the same size as the surrounding body text.
+\section{Summary of the choices made}
+\label{sec:tools-summary}
+
+\Cref{tab:tool-choices} collects every decision argued above alongside the alternatives it was chosen over. Read as a whole, it makes the two themes named at the start of this chapter visible: in every category where a live network service competed with a pinned local artefact the local artefact won, and in every category where a faster but approximate component competed with an exact or validated one the exact component won.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \input{images/diagrams/tool_choices.tex}
+    \caption{The technology decisions of this chapter, category by category: the alternatives considered and rejected, and the choice carried into \Cref{cha:design}.}
+    \label{tab:tool-choices}
+\end{table}

@@ -1,0 +1,34 @@
+\begin{tikzpicture}[
+    rec/.style={draw, rectangle split, rectangle split parts=3, align=left,
+                text width=44mm, inner sep=1.8mm, font=\scriptsize},
+    box/.style={draw, rounded corners, align=center, minimum height=9mm, inner sep=2mm, font=\small},
+    note/.style={font=\scriptsize, text=black!60, align=center},
+    arr/.style={-{Latex[length=2mm]}},
+]
+
+\node[rec] (agent) {
+    \textbf{Agent plan}
+    \nodepart{two} \textit{Meal}: name, instructions, rationale
+    \nodepart{three} \textit{PortionRef}: code, display name, grams
+};
+\node[note, above=1.5mm of agent.north] {no nutrient field to write into};
+
+\node[rec, right=44mm of agent] (hydrated) {
+    \textbf{Hydrated plan}
+    \nodepart{two} \textit{Meal}: name, instructions, rationale
+    \nodepart{three} \textit{FoodItem}: database record, nutrients per \qty{100}{\gram}, grams
+};
+
+\coordinate (mid) at ($(agent.east)!0.5!(hydrated.west)$);
+\node[box, above=15mm of mid, text width=36mm] (db) {Food knowledge base};
+
+\draw[arr] (agent.east) -- node[below, font=\scriptsize, align=center] {hydration:\\ resolve every code} (hydrated.west);
+\draw[arr, dashed] (db.south) -- (mid);
+
+\node[box, below=20mm of hydrated, text width=44mm] (totaller) {Totaller\\ (exact rational sums)};
+\draw[arr] (hydrated.south) -- (totaller.north);
+
+\draw[arr, dashed] (agent.south) |-
+    node[above, font=\scriptsize, pos=0.78] {totaller tool call: hydrates internally} (totaller.west);
+
+\end{tikzpicture}

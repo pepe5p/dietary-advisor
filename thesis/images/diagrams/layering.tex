@@ -1,0 +1,25 @@
+\begin{tikzpicture}[
+    box/.style={draw, rounded corners, align=center, minimum height=11mm, inner sep=2mm, font=\small},
+    arr/.style={-{Latex[length=2mm]}},
+]
+
+\node[box, text width=34mm] (setup) {\textbf{setup}\\ offline provisioning};
+\node[box, text width=34mm, right=10mm of setup] (eval) {\textbf{evaluation}\\ ablation harness};
+\node[box, text width=34mm, right=10mm of eval] (repl) {\textbf{repl}\\ debugging helpers};
+
+\node[box, text width=122mm, below=24mm of eval] (runtime) {\textbf{dietary\_advisor}\\ runtime: agents, food knowledge base reader, totaller, reflection loop};
+
+\draw[arr] (setup.south) -- (setup.south |- runtime.north);
+\draw[arr] (eval.south) -- node[right, font=\scriptsize, pos=0.45] {may import} (eval.south |- runtime.north);
+\draw[arr] (repl.south) -- (repl.south |- runtime.north);
+
+\coordinate (gap) at ($(setup.east)!0.5!(eval.west)$);
+\coordinate (up_from) at (gap |- runtime.north);
+\coordinate (up_to) at (gap |- setup.south);
+\coordinate (mid) at ($(up_from)!0.5!(up_to)$);
+\draw[arr, dashed, draw=black!45] (up_from) -- (up_to);
+\draw[draw=black!45, line width=0.8pt] ($(mid) + (-2.2mm, -2.2mm)$) -- ($(mid) + (2.2mm, 2.2mm)$);
+\draw[draw=black!45, line width=0.8pt] ($(mid) + (-2.2mm, 2.2mm)$) -- ($(mid) + (2.2mm, -2.2mm)$);
+\node[font=\scriptsize, text=black!55, left=3mm of mid] {never};
+
+\end{tikzpicture}
