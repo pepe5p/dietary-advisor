@@ -1,6 +1,6 @@
 \begin{tikzpicture}[
     stage/.style={draw, rounded corners, align=center, text width=50mm, minimum height=11mm, inner sep=2mm, font=\small},
-    store/.style={draw, dashed, align=center, text width=40mm, minimum height=10mm, inner sep=1.8mm, font=\small\ttfamily},
+    store/.style={draw, dashed, align=center, text width=48mm, minimum height=10mm, inner sep=1.8mm, font=\small\ttfamily},
     plain/.style={draw, rounded corners, align=center, text width=50mm, minimum height=11mm, inner sep=2mm, font=\small},
     arr/.style={-{Latex[length=2mm]}},
 ]
@@ -12,8 +12,8 @@
 \node[stage] (s2) at (0, -6.0)
     {\textbf{evaluate}\\[0.6mm] each judge $\times$ 3 reps};
 
-\node[store] (sc1) at (-2.8, -8.2) {scores\_judge\_1/};
-\node[store] (sc2) at ( 2.8, -8.2) {scores\_judge\_2/};
+\node[store] (sc1) at (-3.2, -8.2) {scores\_judge\_1/\\\{spec\_key\}\_\_jrep\{n\}.json};
+\node[store] (sc2) at ( 3.2, -8.2) {scores\_judge\_2/\\\{spec\_key\}\_\_jrep\{n\}.json};
 
 \node[stage] (join) at (0, -10.4) {\textbf{join + aggregation}};
 \node[stage] (s3) at (0, -12.4) {\textbf{plot}};
