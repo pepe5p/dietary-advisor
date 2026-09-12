@@ -19,7 +19,7 @@ from dietary_advisor.cli.rendering import format_extra_nutrients
 from dietary_advisor.config import get_settings
 from dietary_advisor.food_db import BatchLookupResult, FoodDb, LookupQuery, OffFoodDb, OFFItem, UsdaFoodDb, USDAItem
 from dietary_advisor.food_db.models import Row
-from dietary_advisor.food_db.nutrients import nutrients_from_row
+from dietary_advisor.food_db.nutrients import nutrients_from_row, nutrients_from_usda_row
 from dietary_advisor.food_db.off_food_db import _barcode, _row_to_off_item, get_off_item_name
 from dietary_advisor.food_db.off_food_db import to_code as to_off_code
 from dietary_advisor.food_db.usda_food_db import _fdc_id, _row_to_usda_item, get_usda_item_name
@@ -227,6 +227,10 @@ def _item_code(item: ReadModel) -> str:
     return to_off_code(item.code) if isinstance(item, OFFItem) else to_usda_code(item.fdc_id)
 
 
+def _item_nutrients(item: ReadModel) -> dict[NutrientName, float]:
+    return nutrients_from_row(item) if isinstance(item, OFFItem) else nutrients_from_usda_row(item)
+
+
 def _food_items_table(food_items: list[ReadModel]) -> Table:
     table = Table(title="Food items", show_lines=True, header_style="bold cyan")
     table.add_column("Name", style="bold", overflow="fold")
@@ -236,7 +240,7 @@ def _food_items_table(food_items: list[ReadModel]) -> Table:
     table.add_column("Other nutrients", overflow="fold")
 
     for item in food_items:
-        nutrients = nutrients_from_row(item)
+        nutrients = _item_nutrients(item)
         macros = [f"{nutrients[n]:.1f}" if n in nutrients else "-" for n in _MACRO_COLUMNS]
         extras = format_extra_nutrients(nutrients) or "-"
         table.add_row(_item_name(item), _item_code(item), *macros, extras)
@@ -262,7 +266,7 @@ def _food_item_detail_table(food_item: ReadModel) -> Table:
     else:
         table.add_row("category", food_item.category or "-")
 
-    nutrients = nutrients_from_row(food_item)
+    nutrients = _item_nutrients(food_item)
     for nutrient in NutrientName:
         amount = nutrients.get(nutrient)
         value = f"{amount:.3g} {canonical_unit(nutrient)}" if amount is not None else "[dim]-[/dim]"

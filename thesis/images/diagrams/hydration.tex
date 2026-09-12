@@ -1,34 +1,67 @@
 \begin{tikzpicture}[
-    rec/.style={draw, rectangle split, rectangle split parts=3, align=left,
-                text width=44mm, inner sep=1.8mm, font=\scriptsize},
-    box/.style={draw, rounded corners, align=center, minimum height=9mm, inner sep=2mm, font=\small},
-    note/.style={font=\scriptsize, text=black!60, align=center},
-    arr/.style={-{Latex[length=2mm]}},
+    x=1mm, y=1mm,
+    proc/.style={draw, rounded corners, fill=black!4, anchor=center, text width=42mm,
+                 minimum height=12mm, inner sep=1.8mm, font=\small, align=center},
+    data/.style={draw, rectangle split, rectangle split parts=5, align=left,
+                 text width=62mm, inner sep=2.2mm, font=\small},
+    datahydrated/.style={data, rectangle split part fill={white,white,white,white,black!8}},
+    entry/.style={draw, rectangle split, rectangle split parts=4, align=left,
+                  text width=38mm, inner sep=2mm, font=\small},
+    store/.style={draw, rounded corners, anchor=center, text width=24mm,
+                  minimum height=28mm, inner sep=1.8mm, font=\small, align=center},
+    arr/.style={-{Latex[length=2.5mm]}},
+    lin/.style={},
 ]
 
-\node[rec] (agent) {
+% --- spine (x = 60) ---
+\node[proc] (nutrition) at (60, 0) {Nutrition agent};
+
+\node[data] (plan) at (60, -44) {
     \textbf{Agent plan}
-    \nodepart{two} \textit{Meal}: name, instructions, rationale
-    \nodepart{three} \textit{PortionRef}: code, display name, grams
+    \nodepart{two} person, rationale, guideline citations
+    \nodepart{three} meal: slot in the day
+    \nodepart{four} recipe: dish name, preparation instructions
+    \nodepart{five} portion: food identifier, display name, mass in grams
 };
-\node[note, above=1.5mm of agent.north] {no nutrient field to write into};
 
-\node[rec, right=44mm of agent] (hydrated) {
+\node[proc] (hydration) at (60, -98) {Hydration};
+
+\node[datahydrated] (hplan) at (60, -148) {
     \textbf{Hydrated plan}
-    \nodepart{two} \textit{Meal}: name, instructions, rationale
-    \nodepart{three} \textit{FoodItem}: database record, nutrients per \qty{100}{\gram}, grams
+    \nodepart{two} person, rationale, guideline citations
+    \nodepart{three} meal: slot in the day, dish name, preparation instructions
+    \nodepart{four} portion: mass in grams
+    \nodepart{five} food record: identifier, product name, per-\qty{100}{\gram} nutrients, package size
 };
 
-\coordinate (mid) at ($(agent.east)!0.5!(hydrated.west)$);
-\node[box, above=15mm of mid, text width=36mm] (db) {Food knowledge base};
+\node[proc] (totaller) at (60, -204) {Totaller};
 
-\draw[arr] (agent.east) -- node[below, font=\scriptsize, align=center] {hydration:\\ resolve every code} (hydrated.west);
-\draw[arr, dashed] (db.south) -- (mid);
+\node[data, rectangle split parts=4] (totals) at (60, -248) {
+    \textbf{Nutrient totals}
+    \nodepart{two} day totals per nutrient
+    \nodepart{three} per-meal breakdown
+    \nodepart{four} data-coverage caveats
+};
 
-\node[box, below=20mm of hydrated, text width=44mm] (totaller) {Totaller\\ (exact rational sums)};
-\draw[arr] (hydrated.south) -- (totaller.north);
+% --- food knowledge base branch (left of hydration) ---
+\node[store] (kb) at (-52, -98) {Food\\knowledge\\base};
 
-\draw[arr, dashed] (agent.south) |-
-    node[above, font=\scriptsize, pos=0.78] {totaller tool call: hydrates internally} (totaller.west);
+\node[entry] (dbentry) at (-8, -98) {
+    \textbf{Base entry}
+    \nodepart{two} identifier
+    \nodepart{three} product name as stored
+    \nodepart{four} per-\qty{100}{\gram} nutrient fields, package size
+};
+
+% --- main flow (heads only on edges ending at a process) ---
+\draw[lin] (nutrition) -- (plan);
+\draw[arr] (plan.south) -- (hydration.north);
+\draw[lin] (hydration) -- (hplan);
+\draw[arr] (hplan.south) -- (totaller.north);
+\draw[lin] (totaller) -- (totals);
+
+% --- base lookup branch ---
+\draw[lin] (kb.east) -- (dbentry.west);
+\draw[arr] (dbentry.east) -- (hydration.west);
 
 \end{tikzpicture}

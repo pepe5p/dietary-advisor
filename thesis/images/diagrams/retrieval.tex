@@ -43,9 +43,9 @@
 \coordinate (fan) at ($(o_frame.north)!0.5!(u_frame.north)$);
 \node[call, anchor=south] (tool) at ($(fan) + (0mm, 16mm)$)
     {Lookup tool call:\\ a batch of queries};
-\draw[arr] (tool.south) -| (o_frame.north);
-\draw[arr] (tool.south) -| (u_frame.north);
-\node[note, anchor=west, text width=38mm] at ($(tool.east) + (5mm, 0mm)$)
+\draw[arr] (tool.west) -| (o_frame.north);
+\draw[arr] (tool.east) -| (u_frame.north);
+\node[note, anchor=south, text width=38mm] at ($(tool.north) + (0mm, 3mm)$)
     {every query goes to both sources, searched concurrently};
 
 % --- the two ranked lists, returned side by side ---

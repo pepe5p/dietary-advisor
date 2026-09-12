@@ -170,11 +170,17 @@ class USDAHit(_NutrientHit):
 
     @classmethod
     def create_from_usda_item(cls, item: USDAItem) -> Self:
+        # USDA is a curated reference: an absent modelled nutrient is a real
+        # zero, not unknown, so surface it as 0 instead of dropping the field.
+        nutrients: dict[str, Any] = {
+            hit_key: (value if (value := getattr(item, col)) is not None else 0)
+            for hit_key, col in _SHARED_NUTRIENT_FIELDS
+        }
         return cls(
             code=to_usda_code(item.fdc_id),
             name=get_usda_item_name(item),
             category=item.category,
-            **_nutrient_kwargs(item, _SHARED_NUTRIENT_FIELDS),
+            **nutrients,
         )
 
     def csv_row(self) -> list[str]:

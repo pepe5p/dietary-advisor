@@ -1,0 +1,38 @@
+\begin{tikzpicture}[
+    x=1mm, y=1mm,
+    head/.style={draw, rounded corners, anchor=center, text width=34mm,
+                 minimum height=9mm, inner sep=1.2mm, font=\scriptsize, align=center},
+    life/.style={draw=black!45, dashed},
+    net/.style={-{Latex[length=2mm]}},
+    netret/.style={-{Latex[length=1.8mm]}, dashed},
+    loc/.style={-{Latex[length=2mm]}, draw=black!55},
+    locret/.style={-{Latex[length=1.8mm]}, dashed, draw=black!55},
+    msg/.style={font=\scriptsize, align=center},
+    tag/.style={font=\scriptsize\itshape, text=black!60, align=center},
+    halt/.style={circle, fill=black, draw=black, inner sep=0pt, minimum size=1.6mm},
+]
+
+% --- lifelines ---
+\node[head] (runner) at (0, 0) {Agent runner\\(local process)};
+\node[head] (api) at (75, 0) {Model provider\\API};
+\node[head] (kb) at (150, 0) {Food knowledge base\\(local DuckDB)};
+
+\draw[life] (runner.south) -- (0, -86);
+\draw[life] (api.south) -- (75, -86);
+\draw[life] (kb.south) -- (150, -86);
+
+% --- network round trip out to the provider ---
+\draw[net] (0, -12) -- node[msg, above] {send the whole conversation} (75, -12);
+\draw[netret] (75, -22) -- node[msg, above] {tool call returned} (0, -22);
+\node[halt] at (75, -22) {};
+\node[tag, anchor=west] at (78, -22) {halts for tool call};
+
+% --- local hop to the database ---
+\draw[loc] (0, -38) -- node[msg, above] {\texttt{lookup\_foods}(batch of queries)} (150, -38);
+\draw[locret] (150, -46) -- node[msg, above] {ranked hits} (0, -46);
+
+% --- second network round trip to resume ---
+\draw[net] (0, -60) -- node[msg, above] {resend the whole conversation,\\ now plus the tool result} (75, -60);
+\draw[netret] (75, -70) -- node[msg, above] {generation resumes} (0, -70);
+
+\end{tikzpicture}

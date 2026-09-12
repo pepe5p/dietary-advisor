@@ -26,7 +26,7 @@
     \node[toollane] at (0, 0) {External verification tool};
     \node[box] (c_agent) at (0, -15) {Agent};
     \node[box] (c_critic) at (42, -15) {Critic};
-    \node[box] (c_revise) at (84, -15) {Refiner};
+    \node[box] (c_revise) at (84, -15) {Revise};
     \node[box] (c_plan) at (126, -15) {Result};
     \draw[arr] (c_agent.east) -- node[edgelab, above] {draft plan} (c_critic.west);
     \draw[arr] (c_critic.east) -- node[edgelab, above] {feedback} (c_revise.west);
@@ -68,7 +68,7 @@
     \draw[arr] (r_critic.east) -- node[edgelab, above] {feedback} (r_refiner.west);
 
     \draw[arr] (97.2, -20.5) -- (97.2, -24) -- (54, -24) -- (54, -20.5);
-    \node[edgelab, anchor=south] at (75.6, -23.5) {revised plan};
+    \node[edgelab, anchor=south] at (75.6, -23.5) {refined plan};
 
     \draw[arr] (46, -20.5) -- (46, -29) -- (139.2, -29) -- (139.2, -20.5);
     \node[edgelab, anchor=north] at (92.6, -29.5) {no issues};
@@ -96,7 +96,7 @@
     \draw[toolcallensured] (90, -2.5) -- node[edgelab, left, pos=0.45] {ensured} (90, -9.5);
 
     \draw[arr] (97.2, -20.5) -- (97.2, -24) -- (54, -24) -- (54, -20.5);
-    \node[edgelab, anchor=south] at (75.6, -23.5) {revised plan};
+    \node[edgelab, anchor=south] at (75.6, -23.5) {refined plan};
 
     \draw[arr] (46, -20.5) -- (46, -29) -- (139.2, -29) -- (139.2, -20.5);
     \node[edgelab, anchor=north] at (92.6, -29.5) {no issues};

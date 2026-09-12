@@ -1,0 +1,44 @@
+{
+  "kind": "breakfast",
+  "recipe": {
+    "name": "Overnight oats with chia seeds, grated apple, cinnamon, and walnuts",
+    "portions": [
+      {
+        "code": "off:5906827018608",
+        "name": "Płatki owsiane górskie",
+        "grams": 90.0
+      },
+      {
+        "code": "usda:170554",
+        "name": "Seeds, chia seeds, dried",
+        "grams": 20.0
+      },
+      {
+        "code": "off:5900512983639",
+        "name": "Mleko 2%",
+        "grams": 250.0
+      },
+      {
+        "code": "usda:1105781",
+        "name": "Apples, gala, with skin, raw",
+        "grams": 150.0
+      },
+      {
+        "code": "usda:2346394",
+        "name": "Nuts, walnuts, English, halves, raw",
+        "grams": 27.0
+      },
+      {
+        "code": "off:5907707102493",
+        "name": "Miód nektarowy wielokwiatowy",
+        "grams": 10.0
+      },
+      {
+        "code": "usda:171320",
+        "name": "Spices, cinnamon, ground",
+        "grams": 2.0
+      }
+    ],
+    "instructions": "In a bowl or mason jar, combine the rolled oats, chia seeds, and ground cinnamon. Pour in the milk and stir well until thoroughly mixed. Cover and place in the refrigerator overnight (or for at least 4 hours) to allow the oats and chia seeds to absorb the liquid and thicken. In the morning, wash and coarsely grate the fresh Gala apple. Stir the grated apple into the chilled oatmeal mixture. Top with chopped raw walnuts and drizzle with natural blossom honey before serving."
+  }
+}

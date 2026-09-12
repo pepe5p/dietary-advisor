@@ -1,9 +1,12 @@
 \chapter{Experimental methodology}
 \label{cha:methodology}
 
-This chapter defines exactly how the three hypotheses from \Cref{sec:introduction-goal} are tested. Because the claims this thesis makes are comparative -- one configuration is more accurate than another -- almost all of the methodological effort goes into making sure that a measured difference can only be attributed to the thing that was deliberately changed. That concern shapes three decisions described in this chapter: the grid varies one factor at a time from a fixed baseline, everything is repeated because neither the system nor the instrument measuring it is deterministic, and the qualitative scoring stage is replicated across two independent judges precisely because that instrument is another language model and cannot be assumed neutral.
+Because the claims this thesis makes are comparative -- one configuration is more accurate than another -- almost all of the methodological effort goes into making sure that a measured difference can only be attributed to the thing that was deliberately changed. The grid varies one factor at a time from a fixed baseline, and everything is repeated on two independent axes because neither the system nor the instrument measuring it is deterministic (\Cref{sec:methodology-stability}).
 
-Repetition happens on two independent axes, and keeping them apart matters for reading the numbers that follow. Every combination of language model, system variant and scenario is planned three times, which samples the generating model's own nondeterminism. Each of those runs is then scored three times by each judge, which samples the judge's. The first axis is what \Cref{sec:methodology-stability} quantifies as run-to-run variability; the second is averaged away as described in \Cref{sec:methodology-qualitative}. With that established, the chapter states the research questions, defines the two grids and the scenarios they run against, and specifies every metric reported in \Cref{cha:results}.
+\begin{definition}[Cell]
+    \label{def:cell}
+    A \emph{cell} of an experimental grid is one combination of language model, system variant and scenario.
+\end{definition}
 
 \section{Research questions}
 \label{sec:methodology-research-questions}
@@ -21,28 +24,7 @@ RQ1~and RQ2~are answered by a single \emph{component ablation} experiment, refer
 \section{Experiment 1: component ablation}
 \label{sec:methodology-variants}
 
-The component ablation experiment uses the four-way grid implied by the two independent flags in \Cref{sec:design-variant-config}, summarised in \Cref{tab:methodology-variants} and drawn component by component in \Cref{fig:diagram-variants}. As established in \Cref{sec:vision-food-lookup-baseline}, food knowledge base access is not one of the varied flags: it is present, identically configured, in every one of the four variants, so that \emph{baseline} in this experiment denotes a system that already looks up real foods and simply lacks the two optional grounding and review mechanisms under study, not a system reasoning about nutrition from the language model's own memory.
-
-\begin{table}[htbp]
-    \centering
-    \begin{tabular}{lcc}
-        \toprule
-        Variant & Totaller & Reflection \\
-        \midrule
-        baseline & off & off \\
-        totaller-only & on & off \\
-        reflection-only & off & on \\
-        full & on & on \\
-        \bottomrule
-    \end{tabular}
-    \caption{The four-way component ablation grid. Food knowledge base access is present, unchanged, in every variant.}
-    \label{tab:methodology-variants}
-\end{table}
-
-\begin{definition}[Cell]
-    \label{def:cell}
-    A \emph{cell} of an experimental grid is one combination of language model, system variant and scenario.
-\end{definition}
+The component ablation experiment uses the four-way grid implied by the two independent flags in \Cref{sec:design-variant-config}, shown in \Cref{fig:diagram-variants}. Food knowledge base access is not one of the varied flags (\Cref{sec:vision-food-lookup-baseline}): \emph{baseline} here denotes a system that already looks up real foods and simply lacks the two optional mechanisms under study.
 
 Each of the four variants is run against every scenario in \Cref{sec:methodology-scenarios} with one fixed language model, giving 60 runs in total for this experiment. The following parameters are held constant across both experiments: three repetitions per cell, three scoring passes per judge per run, and a critique-and-refine loop budget of three refinement passes (\Cref{def:iterations}).
 
@@ -51,7 +33,7 @@ Each of the four variants is run against every scenario in \Cref{sec:methodology
 
 The model comparison experiment fixes the system at the full variant and varies the generating model instead. Two things are varied at once, deliberately: the base model, and the reasoning-effort level that model is asked to run at. Four base models are compared, each at three effort levels, giving twelve configurations. Where a provider's default effort already falls at one of the three levels being compared, that default is used as the level rather than re-requesting it explicitly, so a configuration is identified by a model together with the effort it actually ran at.
 
-Two properties of this design matter for interpreting the results. Within one base model the three configurations differ only in effort, so a difference between them is attributable to deliberation alone. Across base models, by contrast, the effort labels are each vendor's own and carry no guarantee of comparability -- one provider's \emph{high} may buy considerably more or less internal computation than another's -- so the aggregate comparison across effort levels in \Cref{sec:results-effort} groups vendor-specific labels into three coarse buckets and should be read as an indication of direction rather than as a calibrated measurement. Each of the twelve configurations is run against all five scenarios, giving 180 runs. Fifteen of these coincide exactly with the full-variant cell of the ablation experiment and are stored and scored once, so the two experiments together comprise 225 distinct runs.
+Two properties of this design matter for interpreting the results. Within one base model the three configurations differ only in effort, so a difference between them is attributable to deliberation alone. Across base models, by contrast, the effort labels are each vendor's own, with no guarantee that one vendor's \emph{high} corresponds to another's -- so the aggregate comparison across effort levels in \Cref{sec:results-effort} groups vendor-specific labels into three coarse buckets and should be read as an indication of direction rather than as a calibrated measurement. Each of the twelve configurations is run against all five scenarios, giving 180 runs. Fifteen of these coincide exactly with the full-variant cell of the ablation experiment and are stored and scored once, so the two experiments together comprise 225 distinct runs.
 
 The reasoning-effort setting is applied only to the agents whose output affects plan correctness -- the nutrition agent, the critic and the refiner -- as described in \Cref{sec:design-agents}. The judges are not affected by it: they run at their own providers' defaults regardless of which configuration produced the plan they are scoring, so that the measuring instrument does not change as the object of measurement does.
 
@@ -79,7 +61,62 @@ Each evaluated run pairs a fixed user profile with a scenario: an optional free-
 
 Each scenario's underlying profile is frozen ahead of time -- age, sex, body measurements, activity level, dietary goal, allergies, diagnosed conditions and standing preferences are all fixed -- and each profile carries a frozen set of energy and macronutrient targets computed independently of the pipeline under test, so that every run's reported error is measured against the same target regardless of which variant or model produced the plan.
 
-The five scenarios were chosen to stress different parts of the system rather than to sample a population. \emph{regular} isolates baseline planning quality with no competing constraint. The two conflicting-request scenarios (\emph{lactose-intolerant-athlete-wants-cheesecake} and \emph{vegetarian-allergic}) test whether a hard exclusion survives a direct user request that would violate it, in two different forms (a single allergen against a high-energy target, and a diet pattern plus a second allergen at once). The two chronic-condition scenarios (\emph{diabetes-hypertension} and \emph{dyslipidemia-obesity}) test whether the system can satisfy interacting medical constraints, one without a session request and one with the conflicting-request pattern layered on top. Five is fewer than would be needed to support claims about dietary planning in general (\Cref{sec:results-threats} returns to this), but each additional scenario would multiply the grid cost and exceed the budget.
+\section{Structure of the evaluation harness}
+\label{sec:design-eval-harness}
+
+The evaluation harness is a command-line application of its own, structured as shown in \Cref{fig:diagram-layering}: a case runner drives the grid, a scoring stage applies the judges, and a reporting stage turns stored scores into figures and a metrics file. Two design principles run through every part of it. The first is that every reported number must be reproducible from durable artefacts on disk rather than from the transient state of a single long-running process, so each stage reads what the previous one wrote and any stage can be repeated on its own. The second is that no component ever scores its own work: the code that generates a plan, the code that computes its deterministic totals, and the model that judges its quality are kept apart. \Cref{fig:diagram-eval-flow} traces the data through the three stages and the artefact stores that connect them; \Cref{fig:diagram-layering} shows the same harness at the level of code modules and the runtime modules it reuses (\Cref{sec:design-eval-reuse}).
+
+\begin{figure}[htbp]
+    \centering
+    \input{images/diagrams/eval_flow.tex}
+    \caption{Data flow through the evaluation harness. Each stage is a separate command that communicates with the next only through the artefact stores drawn as dashed boxes, so a stage can be rerun without repeating the stages before it. The deterministic, judge-independent half of a run is stored by the case runner and read directly by the join, bypassing the scoring stage entirely.}
+    \label{fig:diagram-eval-flow}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \resizebox{\textwidth}{!}{\input{images/diagrams/layering.tex}}
+    \caption{Evaluation harness and runtime modules. An arrow points from a module to what it depends on: inside each package, modules depend downwards only, and the three cross-package arrows show the runtime code the harness deliberately reuses -- the pipeline the case runner drives, and the hydration and totaller the validation stage rescores with.}
+    \label{fig:diagram-layering}
+\end{figure}
+
+\subsection{Three stages with three different costs}
+\label{sec:design-eval-stages}
+
+The harness is deliberately split into three separately invoked commands -- case collection, scoring, and reporting -- rather than a single end-to-end run, because the three differ sharply in what they cost and how often they are run. Generating a plan is slow and paid for in model tokens; scoring a stored plan is also paid, but entirely independent of how the plan was generated; and reporting is free and can be rerun whenever a figure or a summary is refined. Fusing them would force the expensive stages to rerun whenever a cheap one changed. Keeping them separate means the interface between stages is the artefact store on disk rather than an object in memory, so each stage can be run, interrupted, and repeated without its predecessor being present in the same process.
+
+\subsection{The run specification as the unit of work and identity}
+\label{sec:design-eval-runspec}
+
+The atom the whole harness is organised around is the \emph{run specification}: a language model, a system variant, a scenario, and a repetition index. Every run specification derives a stable, filesystem-safe key from those four fields, and that key names every artefact belonging to the run. The full grid is enumerated in code as the set union of the two experiments' specifications, so the combination both experiments share -- the full variant of the fixed model -- exists as a single specification and is therefore collected and scored only once. Because a specification's variant and model are the very same configuration objects the runtime consumes (\Cref{sec:design-variant-config}), a run's recorded label cannot drift away from the configuration that actually produced it: the label is derived mechanically from the flags that were set, not tracked separately.
+
+\subsection{An artefact store written only on success}
+\label{sec:design-eval-store}
+\label{sec:impl-eval-harness}
+
+Each unit of work is persisted as a single JSON file named by its key: one file per collected run, and one file per judge per scoring repetition under a per-judge directory. All artefact paths are derived in one place, so the layout is defined once rather than reconstructed at each call site. There is no database, no lock, and no central manifest of progress: the set of work still to do is simply the difference between the grid the code enumerates and the files already present on disk. A file is written only after its stage succeeds, so a failed or interrupted unit leaves no artefact behind and is naturally retried on the next invocation. Each record is self-describing -- it repeats the variant flags, the frozen targets, the plan, and the run's telemetry -- so it can be read and interpreted without the grid that produced it.
+
+Running a grid spanning several models, several ablation variants, several test scenarios and several repetitions each represents a nontrivial amount of paid model usage, and an interrupted run -- a transient network failure, a rate limit, or simply stopping the process to review intermediate results -- is a normal occurrence rather than an edge case. Re-invoking the collector therefore recomputes only the combinations still missing a result file, so that a long grid can be run incrementally, over several sessions, without repeating (and repaying for) work already done. The same pipeline instance and food knowledge base connection are reused across every run sharing a model and variant, both so that no variant-specific initialisation difference (a stale cache, a re-seeded index) can creep in as a confound alongside the one flag actually being varied, and because reconstructing the food knowledge base's index from scratch for every single run would have dominated the harness's own running time. Every run's token usage, request count and wall-clock time are recorded alongside its result, because they are the only way to characterise the computational overhead each mechanism imposes (\Cref{sec:results-overhead}) without having to re-run the grid purely to measure it.
+
+\subsection{Separating the judge-independent half from the judge-dependent half}
+\label{sec:design-eval-two-halves}
+
+A run's evaluation splits cleanly into a half that does not depend on any judge and a half that does, and the harness stores them separately. The deterministic energy and macronutrient error is computed at collection time, using the runtime's own hydration and totaller so that it is measured against a real total rather than anything the model claimed, and written onto the run record itself. The qualitative verdicts are stored apart, one file per judge per repetition, and the two halves are joined only in the reporting stage. Adding, removing, or rescoring a judge therefore regenerates no plan and cannot change any quantitative number, because the quantitative number never lived in a judge's record in the first place.
+
+\subsection{Judges as a registry}
+\label{sec:design-eval-judges}
+
+A judge is nothing more than a key paired with a model identifier, sharing one common rubric with every other judge; the only thing that varies between judges is the model. Every layer beneath the registry iterates over it rather than naming individual judges, so introducing a second judge propagates by itself into the per-judge artefact directories, the aggregation, the figures, and the metrics file. This registry is the structural device that carries the rule, specified in \Cref{sec:methodology-qualitative}, that judge-dependent metrics are never averaged across judges: they are carried through as one parallel series per registered judge from the store all the way to the reported columns.
+
+\subsection{Aggregation in layers}
+\label{sec:design-eval-aggregation}
+
+Turning stored artefacts into reportable numbers happens in four layers, each a pure function over the layer below. The first averages a judge's repeated verdicts for one run into a single verdict, suppressing the judge's sampling noise. The second joins that averaged verdict with its run record. The third summarises the joined records per (model, variant) group into the per-variant means. The fourth groups records for the figures and computes their dispersion -- the standard error drawn as an error bar, and the spread of \Cref{def:spread}, which is computed only where all of a group's repetitions are present. Because nothing but the deterministic per-run error is aggregated at collection time, changing how a metric is summarised means rerunning only the free reporting stage.
+
+\subsection{Reporting: one declaration per metric}
+\label{sec:design-eval-reporting}
+
+A reported metric is declared exactly once, as a record carrying its key, its title, the function that extracts its value from a scored run, whether it depends on the judge, and an optional predicate restricting it to the variants where it is meaningful (the refinement-pass count only for variants that run the reflection loop, the count of model-initiated totaller invocations only where the totaller is enabled). That single declaration drives the metric's figure and its entry in the machine-readable metrics file together, so a metric cannot be plotted one way and summarised another.
 
 \section{Quantitative scoring: energy and macronutrient error}
 \label{sec:methodology-quantitative}
@@ -135,7 +172,10 @@ Every run is scored on one criterion present in all scenarios (whether the gener
 
 The judges are explicitly instructed not to penalise a plan for a missing micronutrient figure that the underlying food data itself does not cover, so that the coverage gaps described in \Cref{sec:impl-missing-nutrients} are not double-counted as a plan-quality failure on top of being flagged by the totaller's own coverage warnings.
 
-An LLM judge is subject to documented biases -- a tendency to favour longer or more elaborately reasoned responses, and a tendency to prefer LLM-generated text over human-written text when scoring open-ended output~\cite{zheng2023judging,liu2023geval} -- and it is also a stochastic sampler, so it need not return the same verdict twice on an unchanged plan. Rather than assume either problem away, the protocol is built so that both become measurable, as motivated in \Cref{sec:impl-judges}:
+\label{sec:impl-judges}
+The first version of the qualitative scoring stage was the naive one: a single judge model, one call per plan, and the bare integer it happened to sample. G-Eval does not read off a single sampled integer but a probability-weighted score computed over the judge's output token distribution~\cite{liu2023geval}, but the judge APIs used here expose no token probabilities, so this first version simply took the sampled score at face value. Two problems with that arrangement surfaced once enough runs had accumulated. The first is that the judge is itself a sampled language model, so scoring the same unchanged plan twice does not reliably produce the same number. The second is that the judge initially used belongs to the same model family as one of the configurations under comparison, which is exactly the situation in which the self-preference bias documented for this evaluation pattern~\cite{zheng2023judging} would inflate that configuration's scores. Neither problem is observable from inside a single-judge protocol.
+
+Both were addressed at the protocol level rather than by attempting to make one judge behave better:
 
 \begin{itemize}
     \item \emph{Two judges, from different vendors.} Every plan is scored independently by both. One of them belongs to the same family as one of the compared configurations, which is exactly the situation self-preference bias would exploit; the other has no such overlap with any compared configuration. A family-specific bias therefore cannot hide, because it would appear as a divergence between two judges reading the same plans against the same rubric.
@@ -143,8 +183,12 @@ An LLM judge is subject to documented biases -- a tendency to favour longer or m
     \item \emph{No averaging across judges.} Judge-dependent metrics -- the soft score and safety score -- are carried through the whole reporting pipeline as two parallel series and always reported side by side. Collapsing them into one number would destroy precisely the disagreement the second judge exists to reveal.
 \end{itemize}
 
+Each (run, judge, judge repetition) triple is persisted to its own file under a per-judge directory, so scoring a grid with a newly added judge re-scores nothing that already exists, and an interrupted scoring pass resumes where it stopped rather than restarting. This mattered in practice: the second judge was introduced long after the first had finished scoring the entire grid, and adding it cost only the second judge's own calls. What the protocol revealed is reported in \Cref{sec:results-stability}.
+
 \section{Stability metrics}
 \label{sec:methodology-stability}
+
+Repetition happens on two independent axes, and keeping them apart matters for reading the numbers that follow. Every cell of the grid is planned three times, which samples the generating model's own nondeterminism. Each of those runs is then scored three times by each judge, which samples the judge's. The first axis is quantified here as run-to-run variability; the second is averaged away as described in \Cref{sec:methodology-qualitative}.
 
 Two further quantities describe how repeatable a result is, rather than how good it is, and both are reported per judge.
 

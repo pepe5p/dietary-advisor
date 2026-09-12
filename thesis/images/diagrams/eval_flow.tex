@@ -1,0 +1,36 @@
+\begin{tikzpicture}[
+    stage/.style={draw, rounded corners, align=center, text width=50mm, minimum height=11mm, inner sep=2mm, font=\small},
+    store/.style={draw, dashed, align=center, text width=40mm, minimum height=10mm, inner sep=1.8mm, font=\small\ttfamily},
+    plain/.style={draw, rounded corners, align=center, text width=50mm, minimum height=11mm, inner sep=2mm, font=\small},
+    arr/.style={-{Latex[length=2mm]}},
+]
+
+\node[plain] (grid) at (0, 0) {run specification grid};
+\node[stage] (s1) at (0, -2.0)
+    {\textbf{run-cases}\\[0.6mm] drive Pipeline, compute macro error};
+\node[store] (runs) at (0, -4.0) {runs/\{spec\_key\}.json};
+\node[stage] (s2) at (0, -6.0)
+    {\textbf{evaluate}\\[0.6mm] each judge $\times$ 3 reps};
+
+\node[store] (sc1) at (-2.8, -8.2) {scores\_judge\_1/};
+\node[store] (sc2) at ( 2.8, -8.2) {scores\_judge\_2/};
+
+\node[stage] (join) at (0, -10.4) {\textbf{join + aggregation}};
+\node[stage] (s3) at (0, -12.4) {\textbf{plot}};
+\node[store] (figs) at (0, -14.4) {figures/, metrics/};
+
+\draw[arr] (grid) -- (s1);
+\draw[arr] (s1) -- (runs);
+\draw[arr] (runs) -- (s2);
+\draw[arr] (s2) -- (sc1);
+\draw[arr] (s2) -- (sc2);
+\draw[arr] (sc1) -- (join);
+\draw[arr] (sc2) -- (join);
+
+% runs feeds the join directly, bypassing the scoring stage
+\draw[arr] (runs.east) -- ++(36mm, 0) |- (join.east);
+
+\draw[arr] (join) -- (s3);
+\draw[arr] (s3) -- (figs);
+
+\end{tikzpicture}

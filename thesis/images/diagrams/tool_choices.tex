@@ -1,77 +1,77 @@
 \begin{tabularx}{\textwidth}{@{}
     >{\raggedright\arraybackslash}p{0.24\textwidth}
-    >{\raggedright\arraybackslash}X
     >{\raggedright\arraybackslash}p{0.28\textwidth}
+    >{\raggedright\arraybackslash}X
     @{}}
     \toprule
-    Name and section & Rejected alternatives & Chosen \\
+    Name and section & Chosen & Rejected alternatives \\
     \midrule
     Implementation platform\newline
     \textit{\scriptsize\Cref{sec:tools-platform}}
-        & Statically typed, compiled language
-        & Python \\
+        & Python
+        & Statically typed, compiled language \\
     \addlinespace
     Agent framework\newline
     \textit{\scriptsize\Cref{sec:tools-agent-framework}}
+        & Schema-first agent library
         & Raw provider SDKs\newline
-          General-purpose orchestration framework
-        & Schema-first agent library \\
+          General-purpose orchestration framework \\
     \addlinespace
     Model access\newline
     \textit{\scriptsize\Cref{sec:tools-model-access}}
+        & Routing service over many providers
         & Direct per-provider API\newline
-          Self-hosted open-weight inference
-        & Routing service over many providers \\
+          Self-hosted open-weight inference \\
     \addlinespace
     Food data access\newline
     \textit{\scriptsize\Cref{sec:tools-food-data}}
+        & Bulk, version-pinned offline exports
         & Live query APIs\newline
-          Commercial nutrition data API
-        & Bulk, version-pinned offline exports \\
+          Commercial nutrition data API \\
     \addlinespace
     Storage engine\newline
     \textit{\scriptsize\Cref{sec:tools-storage}}
+        & DuckDB, embedded, full-text and vector
         & SQLite with FTS5\newline
-          PostgreSQL with pgvector
-        & DuckDB, embedded, full-text and vector \\
+          PostgreSQL with pgvector \\
     \addlinespace
     Retrieval channel\newline
     \textit{\scriptsize\Cref{sec:tools-retrieval}}
+        & Both channels, in parallel
         & Lexical ranking alone (BM25)\newline
-          Dense ranking alone
-        & Both channels, in parallel \\
+          Dense ranking alone \\
     \addlinespace
     Fusion strategy\newline
     \textit{\scriptsize\Cref{sec:tools-retrieval}}
-        & Weighted sum of raw scores
-        & Reciprocal rank fusion \\
+        & Reciprocal rank fusion
+        & Weighted sum of raw scores \\
     \addlinespace
     Embedding model\newline
     \textit{\scriptsize\Cref{sec:tools-embeddings}}
+        & Multilingual local model
         & Hosted embedding API\newline
-          Small, English-only local model
-        & Multilingual local model \\
+          Small, English-only local model \\
     \addlinespace
     Vector index\newline
     \textit{\scriptsize\Cref{sec:tools-embeddings}}
-        & Exact brute-force scan
-        & HNSW proximity graph \\
+        & HNSW proximity graph
+        & Exact brute-force scan \\
     \addlinespace
     Nutrient aggregation\newline
     \textit{\scriptsize\Cref{sec:tools-aggregation}}
+        & Exact rational arithmetic
         & Floating-point arithmetic\newline
-          Mixed-integer programming solver
-        & Exact rational arithmetic \\
+          Mixed-integer programming solver \\
     \addlinespace
     Self-correction\newline
     \textit{\scriptsize\Cref{sec:tools-self-correction}}
+        & Tool-less critic shown computed totals
         & Critic re-reading its own output only\newline
-          Critic issuing its own tool calls
-        & Tool-less critic shown computed totals \\
+          Critic issuing its own tool calls \\
     \addlinespace
     Judge protocol\newline
     \textit{\scriptsize\Cref{sec:tools-evaluation}}
-        & One judge, one call per plan
-        & Two vendors' judges, repeated scoring \\
+        & Two vendors' judges, repeated scoring
+        & One judge, one call per plan \\
     \bottomrule
 \end{tabularx}

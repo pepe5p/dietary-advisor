@@ -47,6 +47,30 @@
 
 \usepackage{microtype}
 
+% Verbatim listings for the worked example in \Cref{cha:worked-example}. A single
+% house style; `literate` maps the Polish letters appearing in Open Food Facts
+% product names so they render correctly under pdflatex regardless of inputenc.
+\usepackage{listings}
+\lstdefinestyle{thesis}{
+    basicstyle=\footnotesize\ttfamily,
+    breaklines=true,
+    breakatwhitespace=false,
+    columns=fullflexible,
+    keepspaces=true,
+    showstringspaces=false,
+    frame=single,
+    framesep=4pt,
+    xleftmargin=6pt,
+    xrightmargin=6pt,
+    extendedchars=true,
+    literate=%
+        {ą}{{\k a}}1 {ć}{{\'c}}1 {ę}{{\k e}}1 {ł}{{\l}}1 {ń}{{\'n}}1
+        {ó}{{\'o}}1 {ś}{{\'s}}1 {ź}{{\'z}}1 {ż}{{\.z}}1
+        {Ą}{{\k A}}1 {Ć}{{\'C}}1 {Ę}{{\k E}}1 {Ł}{{\L}}1 {Ń}{{\'N}}1
+        {Ó}{{\'O}}1 {Ś}{{\'S}}1 {Ź}{{\'Z}}1 {Ż}{{\.Z}}1,
+}
+\lstset{style=thesis}
+
 \newtheorem{definition}{Definition}[chapter]
 
 % The class sizes the description label column for the single-symbol labels of its
@@ -123,6 +147,9 @@
 \include{chapters/07_methodology}
 \include{chapters/08_results}
 \include{chapters/09_conclusions}
+
+\appendix
+\include{chapters/A_worked_example}
 
 \printbibliography
 

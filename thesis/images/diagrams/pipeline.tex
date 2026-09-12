@@ -1,29 +1,100 @@
 \begin{tikzpicture}[
-    node distance=6mm and 14mm,
-    box/.style={draw, rounded corners, align=center, minimum height=8mm, inner sep=2mm, font=\small},
-    tool/.style={draw, dashed, align=center, minimum height=7mm, inner sep=1.5mm, font=\scriptsize},
+    x=1mm, y=1mm,
+    box/.style={draw, rounded corners, anchor=center, text width=34mm,
+                minimum height=11mm, inner sep=1.2mm, font=\scriptsize, align=center},
+    agent/.style={box, minimum height=20mm},
+    side/.style={draw, rounded corners, anchor=center, text width=22mm,
+                 minimum height=9mm, inner sep=1.2mm, font=\scriptsize, align=center},
+    lane/.style={draw, rounded corners, anchor=center, text width=18mm,
+                 inner sep=1.2mm, font=\scriptsize, align=center},
+    dcall/.style={-{Latex[length=1.6mm]}, draw=black!55, dashed},
+    ret/.style={-{Latex[length=1.6mm]}, draw=black!55, dashed},
+    ensured/.style={{Latex[length=1.6mm]}-{Latex[length=1.6mm]}},
+    edgelab/.style={font=\scriptsize, text=black!60, align=center},
     arr/.style={-{Latex[length=2mm]}},
+    % validator marker: a hollow triangle sitting on an edge, deliberately
+    % unlike the solid arrow heads used for flow
+    pics/vtri/.style={code={\filldraw[fill=white, draw=black]
+        (-1.8, -2.2) -- (-1.8, 2.2) -- (2.0, 0) -- cycle;}},
 ]
 
-\node[box] (input) {User profile\\ + session request};
-\node[box, below=of input] (idea) {Meal-idea agent};
-\node[box, below=of idea] (nutrition) {Nutrition agent};
-\node[tool, right=of nutrition] (lookup) {Food knowledge\\ base lookup};
-\node[tool, below=4mm of lookup] (totaller_tool) {Totaller tool\\ (hydrates internally,\\ if enabled)};
-\node[box, below=of nutrition] (plan) {AgentMealPlan\\ (codes and grams only)};
-\node[box, below=of plan] (validator) {Output validator\\ (every code resolves)};
-\node[box, below=of validator] (reflection) {Critique-and-refine loop\\ (if enabled, \Cref{fig:diagram-reflection})};
-\node[box, below=of reflection] (hydration) {Code resolution\\ (hydration)};
-\node[box, below=of hydration] (output) {Meal plan};
+% --- centre column (x = 48) ---
+\node[box] (runner) at (48, 0) {Runner};
+\node[agent] (nutrition) at (48, -30) {Nutrition agent};
+\node[agent] (critic) at (48, -70) {Critic};
+\node[agent] (refiner) at (48, -110) {Refiner};
+\node[agent] (hydration) at (48, -144) {Hydration};
 
-\draw[arr] (input) -- (idea);
-\draw[arr] (idea) -- (nutrition);
-\draw[arr] (nutrition) -- (lookup);
-\draw[arr] (nutrition) -- (totaller_tool);
-\draw[arr] (nutrition) -- (plan);
-\draw[arr] (plan) -- (validator);
-\draw[arr] (validator) -- (reflection);
-\draw[arr] (reflection) -- (hydration);
-\draw[arr] (hydration) -- (output);
+% --- profiles store, top left ---
+\node[side] (profiles) at (0, 0) {Profiles store};
+
+% --- tool lanes on opposite sides ---
+\node[lane, minimum height=140mm] (lookup) at (-10, -85) {Food knowledge database};
+\node[lane, minimum height=108mm] (totaller) at (106, -70) {Totaller};
+
+% --- attachment points, taken from the block borders themselves ---
+\coordinate (n_call_w) at ([yshift=6mm]nutrition.west);
+\coordinate (n_ret_w)  at ([yshift=0mm]nutrition.west);
+\coordinate (n_retry)  at ([yshift=-6mm]nutrition.west);
+\coordinate (n_call_e) at ([yshift=6mm]nutrition.east);
+\coordinate (n_ret_e)  at ([yshift=0mm]nutrition.east);
+\coordinate (r_call_w) at ([yshift=4mm]refiner.west);
+\coordinate (r_ret_w)  at ([yshift=-4mm]refiner.west);
+\coordinate (r_call_e) at ([yshift=4mm]refiner.east);
+\coordinate (r_ret_e)  at ([yshift=-4mm]refiner.east);
+\coordinate (c_out)    at ([yshift=-6mm]critic.west);
+\coordinate (h_in)     at ([yshift=6mm]hydration.west);
+
+% --- main vertical flow ---
+\draw[arr] (48, 14) -- node[edgelab, right] {prompt} (runner);
+\draw[arr] (runner) -- node[edgelab, right] {runs} (nutrition);
+\pic[rotate=-90] at ([yshift=-2mm]nutrition.south) {vtri};
+\draw[arr] ([yshift=-4mm]nutrition.south) -- node[edgelab, right] {plan} (critic.north);
+\draw[arr] (hydration) -- node[edgelab, right] {hydrated plan} (48, -160);
+
+% --- critic and refiner: two parallel edges, opposite directions ---
+\pic[rotate=-90] at ([xshift=-6mm, yshift=-2mm]critic.south) {vtri};
+\draw[arr] ([xshift=-6mm, yshift=-4mm]critic.south) -- node[edgelab, anchor=east, pos=0.55] {feedback} ([xshift=-6mm]refiner.north);
+\pic[rotate=90] at ([xshift=6mm, yshift=2mm]refiner.north) {vtri};
+\draw[arr] ([xshift=6mm, yshift=4mm]refiner.north) -- node[edgelab, anchor=west, pos=0.55] {refined plan} ([xshift=6mm]critic.south);
+
+% --- approved plan: critic -> hydration ---
+\draw[arr] (c_out) -- (14, -76) -- (14, -138) -- (h_in);
+\node[edgelab, anchor=south] at (20, -75) {approved plan};
+
+% --- profiles feed ---
+\draw[arr] (profiles) -- node[edgelab, above] {profile} (runner);
+
+% --- left lane: food knowledge database (call validated on the way in) ---
+\pic[rotate=180] at ([xshift=-2mm]n_call_w) {vtri};
+\draw[dcall] ([xshift=-4mm]n_call_w) -- node[edgelab, above, pos=0.7] {tool call} (n_call_w -| lookup.east);
+\draw[ret] (n_ret_w -| lookup.east) -- node[edgelab, below, pos=0.3] {tool response} (n_ret_w);
+\pic[rotate=180] at ([xshift=-2mm]r_call_w) {vtri};
+\draw[dcall] ([xshift=-4mm]r_call_w) -- node[edgelab, above, pos=0.7] {tool call} (r_call_w -| lookup.east);
+\draw[ret] (r_ret_w -| lookup.east) -- node[edgelab, below, pos=0.3] {tool response} (r_ret_w);
+
+% hydration <-> food knowledge database: deterministic, no validator
+\coordinate (h_dbc) at ([yshift=0mm]hydration.west);
+\coordinate (h_dbr) at ([yshift=-6mm]hydration.west);
+\draw[arr] (h_dbc) -- node[edgelab, above, pos=0.7] {call} (h_dbc -| lookup.east);
+\draw[-{Latex[length=1.6mm]}] (h_dbr -| lookup.east) -- node[edgelab, below, pos=0.3] {result} (h_dbr);
+
+% --- right lane: totaller (call validated on the way in) ---
+\pic at ([xshift=2mm]n_call_e) {vtri};
+\draw[dcall] ([xshift=4mm]n_call_e) -- node[edgelab, above, pos=0.5] {tool call} (n_call_e -| totaller.west);
+\draw[ret] (n_ret_e -| totaller.west) -- node[edgelab, below, pos=0.5] {tool response} (n_ret_e);
+\pic at ([xshift=2mm]r_call_e) {vtri};
+\draw[dcall] ([xshift=4mm]r_call_e) -- node[edgelab, above, pos=0.5] {tool call} (r_call_e -| totaller.west);
+\draw[ret] (r_ret_e -| totaller.west) -- node[edgelab, below, pos=0.5] {tool response} (r_ret_e);
+
+% critic <-> totaller: call validated on the way in
+\coordinate (c_call_e) at ([yshift=4mm]critic.east);
+\coordinate (c_ret_e)  at ([yshift=-4mm]critic.east);
+\draw[arr] (c_call_e) -- node[edgelab, above, pos=0.5] {call} (c_call_e -| totaller.west);
+\draw[-{Latex[length=1.6mm]}] (c_ret_e -| totaller.west) -- node[edgelab, below, pos=0.5] {result} (c_ret_e);
+
+% --- legend ---
+\pic at (-19, -166) {vtri};
+\node[edgelab, anchor=west, text=black] at (-15, -166) {pydantic-ai validator};
 
 \end{tikzpicture}

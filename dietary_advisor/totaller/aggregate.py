@@ -52,6 +52,8 @@ def _coverage_warnings(plan: MealPlan, rounded_totals: dict[NutrientName, float]
     """Flag nutrients whose summed totals omit foods with no DB value for that nutrient.
 
     A key absent from ``nutrients_per_100g`` means unknown; a present ``0.0`` is a real zero.
+    USDA absences are resolved to real zeros during hydration, so in practice these
+    warnings fire on the crowd-sourced Open Food Facts foods, where a gap is genuine.
     """
     portions = [portion for meal in plan.meals for portion in meal.portions]
     if not portions:

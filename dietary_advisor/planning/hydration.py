@@ -14,7 +14,7 @@ import logging
 from dietary_advisor.agents.agent_output import AgentMealPlan
 from dietary_advisor.food_db import FoodDb, OFFItem, USDAItem
 from dietary_advisor.food_db.errors import MultipleUnknownFoodCodesError, UnknownFoodCodeError
-from dietary_advisor.food_db.nutrients import nutrients_from_row
+from dietary_advisor.food_db.nutrients import nutrients_from_row, nutrients_from_usda_row
 from dietary_advisor.food_db.off_food_db import get_off_item_name
 from dietary_advisor.food_db.off_food_db import to_code as to_off_code
 from dietary_advisor.food_db.usda_food_db import get_usda_item_name
@@ -32,14 +32,16 @@ def to_food_item(item: OFFItem | USDAItem) -> FoodItem:
         code = to_off_code(item.code)
         name = get_off_item_name(item)
         quantity_g = item.product_quantity
+        nutrients = nutrients_from_row(item)
     else:
         code = to_usda_code(item.fdc_id)
         name = get_usda_item_name(item)
         quantity_g = None
+        nutrients = nutrients_from_usda_row(item)
     return FoodItem(
         code=code,
         name=name,
-        nutrients_per_100g=nutrients_from_row(item),
+        nutrients_per_100g=nutrients,
         quantity_g=quantity_g,
     )
 

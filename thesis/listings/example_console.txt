@@ -1,0 +1,221 @@
+  Nutrient totals (actual vs target)   
++-------------------+--------+--------+
+| Nutrient          | Actual | Target |
++-------------------+--------+--------+
+| Energy (kcal)     |   2727 |   2728 |
+| Protein (g)       |  124.9 |  124.8 |
+| Carbs (g)         |  397.5 |  386.7 |
+| Fat (g)           |   76.5 |   75.8 |
+| Saturated fat (g) |   17.0 |      - |
+| Fiber (g)         |   55.0 |   25.0 |
+| Sugar (g)         |   98.2 |      - |
+| Salt (g)          |    0.4 |      - |
+| Sodium (mg)       |   1205 |      - |
+| Potassium (mg)    |   6095 |      - |
+| Calcium (mg)      |    851 |      - |
+| Iron (mg)         |     17 |      - |
+| Vitamin c (mg)    |    417 |      - |
+| Vitamin d (ug)    |    1.3 |      - |
+| Cholesterol (mg)  |    172 |      - |
++-------------------+--------+--------+
+
+Data-coverage caveats
+  * salt: 20 of 26 foods have no salt data - 1786 g of 2376 g (75% of plan mass), so the 0.38 g 
+total is understated (Seeds, chia seeds, dried, Apples, gala, with skin, raw, Nuts, walnuts, 
+English, halves, raw and 17 more)
+  * cholesterol: 4 of 26 foods have no cholesterol data - 370 g of 2376 g (16% of plan mass), so the
+171.95 mg total is understated (Mleko 2%, Miód nektarowy wielokwiatowy, Skyr naturalny)
+  * fiber: 4 of 26 foods have no fiber data - 370 g of 2376 g (16% of plan mass), so the 55.04 g 
+total is understated (Mleko 2%, Miód nektarowy wielokwiatowy, Skyr naturalny)
+  * iron: 4 of 26 foods have no iron data - 370 g of 2376 g (16% of plan mass), so the 17.36 mg 
+total is understated (Mleko 2%, Miód nektarowy wielokwiatowy, Skyr naturalny)
+  * potassium: 4 of 26 foods have no potassium data - 370 g of 2376 g (16% of plan mass), so the 
+6094.88 mg total is understated (Mleko 2%, Miód nektarowy wielokwiatowy, Skyr naturalny)
+  * vitamin c: 4 of 26 foods have no vitamin c data - 370 g of 2376 g (16% of plan mass), so the 
+417.17 mg total is understated (Mleko 2%, Miód nektarowy wielokwiatowy, Skyr naturalny)
+  * vitamin d: 4 of 26 foods have no vitamin d data - 370 g of 2376 g (16% of plan mass), so the 
+1.33 ug total is understated (Mleko 2%, Miód nektarowy wielokwiatowy, Skyr naturalny)
+  * calcium: 3 of 26 foods have no calcium data - 120 g of 2376 g (5% of plan mass), so the 851.05 
+mg total is understated (Miód nektarowy wielokwiatowy, Skyr naturalny)
+  * saturated fat: 2 of 26 foods have no saturated fat data - 20 g of 2376 g (1% of plan mass), so 
+the 16.96 g total is understated (Miód nektarowy wielokwiatowy)
+
+Rationale: This 1-day meal plan is designed for a 30-year-old male omnivore aiming for ~2,728 kcal 
+with balanced macronutrients (124.8 g protein, 386.7 g carbohydrates, and 75.8 g fat). 
+
+Key dietary choices:
+- High-quality, lean protein sources such as chicken breast, Atlantic cod, natural skyr, and 
+semi-skimmed milk provide complete amino acid profiles to comfortably hit the 124.8 g daily protein 
+target while keeping saturated fats well below 10% of total energy.
+- Complex carbohydrates from whole-grain rolled oats, potatoes, and rice noodles provide sustained 
+glycogen replenishment and energy for physical activity.
+- Healthy unsaturated fats are supplied via English walnuts, chia seeds, extra virgin olive oil, and
+sesame oil, offering an optimal balance of ALA omega-3 and omega-6 fatty acids to support 
+cardiovascular health.
+- Over 850 g of vegetables and fruits (apples, blueberries, banana, broccoli, carrots, bell peppers,
+green beans) ensure rich dietary fiber (>54 g), abundant potassium (>6,000 mg), and ample vitamin C 
+(>400 mg), comfortably exceeding all WHO/DGA micronutrient guardrails.
+- Sodium is strictly controlled (~1,205 mg) through the use of low-sodium soy sauce and fresh herbs 
+like dill and ginger instead of table salt.
+
+Supplementation guidance:
+- Vitamin D: Like most adults residing in temperate European latitudes with limited year-round sun 
+exposure, dietary sources alone (providing ~1.3 µg) are insufficient to reach optimal physiological 
+levels (15–20 µg / 600–800 IU daily). Supplementation with Vitamin D3 (cholecalciferol) at 
+1,000–2,000 IU (25–50 µg) daily is recommended, especially during autumn and winter months; confirm 
+specific dosing with a healthcare professional based on 25(OH)D blood testing.
+- All other essential micronutrients (Calcium, Iron, Magnesium, Potassium, Zinc, Vitamin B-complex, 
+and Vitamin C) are comprehensively covered through this whole-food omnivorous diet, so no routine 
+multivitamin supplementation is warranted.
+                                         MealPlan (4 meals)                                         
++-----------+---------------------+---------------------+---------------------+--------------------+
+| Meal      | Meal Name           | Products            | Meal totals         | Recipe             |
++-----------+---------------------+---------------------+---------------------+--------------------+
+| breakfast | Overnight oats with | * Płatki owsiane    | 886 kcal            | In a bowl or mason |
+|           | chia seeds, grated  | górskie: 90g — 337  |                     | jar, combine the   |
+|           | apple, cinnamon,    | kcal, P11.7 C54.9   | Protein 27.3g       | rolled oats, chia  |
+|           | and walnuts         | F6.0                | Carbs 110.1g        | seeds, and ground  |
+|           |                     | * Seeds, chia       |   Sugar 37.8g       | cinnamon. Pour in  |
+|           |                     | seeds, dried: 20g — | Fat 36.3g           | the milk and stir  |
+|           |                     | 97 kcal, P3.3 C8.4  |   Saturated 6.7g    | well until         |
+|           |                     | F6.1                |                     | thoroughly mixed.  |
+|           |                     | * Mleko 2%: 250g —  | 20.6g fiber, 0.26g  | Cover and place in |
+|           |                     | 125 kcal, P8.0      | salt, 107mg sodium, | the refrigerator   |
+|           |                     | C11.7 F5.0          | 702.67mg potassium, | overnight (or for  |
+|           |                     | * Apples, gala,     | 518.94mg calcium,   | at least 4 hours)  |
+|           |                     | with skin, raw:     | 6.05mg iron, 0.4mg  | to allow the oats  |
+|           |                     | 150g — 92 kcal,     | vitamin c           | and chia seeds to  |
+|           |                     | P0.2 C22.2 F0.2     |                     | absorb the liquid  |
+|           |                     | * Nuts, walnuts,    |                     | and thicken. In    |
+|           |                     | English, halves,    |                     | the morning, wash  |
+|           |                     | raw: 27g — 197      |                     | and coarsely grate |
+|           |                     | kcal, P3.9 C2.9     |                     | the fresh Gala     |
+|           |                     | F18.8               |                     | apple. Stir the    |
+|           |                     | * Miód nektarowy    |                     | grated apple into  |
+|           |                     | wielokwiatowy: 10g  |                     | the chilled        |
+|           |                     | — 34 kcal, P0.1     |                     | oatmeal mixture.   |
+|           |                     | C8.3 F0.0           |                     | Top with chopped   |
+|           |                     | * Spices, cinnamon, |                     | raw walnuts and    |
+|           |                     | ground: 2g — 5      |                     | drizzle with       |
+|           |                     | kcal, P0.1 C1.6     |                     | natural blossom    |
+|           |                     | F0.0                |                     | honey before       |
+|           |                     |                     |                     | serving.           |
++-----------+---------------------+---------------------+---------------------+--------------------+
+| lunch     | Chicken and         | * Rice stick        | 854 kcal            | Prepare the        |
+|           | vegetable stir-fry  | noodle: 130g — 467  |                     | ingredients: cut   |
+|           | with rice noodles   | kcal, P9.0 C105.3   | Protein 46.7g       | chicken breast     |
+|           | and soy-sesame      | F0.8                | Carbs 135.0g        | into bite-sized    |
+|           | sauce               | * Chicken, breast,  |   Sugar 11.8g       | strips; cut        |
+|           |                     | boneless, skinless, | Fat 16.5g           | broccoli into      |
+|           |                     | raw: 130g — 138     |   Saturated 2.8g    | small florets;     |
+|           |                     | kcal, P29.3 C0.0    |                     | slice red bell     |
+|           |                     | F2.5                | 13.18g fiber, 0.03g | pepper and carrot  |
+|           |                     | * Broccoli, raw:    | salt, 939.78mg      | into thin          |
+|           |                     | 150g — 51 kcal,     | sodium, 1879.99mg   | matchsticks;       |
+|           |                     | P4.2 C10.0 F0.6     | potassium, 145.58mg | finely mince       |
+|           |                     | * Peppers, sweet,   | calcium, 3.65mg     | garlic and fresh   |
+|           |                     | red, raw: 100g — 26 | iron, 269.87mg      | ginger root. Cook  |
+|           |                     | kcal, P1.0 C6.0     | vitamin c, 0.16ug   | the rice stick     |
+|           |                     | F0.3                | vitamin d, 94.55mg  | noodles in boiling |
+|           |                     | * Carrots, raw:     | cholesterol         | water according to |
+|           |                     | 100g — 41 kcal,     |                     | package            |
+|           |                     | P0.9 C9.6 F0.2      |                     | instructions       |
+|           |                     | * Garlic, raw: 6g — |                     | (about 3-4         |
+|           |                     | 9 kcal, P0.4 C2.0   |                     | minutes), drain    |
+|           |                     | F0.0                |                     | and rinse under    |
+|           |                     | * Ginger root, raw: |                     | cold water. Heat   |
+|           |                     | 6g — 5 kcal, P0.1   |                     | sesame oil in a    |
+|           |                     | C1.1 F0.0           |                     | large skillet or   |
+|           |                     | * Soy sauce made    |                     | wok over           |
+|           |                     | from soy and wheat  |                     | medium-high heat.  |
+|           |                     | (shoyu), low        |                     | Add the minced     |
+|           |                     | sodium: 20g — 11    |                     | garlic and ginger, |
+|           |                     | kcal, P1.8 C1.1     |                     | stir-frying for 30 |
+|           |                     | F0.1                |                     | seconds until      |
+|           |                     | * Oil, sesame,      |                     | fragrant. Add the  |
+|           |                     | salad or cooking:   |                     | chicken strips and |
+|           |                     | 12g — 106 kcal,     |                     | stir-fry for 4-5   |
+|           |                     | P0.0 C0.0 F12.0     |                     | minutes until      |
+|           |                     |                     |                     | cooked through.    |
+|           |                     |                     |                     | Add broccoli,      |
+|           |                     |                     |                     | carrots, and sweet |
+|           |                     |                     |                     | red pepper,        |
+|           |                     |                     |                     | stir-frying for    |
+|           |                     |                     |                     | another 3-4        |
+|           |                     |                     |                     | minutes until      |
+|           |                     |                     |                     | tender-crisp. Pour |
+|           |                     |                     |                     | in the low-sodium  |
+|           |                     |                     |                     | soy sauce and add  |
+|           |                     |                     |                     | the drained rice   |
+|           |                     |                     |                     | noodles. Toss      |
+|           |                     |                     |                     | everything         |
+|           |                     |                     |                     | together           |
+|           |                     |                     |                     | vigorously for 1-2 |
+|           |                     |                     |                     | minutes until      |
+|           |                     |                     |                     | thoroughly         |
+|           |                     |                     |                     | combined and hot.  |
+|           |                     |                     |                     | Serve immediately. |
++-----------+---------------------+---------------------+---------------------+--------------------+
+| dinner    | Pan-seared cod      | * Fish, cod,        | 714 kcal            | Thoroughly scrub   |
+|           | fillet with boiled  | Atlantic, raw: 130g |                     | and rinse the      |
+|           | potatoes, dill      | — 107 kcal, P23.2   | Protein 36.7g       | potatoes, cut them |
+|           | butter, and         | C0.0 F0.9           | Carbs 95.1g         | into bite-sized    |
+|           | blanched green      | * Potatoes, flesh   |   Sugar 10.3g       | pieces, and place  |
+|           | beans               | and skin, raw: 460g | Fat 22.9g           | them in a saucepan |
+|           |                     | — 354 kcal, P9.4    |   Saturated 7.2g    | of boiling water   |
+|           |                     | C80.5 F0.4          |                     | for 15-20 minutes  |
+|           |                     | * Beans, snap,      | 15.27g fiber,       | until tender; then |
+|           |                     | green, raw: 200g —  | 117.26mg sodium,    | drain. Trim the    |
+|           |                     | 62 kcal, P3.7 C13.9 | 2990.23mg           | fresh green beans  |
+|           |                     | F0.4                | potassium, 173.33mg | and boil or steam  |
+|           |                     | * Dill weed, fresh: | calcium, 7.01mg     | them in water for  |
+|           |                     | 10g — 4 kcal, P0.3  | iron, 124.82mg      | 4-5 minutes until  |
+|           |                     | C0.7 F0.1           | vitamin c, 1.17ug   | bright green and   |
+|           |                     | * Butter, without   | vitamin d, 77.4mg   | tender-crisp, then |
+|           |                     | salt: 10g — 72      | cholesterol         | drain. In a small  |
+|           |                     | kcal, P0.1 C0.0     |                     | dish, combine      |
+|           |                     | F8.1                |                     | melted unsalted    |
+|           |                     | * Oil, olive, salad |                     | butter with        |
+|           |                     | or cooking: 13g —   |                     | freshly chopped    |
+|           |                     | 115 kcal, P0.0 C0.0 |                     | dill weed and      |
+|           |                     | F13.0               |                     | gently toss with   |
+|           |                     |                     |                     | the warm boiled    |
+|           |                     |                     |                     | potatoes and green |
+|           |                     |                     |                     | beans. Pat the     |
+|           |                     |                     |                     | Atlantic cod       |
+|           |                     |                     |                     | fillet dry with a  |
+|           |                     |                     |                     | paper towel and    |
+|           |                     |                     |                     | lightly season.    |
+|           |                     |                     |                     | Heat olive oil in  |
+|           |                     |                     |                     | a skillet over     |
+|           |                     |                     |                     | medium heat, add   |
+|           |                     |                     |                     | the cod fillet,    |
+|           |                     |                     |                     | and sear for 3-4   |
+|           |                     |                     |                     | minutes per side   |
+|           |                     |                     |                     | until golden on    |
+|           |                     |                     |                     | the outside and    |
+|           |                     |                     |                     | flaking easily     |
+|           |                     |                     |                     | with a fork. Plate |
+|           |                     |                     |                     | the seared cod     |
+|           |                     |                     |                     | fillet alongside   |
+|           |                     |                     |                     | the dill-buttered  |
+|           |                     |                     |                     | potatoes and green |
+|           |                     |                     |                     | beans.             |
++-----------+---------------------+---------------------+---------------------+--------------------+
+| snack     | Natural skyr with   | * Skyr naturalny:   | 273 kcal            | Spoon the natural  |
+|           | fresh blueberries,  | 100g — 64 kcal,     |                     | skyr into a        |
+|           | banana, and honey   | P12.0 C4.1 F0.0     | Protein 14.2g       | serving bowl. Wash |
+|           |                     | * Blueberries, raw: | Carbs 57.2g         | the fresh          |
+|           |                     | 120g — 68 kcal,     |   Sugar 38.3g       | blueberries and    |
+|           |                     | P0.9 C17.4 F0.4     | Fat 0.8g            | distribute them    |
+|           |                     | * Bananas, raw:     |   Saturated 0.2g    | over the skyr.     |
+|           |                     | 120g — 107 kcal,    |                     | Peel and slice the |
+|           |                     | P1.3 C27.4 F0.4     | 6g fiber, 0.1g      | banana, arranging  |
+|           |                     | * Miód nektarowy    | salt, 41.4mg        | the slices neatly  |
+|           |                     | wielokwiatowy: 10g  | sodium, 522mg       | on top. Drizzle    |
+|           |                     | — 34 kcal, P0.1     | potassium, 13.2mg   | with natural       |
+|           |                     | C8.3 F0.0           | calcium, 0.65mg     | blossom honey and  |
+|           |                     |                     | iron, 22.08mg       | serve as a fresh,  |
+|           |                     |                     | vitamin c           | nutrient-dense     |
+|           |                     |                     |                     | snack.             |
++-----------+---------------------+---------------------+---------------------+--------------------+
