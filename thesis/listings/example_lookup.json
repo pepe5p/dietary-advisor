@@ -5,29 +5,28 @@
       "results": {
         "open_food_facts": [
           {
-            "energy_kcal": 372.0,
-            "protein_g": 14.0,
-            "carbs_g": 58.0,
-            "fat_g": 7.1,
+            "energy_kcal": 374.0,
+            "protein_g": 13.0,
+            "carbs_g": 61.0,
+            "fat_g": 6.7,
             "saturated_fat_g": 1.3,
-            "fiber_g": 10.2,
-            "sugar_g": 0.0,
-            "sodium_mg": 8.0,
+            "fiber_g": 9.0,
+            "sugar_g": 1.6,
+            "sodium_mg": 4.0,
             "potassium_mg": 377.0,
-            "calcium_mg": 84.0,
+            "calcium_mg": 84.3,
             "iron_mg": 4.05,
             "vitamin_c_mg": 0.0,
             "vitamin_d_ug": 0.0,
             "cholesterol_mg": 0.0,
-            "code": "off:5907709953260",
-            "name": "Płatki owsiane",
-            "brands": "Batom",
-            "categories": "rolled oats",
-            "ingredients_text": "Płatki owsiane* 100%. *certyfikowany składnik ekologiczny. Może zawierać alergeny<span class=\"allergen\">: zboża zawierające gluten</span>,<span class=\"allergen\"> orzechy</span>,<span class=\"allergen\">...",
-            "energy_kj": 1486.7,
-            "salt_g": 0.0
-          },
-          ...
+            "code": "off:5906827018608",
+            "name": "Płatki owsiane górskie",
+            "brands": "Naturall",
+            "categories": "Płatki owsiane górskie",
+            "ingredients_text": "Płatki owsiane górskie",
+            "energy_kj": 1578.0,
+            "salt_g": 0.01
+          }
         ],
         "usda": [
           {
@@ -48,8 +47,7 @@
             "code": "usda:2346396",
             "name": "Oats, whole grain, rolled, old fashioned",
             "category": "Cereal Grains and Pasta"
-          },
-          ...
+          }
         ]
       }
     }

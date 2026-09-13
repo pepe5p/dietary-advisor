@@ -1,4 +1,9 @@
-from evaluation.plotting.figures import render_experiment, render_run_variability, render_tradeoff
+from evaluation.plotting.figures import (
+    render_experiment,
+    render_paired_scenarios,
+    render_run_variability,
+    render_tradeoff,
+)
 from evaluation.plotting.stats import (
     BY_EFFORT,
     BY_MODEL,
@@ -57,6 +62,7 @@ __all__ = [
     "pooled_variability",
     "primary_records",
     "render_experiment",
+    "render_paired_scenarios",
     "render_run_variability",
     "render_tradeoff",
     "stacked_group_stats",

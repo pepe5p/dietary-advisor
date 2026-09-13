@@ -10,6 +10,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from matplotlib.ticker import FixedLocator, FuncFormatter, NullLocator
 
 from evaluation.judges import all_judges
@@ -19,6 +20,7 @@ from evaluation.plotting.stats import (
     _bare_short_model_name,
     _default_grouping,
     _resolved_effort,
+    _variant_order,
     BY_EFFORT,
     BY_MODEL,
     experiment_display_label,
@@ -38,14 +40,22 @@ from evaluation.plotting.stats import (
     StackedMetric,
     TOKEN_STACK,
     variability_by_judge,
+    variant_display_label,
 )
 from evaluation.records import ScoredRun
 
 _DPI = 150
 _SERIES_COLORS = ("#4472C4", "#ED7D31", "#70AD47", "#A5A5A5")
 _EXTRA_GROUPINGS = (BY_MODEL, BY_EFFORT)
+_CITED_EXTRA_STEMS = {
+    "mae_pct_by_model",
+    "soft_aggregate_by_model",
+    "mae_pct_by_effort",
+    "soft_aggregate_by_effort",
+    "elapsed_s_by_effort",
+}
 _TRADEOFF_HEIGHT_IN = 4.6
-_X_TICK_CANDIDATES = (0.5, 1, 2, 3, 5, 7, 10, 20, 30, 50, 100)
+_LOG_TICK_CANDIDATES = (0.5, 1, 2, 3, 5, 7, 10, 20, 30, 50, 100)
 # Scatter series carry a shape as well as a colour, so they stay distinguishable in greyscale.
 _MARKERS = ("o", "s", "^", "D", "v", "P")
 
@@ -428,7 +438,7 @@ def _render_tradeoff_figure(
     ax.set_xlim(x_low, x_high)
     # Matplotlib's own log ticks mix decade and subdecade labels at two different
     # sizes and collide once the span is under two decades, so place them by hand.
-    ax.xaxis.set_major_locator(FixedLocator([tick for tick in _X_TICK_CANDIDATES if x_low <= tick <= x_high]))
+    ax.xaxis.set_major_locator(FixedLocator([tick for tick in _LOG_TICK_CANDIDATES if x_low <= tick <= x_high]))
     ax.xaxis.set_minor_locator(NullLocator())
     ax.xaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:g}"))
     ax.set_xlabel(f"{MAE_METRIC.ylabel} ($\\log_{{10}}$ scale)", fontsize=_AXIS_LABEL_SIZE)
@@ -473,9 +483,6 @@ def render_tradeoff(
             continue
         per_judge.append(points)
         judge_labels.append(judge.label)
-        path = dest / f"tradeoff_{judge.key}.png"
-        _render_tradeoff_figure(experiment, judge.label, points, path)
-        paths.extend([path, path.with_suffix(".pdf")])
 
     if len(per_judge) > 1:
         mean_points = _mean_tradeoff_points(per_judge)
@@ -499,21 +506,120 @@ def render_experiment(
     extra_groupings = _EXTRA_GROUPINGS if len({record.llm_model for record in primary}) > 1 else ()
     dest = figures_dir(name, output_dir=output_dir)
     paths: list[Path] = []
+    default_keys = {"mae_pct", "soft_aggregate"} if extra_groupings else None
     for metric in PLOT_METRICS:
         filtered = _filter_records(records_by_judge, metric)
         if not primary_records(filtered):
             continue
-        paths.extend(_write_metric_figure(name, filtered, metric, dest / metric.filename))
+        if default_keys is None or metric.key in default_keys:
+            paths.extend(_write_metric_figure(name, filtered, metric, dest / metric.filename))
         for grouping in extra_groupings:
-            extra_path = dest / f"{metric.key}_{grouping.key}.png"
+            stem = f"{metric.key}_{grouping.key}"
+            if stem not in _CITED_EXTRA_STEMS:
+                continue
+            extra_path = dest / f"{stem}.png"
             paths.extend(_write_metric_figure(name, filtered, metric, extra_path, grouping=grouping))
-    paths.extend(_write_stacked_figure(name, primary, TOKEN_STACK, dest / TOKEN_STACK.filename))
-    for grouping in extra_groupings:
-        extra_path = dest / f"{TOKEN_STACK.key}_{grouping.key}.png"
-        paths.extend(_write_stacked_figure(name, primary, TOKEN_STACK, extra_path, grouping=grouping))
     if extra_groupings:
         paths.extend(render_tradeoff(name, records_by_judge, output_dir=output_dir))
+    else:
+        paths.extend(_write_stacked_figure(name, primary, TOKEN_STACK, dest / TOKEN_STACK.filename))
+        paths.extend(render_paired_scenarios(name, records_by_judge, output_dir=output_dir))
     return paths
+
+
+def render_paired_scenarios(
+    experiment: str,
+    records_by_judge: dict[str, list[ScoredRun]],
+    *,
+    output_dir: Path | None = None,
+) -> list[Path]:
+    from evaluation.paired import cell_means
+
+    primary = primary_records(records_by_judge)
+    if not primary or len({record.llm_model for record in primary}) > 1:
+        return []
+
+    variant_ids = _variant_order({record.variant for record in primary})
+    if len(variant_ids) < 2:
+        return []
+    variant_labels = [variant_display_label(variant) for variant in variant_ids]
+    model = next(iter({record.llm_model for record in primary}))
+
+    panels: list[tuple[str, dict[tuple[str, str, str], float], bool]] = [
+        (MAE_METRIC.ylabel, cell_means(primary, MAE_METRIC), True),
+    ]
+    for judge in all_judges():
+        records = records_by_judge.get(judge.key)
+        if not records:
+            continue
+        panels.append((f"{SOFT_METRIC.ylabel} ({judge.label})", cell_means(records, SOFT_METRIC), False))
+    if not panels:
+        return []
+
+    scenarios = sorted({scenario for _, scenario, _ in panels[0][1]})
+    dest = figures_dir(experiment, output_dir=output_dir)
+    path = dest / "paired_scenarios.png"
+    fig, axes = plt.subplots(
+        1,
+        len(panels),
+        figsize=(_TEXT_WIDTH_IN, 3.6),
+        sharex=True,
+        squeeze=False,
+    )
+    handles: list[Line2D] = []
+    labels: list[str] = []
+    for ax, (ylabel, means, log_y) in zip(axes[0], panels, strict=True):
+        for idx, scenario in enumerate(scenarios):
+            ys = [means.get((variant, scenario, model)) for variant in variant_ids]
+            if any(value is None for value in ys):
+                continue
+            (line,) = ax.plot(
+                range(len(variant_ids)),
+                ys,
+                color=_SERIES_COLORS[idx % len(_SERIES_COLORS)],
+                marker=_MARKERS[idx % len(_MARKERS)],
+                markersize=4,
+                linewidth=1.2,
+            )
+            if ax is axes[0][0]:
+                handles.append(line)
+                labels.append(scenario)
+        ax.set_xticks(list(range(len(variant_ids))))
+        ax.set_xticklabels(variant_labels, rotation=_SLANT_DEGREES, ha="right")
+        ax.tick_params(labelsize=_TICK_SIZE)
+        ax.set_ylabel(ylabel, fontsize=_AXIS_LABEL_SIZE)
+        ax.grid(axis="y", linestyle="--", alpha=0.4)
+        if log_y:
+            ax.set_yscale("log")
+            # Matplotlib's own log ticks mix decade and subdecade labels at two different
+            # sizes and collide once the span is under two decades, so place them by hand.
+            y_low, y_high = ax.get_ylim()
+            ax.yaxis.set_major_locator(
+                FixedLocator([tick for tick in _LOG_TICK_CANDIDATES if y_low <= tick <= y_high])
+            )
+            ax.yaxis.set_minor_locator(NullLocator())
+            ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:g}"))
+
+    title = textwrap.fill(
+        f"{experiment_display_label(experiment)}: per-scenario cell means",
+        width=int(_TEXT_WIDTH_IN / (_TITLE_SIZE * _CHAR_IN_PER_PT)),
+    )
+    fig.suptitle(title, fontsize=_TITLE_SIZE)
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        ncol=2,
+        fontsize=_LEGEND_SIZE,
+        frameon=False,
+        bbox_to_anchor=(0.5, 0.0),
+    )
+    fig.tight_layout(rect=(0.0, 0.18, 1.0, 0.92))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=_DPI)
+    fig.savefig(path.with_suffix(".pdf"))
+    plt.close(fig)
+    return [path, path.with_suffix(".pdf")]
 
 
 def _render_variability_subplot(

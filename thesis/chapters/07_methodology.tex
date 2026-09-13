@@ -1,7 +1,7 @@
 \chapter{Experimental methodology}
 \label{cha:methodology}
 
-The claims of this thesis are comparative, so the grid varies one factor at a time from a fixed baseline to attribute any measured difference to the factor changed. Because neither the system nor the judge measuring it is deterministic, every cell is repeated on two independent axes (\Cref{sec:methodology-stability}).
+The claims of this thesis are comparative, so each experiment varies one factor at a time from a fixed starting configuration and attributes any measured difference to the factor that changed. Experiment~1 holds the language model fixed and toggles the totaller and the critique-and-refine loop. Experiment~2 holds the system at its fullest configuration and varies the model and its reasoning-effort level. Because neither the system nor the judge measuring it is deterministic, every combination of those factors is repeated on two independent axes (\Cref{sec:methodology-stability}). The rest of the chapter names the research questions, the five scenarios the experiments share, and the quantitative, qualitative and operational metrics used to score every run. The unit of that grid is defined next.
 
 \begin{definition}[Cell]
     \label{def:cell}
@@ -19,21 +19,23 @@ The hypotheses in \Cref{sec:introduction-goal} translate into three concrete res
     \item[RQ3] How does plan quality vary with the choice of language model and with its reasoning-effort level, and can raising the effort level substitute for a stronger model?
 \end{description}
 
-RQ1~and RQ2~are answered by a \emph{component ablation} experiment, \textbf{Experiment~1} (\Cref{sec:methodology-variants}), which holds the language model fixed and varies only the totaller and reflection flags. RQ3~is answered by a \emph{model comparison} experiment, \textbf{Experiment~2} (\Cref{sec:methodology-model-grid}), which holds the system configuration fixed at its strongest setting and varies the model and its reasoning-effort level together.
+RQ1~and RQ2~are answered by a \emph{component ablation} experiment, \textbf{Experiment~1} (\Cref{sec:methodology-variants}), which holds the language model fixed and varies only the totaller and reflection flags. RQ3~is answered by a \emph{model comparison} experiment, \textbf{Experiment~2} (\Cref{sec:methodology-model-grid}), which holds the system configuration fixed at the full variant and varies the model and its reasoning-effort level together.
 
-\section{Experiment 1: component ablation}
+\section{Experiment~1: component ablation}
 \label{sec:methodology-variants}
 
-The component ablation experiment uses the four-way grid implied by the two independent flags in \Cref{sec:design-variant-config}, shown in \Cref{fig:diagram-variants}. Food knowledge base access is not a varied flag (\Cref{sec:vision-food-lookup-baseline}): \emph{baseline} here denotes a system that already looks up real foods and merely lacks the two optional mechanisms under study.
+The component ablation experiment uses the four-way grid implied by the two independent flags in \Cref{sec:design-variant-config}, shown in \Cref{fig:diagram-variants}. The four \emph{variants} are named after the flags that are on: \texttt{baseline} (neither), \texttt{totaller-only}, \texttt{reflection-only}, and \texttt{full} (both).
 
-Each of the four variants is run against every scenario in \Cref{sec:methodology-scenarios} with one fixed language model, giving 60 runs in total for this experiment. The following parameters are held constant across both experiments: three repetitions per cell, three scoring passes per judge per run, and a critique-and-refine loop budget of three refinement passes (\Cref{def:iterations}).
+What this design licenses is a causal reading of a large change in energy and macronutrient error when the totaller is toggled, and a corresponding reading of a change in judged adherence when the critique-and-refine loop is toggled. It does not license a claim that either mechanism is unnecessary in some other architecture: the comparison is always against the same food-grounded pipeline with the flag off.
 
-\section{Experiment 2: model and reasoning-effort grid}
+Each of the four variants is run against every scenario in \Cref{sec:methodology-scenarios} with one fixed language model held at one fixed reasoning-effort level, giving \num{60} runs in total for this experiment; which model and level those are is reported in \Cref{sec:results-setup}. The following parameters are held constant across both experiments: three repetitions per cell, three scoring passes per judge per run, and a critique-and-refine loop budget of three refinement passes (\Cref{def:iterations}).
+
+\section{Experiment~2: model and reasoning-effort grid}
 \label{sec:methodology-model-grid}
 
-The model comparison experiment fixes the system at the full variant and varies two factors at once: the base model and the reasoning-effort level it is asked to run at. Four base models are compared, each at three effort levels, giving twelve configurations. Where a provider's default effort already falls at one of the three levels, that default is used, so a configuration is identified by a model together with the effort it actually ran at.
+The model comparison experiment fixes the system at the \texttt{full} variant and varies two factors at once: the base model and the reasoning-effort level it is asked to run at. Four base models are compared, each at three effort levels, giving twelve configurations. Where a provider's default effort already falls at one of the three levels, that default is used, so a configuration is identified by a model together with the effort it actually ran at. One provider label sits outside the three-word scale: \texttt{xhigh} is the top setting on \texttt{gpt-5.6-luna} and is grouped with the high-effort bucket in \Cref{sec:results-effort}.
 
-Two properties of this design matter for interpreting the results. Within one base model the three configurations differ only in effort, so a difference between them is attributable to deliberation alone. Across base models the effort labels are each vendor's own, with no guarantee that one vendor's \emph{high} corresponds to another's, so the aggregate comparison across effort levels in \Cref{sec:results-effort} groups vendor-specific labels into three coarse buckets and indicates direction, not a calibrated measurement. Each of the twelve configurations is run against all five scenarios, giving 180 runs. Fifteen coincide with the full-variant cell of the ablation experiment and are stored and scored once, so the two experiments together comprise 225 distinct runs.
+Two properties of this design matter for interpreting the results. Within one base model the three configurations differ only in effort, so a difference between them is attributable to deliberation alone. Across base models the effort labels are each vendor's own, with no guarantee that one vendor's \emph{high} corresponds to another's, so the aggregate comparison across effort levels in \Cref{sec:results-effort} groups vendor-specific labels into three coarse buckets and indicates direction, not a calibrated measurement. Each of the twelve configurations is run against all five scenarios, giving \num{180} runs. Fifteen coincide with the \texttt{full}-variant cell of the ablation experiment and are stored and scored once, so the two experiments together comprise \num{225} distinct runs.
 
 The reasoning-effort setting is applied only to the agents whose output affects plan correctness -- the nutrition agent, the critic and the refiner (\Cref{sec:design-agents}). The judges run at their own providers' defaults regardless of which configuration produced the plan, so the measuring instrument does not change with the object of measurement.
 
@@ -44,27 +46,27 @@ Each evaluated run pairs a fixed user profile with a scenario: an optional free-
 
 \begin{table}[htbp]
     \centering
-    \begin{tabular}{p{0.26\textwidth}p{0.66\textwidth}}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{0.30\textwidth}p{0.62\textwidth}}
         \toprule
         Scenario & What it demands of the system \\
         \midrule
-        regular & Healthy adult, no session request; scored only on general recipe coherence, so it isolates baseline planning quality with nothing else competing for attention. \\
-        lactose-intolerant-athlete-wants-cheesecake & Lactose-intolerant athlete explicitly requests cheesecake, testing whether an allergen exclusion survives a direct, conflicting user request, on top of an unusually high energy target. \\
-        vegetarian-allergic & Vegetarian with a nut allergy requests peanut-butter-and-jam toast: the same conflicting-request pattern, applied to a diet pattern and a second, independent allergen at the same time. \\
-        diabetes-hypertension & Type~2 diabetes and hypertension, no session request; scored against DASH-pattern sodium and potassium targets and diabetes-specific micronutrient considerations that constrain each other. \\
-        dyslipidemia-obesity & Dyslipidaemia and obesity, requests pizza; combines the conflicting-request pattern with cardiometabolic micronutrient and macronutrient targets. \\
+        \texttt{regular} & Healthy adult, no session request; scored only on general recipe coherence, so it isolates baseline planning quality with nothing else competing for attention. \\
+        \texttt{lactose-\allowbreak intolerant-\allowbreak athlete-\allowbreak wants-\allowbreak cheesecake} & Lactose-intolerant athlete explicitly requests cheesecake, testing whether an allergen exclusion survives a direct, conflicting user request, on top of an unusually high energy target. \\
+        \texttt{vegetarian-allergic} & Vegetarian with a peanut and tree-nut allergy requests peanut-butter-and-jam toast: the same conflicting-request pattern, applied to a diet pattern and a second, independent allergen at the same time. \\
+        \texttt{diabetes-hypertension} & Type~2 diabetes and hypertension, no session request; two conditions whose dietary guidance interacts, so a potassium target, a sodium ceiling and several diabetes-specific micronutrient considerations constrain one another at once. \\
+        \texttt{dyslipidemia-obesity} & Dyslipidaemia and obesity, requests pizza; combines the conflicting-request pattern with cardiometabolic micronutrient and macronutrient targets. \\
         \bottomrule
     \end{tabular}
     \caption{The five scenarios used in the main experimental grid.}
     \label{tab:methodology-scenarios}
 \end{table}
 
-Each scenario's underlying profile is frozen ahead of time, and each carries a frozen set of energy and macronutrient targets computed independently of the pipeline under test, so every run's reported error is measured against the same target regardless of which variant or model produced the plan.
+Each scenario's underlying profile is frozen ahead of time, and each carries a frozen set of energy and macronutrient targets computed independently of the pipeline under test, so every run's reported error is measured against the same target regardless of which variant or model produced the plan. Scenario-specific micronutrient figures in the qualitative rubrics are scoring targets for the judge, not a claim that a one-day plan can or should replace medical care.
 
 \section{Measurement controls in the evaluation harness}
 \label{sec:methodology-harness}
 
-No component of the harness scores its own work. The deterministic macro error is computed at collection time from the runtime's own hydration and totaller (\Cref{sec:design-eval-reuse}), written onto the run record, and never depends on a judge, so adding or rescoring a judge cannot move a quantitative number. Collection, scoring and reporting are separate stages joined only through stored artefacts (\Cref{fig:diagram-eval-flow}): the judge is handed a plan carrying no nutrient values and no indication of which variant or model produced it.
+No component of the harness scores its own work. The deterministic macro error (\Cref{def:macro-error}) is computed at collection time from the runtime's own hydration and totaller (\Cref{sec:design-eval-reuse}), written onto the run record, and never depends on a judge, so adding or rescoring a judge cannot move a quantitative number. Collection, scoring and reporting are separate stages joined only through stored artefacts (\Cref{fig:diagram-eval-flow}): the judge is handed a plan carrying no nutrient values and no indication of which variant or model produced it.
 
 \begin{figure}[htbp]
     \centering
@@ -75,14 +77,14 @@ No component of the harness scores its own work. The deterministic macro error i
 
 Two further controls keep a measured difference attributable to the flag that was varied. The same pipeline instance and food knowledge base connection are shared across every run of one model and variant, so no variant-specific initialisation difference -- a stale cache, a re-seeded index -- becomes a confound alongside that flag. A run's label is derived mechanically from the same configuration objects the runtime consumes (\Cref{sec:design-variant-config}), so it cannot drift from the configuration that produced it. Every reported number is regenerable from the stored per-run artefacts.
 
-\section{Quantitative scoring: energy and macronutrient error}
+\section{Quantitative scoring: macro error}
 \label{sec:methodology-quantitative}
 
-The quantitative scoring stage measures how closely a plan's delivered energy and macronutrient totals match their targets, using the deterministic aggregator of \Cref{sec:design-totaller} to compute the delivered values -- independently of whether the totaller tool was available during generation, so that even a baseline-variant plan is judged by a real, exactly computed total.
+The quantitative scoring stage measures how closely a plan's delivered energy and macronutrient totals match their targets, using the deterministic totaller of \Cref{sec:design-totaller} to compute the delivered values -- independently of whether the totaller tool was available during generation, so that even a baseline-variant plan is judged by a real, exactly computed total.
 
 For each tracked nutrient $n$ (energy, protein, carbohydrates, and fat) with a positive target, a signed relative error is computed as
 \[
-    \mathrm{rel}_n = \frac{\mathrm{actual}_n - \mathrm{target}_n}{\mathrm{target}_n} \times 100\%,
+    \mathrm{rel}_n = 100 \times \frac{\mathrm{actual}_n - \mathrm{target}_n}{\mathrm{target}_n},
 \]
 where $\mathrm{actual}_n$ is the deterministically computed total for a hydrated plan and $\mathrm{target}_n$ is the profile's frozen target for that nutrient. Each run is then summarised by the mean absolute and the mean squared value of $\mathrm{rel}_n$.
 
@@ -90,7 +92,7 @@ where $\mathrm{actual}_n$ is the deterministically computed total for a hydrated
     \label{def:macro-error}
     Let $N = \{\text{energy}, \text{protein}, \text{carbohydrate}, \text{fat}\}$ be the aggregated nutrients with a positive target for the run's profile. The \emph{macro error} of a run is the mean absolute relative error
     \[
-        \mathrm{MAE\%} = \frac{1}{\left| N \right|} \sum_{n \in N} \left| \mathrm{rel}_n \right| .
+        \mathrm{MAE\%} = \frac{1}{\left| N \right|} \sum_{n \in N} \left| \mathrm{rel}_n \right|.
     \]
     It is non-negative and unbounded above, and is zero exactly when every aggregated nutrient meets its target, so lower is better. It does not depend on a judge.
 \end{definition}
@@ -99,7 +101,7 @@ where $\mathrm{actual}_n$ is the deterministically computed total for a hydrated
     \label{def:macro-error-squared}
     With $N$ as in \Cref{def:macro-error}, the \emph{squared macro error} of a run is the mean squared relative error
     \[
-        \mathrm{MSE\%} = \frac{1}{\left| N \right|} \sum_{n \in N} \mathrm{rel}_n^2 .
+        \mathrm{MSE\%} = \frac{1}{\left| N \right|} \sum_{n \in N} \mathrm{rel}_n^2.
     \]
     It shares the properties above, but weights a single badly missed nutrient far more heavily than an even spread of small misses. It is always named explicitly where it is used, and likewise does not depend on a judge.
 \end{definition}
@@ -111,15 +113,15 @@ Expressing the error relative to its target keeps a single figure comparable acr
 
 Everything not captured by an energy or macronutrient number -- whether a recipe is physically coherent, whether a stated allergen was avoided, whether an explicit session request was honoured without violating a harder constraint -- is scored by an LLM-as-a-judge stage following the G-Eval pattern of \Cref{sec:background-evaluation}: a judge model is given an explicit natural-language rubric per criterion and asked to produce both a score and a short justification.
 
-Every run is scored on one criterion present in all scenarios (whether the generated recipes are physically and logically coherent) plus every scenario-specific soft criterion listed for it in \Cref{sec:methodology-scenarios} -- for instance, whether a DASH-appropriate sodium-to-potassium balance was targeted, or whether a stated food preference was honoured without including a disliked food. Each criterion is scored on a continuous $[0, 1]$ scale, and the two judged metrics reported in \Cref{cha:results} are built from those scores as follows.
+Every run is scored on one criterion present in all scenarios (whether the generated recipes are physically and logically coherent) plus the soft criteria its own scenario carries -- for instance, whether a potassium target was reached while sodium stayed under its ceiling, or whether a stated food preference was honoured without including a disliked food. Each criterion is scored on a continuous $[0, 1]$ scale, and the two judged metrics reported in \Cref{cha:results} are built from those scores as follows.
 
 \begin{definition}[Soft score]
     \label{def:soft-score}
-    Let $K$ be the set of soft criteria applying to a run: the recipe-coherence criterion present in every scenario, plus that scenario's own criteria (\Cref{sec:methodology-scenarios}). A judge scores each $k \in K$ with $s_k \in [0, 1]$, and the \emph{soft score} of one verdict is
+    Let $K$ be the set of soft criteria applying to a run: the recipe-coherence criterion present in every scenario, plus that scenario's own criteria. A judge scores each $k \in K$ with $q_k \in [0, 1]$, and the \emph{soft score} of one verdict is
     \[
-        \mathrm{soft} = \frac{1}{\left| K \right|} \sum_{k \in K} s_k .
+        \mathrm{soft} = \frac{1}{\left| K \right|} \sum_{k \in K} q_k.
     \]
-    The value carried into every figure and table is the mean of this over the three verdicts that judge returned for the run. It lies in $[0, 1]$, higher is better, and it is judge-dependent: it is reported once per judge and never averaged across judges.
+    The value carried into every figure and table is the mean of this over the three verdicts that judge returned for the run. It lies in $[0, 1]$, higher is better, and it is judge-dependent: it is reported once per judge, and no comparative claim in this thesis rests on a value averaged across judges.
 \end{definition}
 
 \begin{definition}[Safety score]
@@ -129,13 +131,15 @@ Every run is scored on one criterion present in all scenarios (whether the gener
 
 The judges are explicitly instructed not to penalise a plan for a missing micronutrient figure that the underlying food data itself does not cover, so that the coverage gaps described in \Cref{sec:impl-missing-nutrients} are not double-counted as a plan-quality failure on top of being flagged by the totaller's own coverage warnings.
 
-\label{sec:impl-judges}
-The initial scoring stage used a single judge and took its sampled score at face value, since the judge APIs expose no token probabilities from which G-Eval computes its probability-weighted score~\cite{liu2023geval}. Two problems surfaced. First, the judge is itself a sampled language model, so scoring the same plan twice does not reliably produce the same number. Second, the judge initially used belongs to the same model family as one of the compared configurations, exactly the situation in which the self-preference bias documented for this pattern~\cite{zheng2023judging} would inflate that configuration's scores. Neither is observable from inside a single-judge protocol. Both are addressed at the protocol level:
+\section{Two judges and repeated scoring}
+\label{sec:methodology-judge-protocol}
+
+The initial scoring stage used a single judge and took its sampled score at face value, since the judge APIs expose no token probabilities from which G-Eval computes its probability-weighted score~\cite{liu2023geval}. Two problems surfaced. First, the judge is itself a sampled language model, so scoring the same plan twice does not reliably produce the same number. Second, the judge initially used belongs to the same model family as one of the compared configurations, exactly the situation in which a self-preference bias of the kind Zheng et al.\ could not rule out~\cite{zheng2023judging} would inflate that configuration's scores. Neither is observable from inside a single-judge protocol. Both are addressed at the protocol level:
 
 \begin{itemize}
     \item \emph{Two judges, from different vendors.} Every plan is scored independently by both. One shares a family with a compared configuration; the other has no such overlap. A family-specific bias therefore cannot hide, because it would appear as a divergence between two judges reading the same plans against the same rubric.
     \item \emph{Repeated scoring.} On the second of the two repetition axes, the verdicts a judge returns for a run are averaged before its qualitative score is used anywhere. Because the judge API does not expose token probabilities, this averaging also serves as a Monte Carlo estimate of G-Eval's probability-weighted score, which is the substitute G-Eval itself adopts whenever the scoring model's token probabilities are unavailable~\cite{liu2023geval}; it suppresses judge sampling noise without concealing how large it was.
-    \item \emph{No averaging across judges.} Judge-dependent metrics -- the soft score and safety score -- are carried through the whole reporting pipeline as two parallel series and always reported side by side. Collapsing them into one number would destroy precisely the disagreement the second judge exists to reveal.
+    \item \emph{No averaging across judges.} Judge-dependent metrics -- the soft score and safety score -- are carried through the whole reporting pipeline as two parallel series and reported side by side wherever they carry an argument, since collapsing them into one number would destroy precisely the disagreement the second judge exists to reveal.
 \end{itemize}
 
 Each (run, judge, judge repetition) triple is persisted to its own file under a per-judge directory, so adding a judge re-scores nothing that already exists: the second judge was introduced after the first had scored the entire grid, and cost only its own calls. What the protocol revealed is reported in \Cref{sec:results-stability}.
@@ -143,11 +147,11 @@ Each (run, judge, judge repetition) triple is persisted to its own file under a 
 \section{Stability metrics}
 \label{sec:methodology-stability}
 
-Repetition happens on two independent axes. Every cell is planned three times, sampling the generating model's nondeterminism; each run is then scored three times by each judge, sampling the judge's. The first axis is quantified here as run-to-run variability; the second is averaged away (\Cref{sec:methodology-qualitative}).
+Repetition happens on two independent axes. Every cell is planned three times, sampling the generating model's nondeterminism; each run is then scored three times by each judge, sampling the judge's. The first axis is quantified here as run-to-run variability; the second is averaged away (\Cref{sec:methodology-judge-protocol}).
 
 Two quantities describe how repeatable a result is, as opposed to how good it is, both reported per judge.
 
-The first is \emph{run-to-run variability}: how much the same configuration's soft score moves when the identical request is planned again. Because the repetitions of one cell (\Cref{def:cell}) differ only in the model's sampling, the dispersion within a cell isolates that sampling noise.
+The first is run-to-run variability (\Cref{def:variability}): how much the same configuration's soft score moves when the identical request is planned again. Because the repetitions of one cell (\Cref{def:cell}) differ only in the model's sampling, the dispersion within a cell isolates that sampling noise. The quantity used to describe that dispersion is the cell's \emph{spread}; later chapters also report a safety-score spread computed by the same formula on the safety score.
 
 \begin{definition}[Cell spread]
     \label{def:spread}
@@ -157,14 +161,14 @@ The first is \emph{run-to-run variability}: how much the same configuration's so
         \qquad
         d_c = \frac{1}{R} \sum_{r=1}^{R} \left| s_{c,r} - \bar{s}_c \right|,
     \]
-    where:
-    \begin{itemize}
-        \item \( c \) -- a cell (\Cref{def:cell}),
-        \item \( R \) -- the number of repetitions of a cell,
-        \item \( s_{c,r} \) -- the soft score one judge awarded to repetition \( r \) of cell \( c \),
-        \item \( \bar{s}_c \) -- the mean soft score of cell \( c \),
-        \item \( d_c \) -- the spread of cell \( c \).
-    \end{itemize}
+    where
+    \begin{eqwhere}[1.6cm]
+        \item[\(c\)] a cell (\Cref{def:cell}),
+        \item[\(R\)] the number of repetitions of a cell,
+        \item[\(s_{c,r}\)] the soft score one judge awarded to repetition \( r \) of cell \( c \),
+        \item[\(\bar{s}_c\)] the mean soft score of cell \( c \),
+        \item[\(d_c\)] the spread of cell \( c \).
+    \end{eqwhere}
     It is non-negative, expressed on the same $[0, 1]$ scale as the soft score, and lower means more repeatable. Like the soft score it is reported per judge.
 \end{definition}
 
@@ -176,24 +180,24 @@ The first is \emph{run-to-run variability}: how much the same configuration's so
         \qquad
         V = \frac{1}{\left| C \right|} \sum_{c \in C} d_c,
     \]
-    where:
-    \begin{itemize}
-        \item \( C_m \) -- the set of cells whose language model is \( m \),
-        \item \( C \) -- the set of all cells of the experiment,
-        \item \( V_m \) -- the variability reported for model \( m \),
-        \item \( V \) -- the pooled variability of the experiment.
-    \end{itemize}
+    where
+    \begin{eqwhere}[1.6cm]
+        \item[\(C_m\)] the set of cells whose language model is \( m \),
+        \item[\(C\)] the set of all cells of the experiment,
+        \item[\(V_m\)] the variability reported for model \( m \),
+        \item[\(V\)] the pooled variability of the experiment.
+    \end{eqwhere}
     Only cells with all of their repetitions scored contribute, so that no cell's spread is computed from a partial sample.
 \end{definition}
 
-The size of $V$ relative to the differences between configurations is what matters: a spread of the same order as those differences means they cannot be read as real.
+The size of $V$ relative to the differences between configurations is what matters: a cell spread of the same order as those differences means they cannot be read as real.
 
 The second is the agreement between the two judges. Because both score every plan under an identical rubric, any systematic difference between their means is a property of the judges, not the plans; any difference in how they \emph{rank} configurations is the more serious concern, since every comparative claim in \Cref{cha:results} depends on ranking. Both are reported in \Cref{sec:results-stability}.
 
 \section{Operational metrics}
 \label{sec:methodology-operational}
 
-Four further figures are recorded per run without requiring any scoring step.
+Four further figures are recorded per run without requiring any scoring step. They do not enter the hypothesis tests. They exist so that a quality claim can be read against the time and token cost of obtaining it, which \Cref{sec:results-overhead} does. Iterations and totaller calls describe how the pipeline spent its budget inside a run. Wall-clock time and token spend describe what that budget cost the operator. Together they stop a cheaper configuration and a more expensive one from looking interchangeable when they happen to score the same.
 
 \begin{definition}[Iterations]
     \label{def:iterations}
@@ -205,12 +209,43 @@ Four further figures are recorded per run without requiring any scoring step.
     The \emph{totaller calls} of a run is the number of times the model invoked the deterministic totaller tool of \Cref{sec:design-totaller} while planning, counted across the nutrition agent and the refiner. It is zero when the totaller is disabled for the variant, and it counts only model-initiated invocations: the totals the critic is handed automatically (\Cref{sec:design-reflection}) and the aggregation the scoring stage performs itself (\Cref{sec:methodology-quantitative}) are not model decisions and are excluded. It is unbounded above and does not depend on a judge.
 \end{definition}
 
-\begin{definition}[Elapsed time]
-    \label{def:elapsed-time}
-    The \emph{elapsed time} of a run is its wall-clock duration in seconds, from the start of the planning pipeline to the delivered plan, including every model request and tool call the run made along the way. It does not depend on a judge.
+\begin{definition}[Wall-clock time]
+    \label{def:wall-clock-time}
+    The \emph{wall-clock time} of a run is its duration in seconds, from the start of the planning pipeline to the delivered plan, including every model request and tool call the run made along the way. It does not depend on a judge.
 \end{definition}
 
 \begin{definition}[Token spend]
     \label{def:token-spend}
-    The \emph{token spend} of a run is the number of tokens billed across every model request the run made, split into four additive categories matching the provider usage fields: cache read, which the provider served from a prompt cache instead of recomputing; input, the remainder of the billed input; output, the remainder of the billed output after reasoning tokens are set aside; and reasoning, the thinking tokens already included in the billed output. It does not depend on a judge and plays no role in scoring a plan's quality. No monetary cost is reported anywhere in this thesis: converting tokens into money requires per-model prices that change without notice and differ by routing provider, which would make any figure quoted here both unverifiable and out of date within months.
+    The \emph{token spend} of a run is the number of tokens billed across every model request the run made. The total is split into four additive categories matching the provider usage fields: cache read, served from a prompt cache instead of recomputed; input, the remainder of the billed input; output, the remainder of the billed output after reasoning tokens are set aside; and reasoning, the thinking tokens already included in the billed output. It does not depend on a judge and plays no role in scoring a plan's quality. No monetary cost is reported anywhere in this thesis. Converting tokens into money requires per-model prices that change without notice and differ by routing provider, which would make any figure quoted here both unverifiable and out of date within months.
+\end{definition}
+
+\section{Statistical treatment}
+\label{sec:methodology-statistics}
+
+Each ablation variant comprises five scenarios times three repetitions, fifteen runs. The scenario is a blocking factor, chosen so that the five profiles differ in what they demand (\Cref{sec:methodology-scenarios} says they were not drawn as a sample of a population). A standard error computed over those fifteen runs therefore mixes sampling noise with scenario difficulty -- the same mixing \Cref{sec:results-ablation} notes when it declines to read the baseline's pooled standard deviation as a clean measure of nondeterminism.
+
+The grid budget fixed the number of blocks at five. The study is sized for large effects -- a fourfold reduction in macro error -- and is not sized to demonstrate the absence of an effect. Every null reading in \Cref{cha:results} is therefore \enquote{not detectable at this sample size}, not \enquote{absent}.
+
+The reading rule that follows is: a difference smaller than the reported dispersion -- the standard error of the mean on the bar charts, the pooled cell spread of \Cref{def:spread} on judged metrics -- is treated as inconclusive.
+
+Comparative claims that can be paired by scenario use the exact one-sided sign test of \Cref{def:paired-sign-test}. One-sidedness is licensed by the directional hypotheses H1~and H2. A Wilcoxon signed-rank test is not used: the sign test assumes neither a symmetric distribution of the blocked differences nor a meaningful ranking of five blocks, and Wilcoxon requires both.
+
+\Cref{tab:results-paired-tests} reports twenty tests. The H1 comparison on macro error is prespecified; the remaining nineteen are exploratory and are not corrected for multiplicity.
+
+\begin{definition}[Paired sign test]
+    \label{def:paired-sign-test}
+    For a metric $x$ and a pair of variants $c$ (control) and $t$ (treatment), let $\bar{x}_{v,j}$ be the mean of the $R$ repetitions of variant $v$ on scenario $j$. The blocked difference on scenario $j$ is $\delta_j = \bar{x}_{t,j} - \bar{x}_{c,j}$. Ties ($\delta_j = 0$) are dropped. With $B$ remaining scenarios and $b^{+}$ of them moving in the direction the hypothesis predicts,
+    \[
+        p = 2^{-B} \sum_{k=b^{+}}^{B} \binom{B}{k},
+    \]
+    where
+    \begin{eqwhere}[2.0cm]
+        \item[\(\bar{x}_{v,j}\)] the mean of the $R$ repetitions of variant $v$ on scenario $j$,
+        \item[\(R\)] the number of repetitions of a cell, three throughout,
+        \item[\(\delta_j\)] the difference of cell means on scenario $j$,
+        \item[\(B\)] the number of scenarios with $\delta_j \neq 0$,
+        \item[\(b^{+}\)] the number of those scenarios in which the difference favours the hypothesis,
+        \item[\(p\)] the exact one-sided $p$-value under the null that each non-zero sign is a fair coin toss.
+    \end{eqwhere}
+    For macro error the predicted direction is a decrease; for the soft score and the safety score it is an increase.
 \end{definition}

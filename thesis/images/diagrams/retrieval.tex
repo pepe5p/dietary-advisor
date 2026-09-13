@@ -1,12 +1,12 @@
 \begin{tikzpicture}[
     node distance=7mm and 6mm,
-    box/.style={draw, rounded corners, align=center, text width=26mm, minimum height=9mm, inner sep=1.5mm, font=\scriptsize},
+    box/.style={draw, rounded corners, align=center, text width=26mm, minimum height=9mm, inner sep=1.5mm, font=\small},
     band/.style={box, text width=61mm},
     call/.style={draw, rounded corners, align=center, text width=50mm, minimum height=9mm, inner sep=1.5mm, font=\small},
     resultbox/.style={draw, rounded corners, align=center, text width=56mm, minimum height=9mm, inner sep=1.5mm, font=\small},
     frame/.style={draw, rounded corners, draw=black!35, inner sep=3.5mm},
     title/.style={font=\small\bfseries, align=center},
-    note/.style={font=\scriptsize, text=black!60, align=center},
+    note/.style={font=\small, text=black!60, align=center},
     arr/.style={-{Latex[length=2mm]}},
 ]
 
@@ -15,7 +15,7 @@
 \node[box, right=of o_bm] (o_vec) {Dense channel\\ (embedding + HNSW)};
 \coordinate (o_mid) at ($(o_bm)!0.5!(o_vec)$);
 \node[title, above=8mm of o_mid] (o_title)
-    {Open Food Facts\\ {\normalfont\scriptsize branded products}};
+    {Open Food Facts\\ {\normalfont\footnotesize branded products}};
 \node[band, below=11mm of o_mid] (o_rrf) {Reciprocal rank fusion};
 \node[band, below=of o_rrf] (o_hits) {Top-$k$ branded hits};
 \node[frame, fit=(o_title)(o_bm)(o_vec)(o_rrf)(o_hits)] (o_frame) {};
@@ -30,7 +30,7 @@
 \node[box, right=of u_bm] (u_vec) {Dense channel\\ (embedding + HNSW)};
 \coordinate (u_mid) at ($(u_bm)!0.5!(u_vec)$);
 \node[title, above=8mm of u_mid] (u_title)
-    {USDA FoodData Central\\ {\normalfont\scriptsize generic foods}};
+    {USDA FoodData Central\\ {\normalfont\footnotesize generic foods}};
 \node[band, below=11mm of u_mid] (u_rrf) {Reciprocal rank fusion};
 \node[band, below=of u_rrf] (u_hits) {Top-$k$ generic hits};
 \node[frame, fit=(u_title)(u_bm)(u_vec)(u_rrf)(u_hits)] (u_frame) {};
@@ -45,8 +45,6 @@
     {Lookup tool call:\\ a batch of queries};
 \draw[arr] (tool.west) -| (o_frame.north);
 \draw[arr] (tool.east) -| (u_frame.north);
-\node[note, anchor=south, text width=38mm] at ($(tool.north) + (0mm, 3mm)$)
-    {every query goes to both sources, searched concurrently};
 
 % --- the two ranked lists, returned side by side ---
 \coordinate (join) at ($(o_frame.south)!0.5!(u_frame.south)$);
@@ -56,8 +54,6 @@
 \draw[arr] (u_frame.south) |- (result.east);
 
 \node[note, anchor=south, text width=72mm] at ($(result.north) + (0mm, 3mm)$)
-    {no fusion across sources: each list keeps its own ranked order and its own namespaced codes};
-\node[note, anchor=north, text width=84mm] at ($(result.south) + (0mm, -3mm)$)
-    {each query caps its hits per source independently; a cap of zero skips that source};
+    {no fusion across sources};
 
 \end{tikzpicture}

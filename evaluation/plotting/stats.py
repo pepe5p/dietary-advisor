@@ -51,6 +51,7 @@ class Metric:
     floor: float | None = 0.0
     decimals: int = 2
     error_bars: bool = True
+    higher_is_better: bool = False
 
     @property
     def filename(self) -> str:
@@ -108,6 +109,7 @@ SOFT_METRIC = Metric(
     # Soft-score SEMs are far smaller than the zoomed axis makes them look,
     # and the run-to-run variability figure is what the text reasons about.
     error_bars=False,
+    higher_is_better=True,
 )
 SAFETY_METRIC = Metric(
     "safety_adherence",
@@ -115,6 +117,7 @@ SAFETY_METRIC = Metric(
     "Safety score",
     lambda record: record.qualitative.safety_adherence,
     judge_dependent=True,
+    higher_is_better=True,
 )
 ITERATIONS_METRIC = Metric(
     "iterations",
@@ -130,7 +133,7 @@ TOTALLER_CALLS_METRIC = Metric(
     lambda record: float(record.totaller_calls),
     applies_to=lambda record: record.totaller_enabled,
 )
-ELAPSED_METRIC = Metric("elapsed_s", "Elapsed time", "Seconds", lambda record: record.elapsed_s)
+ELAPSED_METRIC = Metric("elapsed_s", "Wall-clock time", "Seconds", lambda record: record.elapsed_s)
 TOKENS_METRIC = Metric(
     "tokens",
     "Token spend",

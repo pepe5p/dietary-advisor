@@ -1,36 +1,34 @@
 \begin{tikzpicture}[
     stage/.style={draw, rounded corners, align=center, text width=50mm, minimum height=11mm, inner sep=2mm, font=\small},
-    store/.style={draw, dashed, align=center, text width=48mm, minimum height=10mm, inner sep=1.8mm, font=\small\ttfamily},
-    plain/.style={draw, rounded corners, align=center, text width=50mm, minimum height=11mm, inner sep=2mm, font=\small},
+    store/.style={draw, dashed, align=center, text width=46mm, minimum height=11mm, inner sep=1.6mm, font=\small\ttfamily},
     arr/.style={-{Latex[length=2mm]}},
+    elab/.style={font=\small\itshape, text=black!70},
 ]
 
-\node[plain] (grid) at (0, 0) {run specification grid};
-\node[stage] (s1) at (0, -2.0)
+\node[stage] (s1) at (0, 0)
     {\textbf{run-cases}\\[0.6mm] drive Pipeline, compute macro error};
-\node[store] (runs) at (0, -4.0) {runs/\{spec\_key\}.json};
-\node[stage] (s2) at (0, -6.0)
-    {\textbf{evaluate}\\[0.6mm] each judge $\times$ 3 reps};
+\node[store] (runs) at (0, -2.0) {runs/\{spec\_key\}.json};
+\node[stage] (s2) at (0, -4.0)
+    {\textbf{evaluate}\\[0.6mm] score each run, repeated per judge};
 
-\node[store] (sc1) at (-3.2, -8.2) {scores\_judge\_1/\\\{spec\_key\}\_\_jrep\{n\}.json};
-\node[store] (sc2) at ( 3.2, -8.2) {scores\_judge\_2/\\\{spec\_key\}\_\_jrep\{n\}.json};
+\node[store] (sc1) at (-3.8, -6.8)
+    {scores\_judge\_1/\\[0.3mm]\{spec\_key\}\_\_jrep\{rep\}.json};
+\node[store] (sc2) at ( 3.8, -6.8)
+    {scores\_judge\_2/\\[0.3mm]\{spec\_key\}\_\_jrep\{rep\}.json};
 
-\node[stage] (join) at (0, -10.4) {\textbf{join + aggregation}};
-\node[stage] (s3) at (0, -12.4) {\textbf{plot}};
-\node[store] (figs) at (0, -14.4) {figures/, metrics/};
+\node[stage] (s3) at (0, -9.4)
+    {\textbf{plot}\\[0.6mm] join artefacts and render figures};
+\node[store] (figs) at (0, -11.4) {figures/, metrics/};
 
-\draw[arr] (grid) -- (s1);
-\draw[arr] (s1) -- (runs);
-\draw[arr] (runs) -- (s2);
-\draw[arr] (s2) -- (sc1);
-\draw[arr] (s2) -- (sc2);
-\draw[arr] (sc1) -- (join);
-\draw[arr] (sc2) -- (join);
+\draw[arr] (s1) -- node[elab, right] {generates} (runs);
+\draw[arr] (runs) -- node[elab, right] {allows} (s2);
+\draw[arr] (s2) -- node[elab, left, pos=0.45] {generates} (sc1.north);
+\draw[arr] (s2) -- node[elab, right, pos=0.45] {generates} (sc2.north);
+\draw[arr] (sc1) -- node[elab, left, pos=0.45] {allows} (s3);
+\draw[arr] (sc2) -- node[elab, right, pos=0.45] {allows} (s3);
 
-% runs feeds the join directly, bypassing the scoring stage
-\draw[arr] (runs.east) -- ++(36mm, 0) |- (join.east);
+\draw[arr] (runs.east) -- node[elab, above] {allows} ++(40mm, 0) |- (s3.east);
 
-\draw[arr] (join) -- (s3);
-\draw[arr] (s3) -- (figs);
+\draw[arr] (s3) -- node[elab, right] {generates} (figs);
 
 \end{tikzpicture}

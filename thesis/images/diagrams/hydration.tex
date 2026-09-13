@@ -1,67 +1,69 @@
 \begin{tikzpicture}[
     x=1mm, y=1mm,
-    proc/.style={draw, rounded corners, fill=black!4, anchor=center, text width=42mm,
+    proc/.style={draw, rounded corners, fill=white, anchor=center, text width=42mm,
                  minimum height=12mm, inner sep=1.8mm, font=\small, align=center},
-    data/.style={draw, rectangle split, rectangle split parts=5, align=left,
-                 text width=62mm, inner sep=2.2mm, font=\small},
-    datahydrated/.style={data, rectangle split part fill={white,white,white,white,black!8}},
-    entry/.style={draw, rectangle split, rectangle split parts=4, align=left,
+    data/.style={draw, dashed, fill=white, align=left,
+                 text width=52mm, inner sep=2.2mm, font=\small},
+    entry/.style={draw, dashed, fill=white, align=left,
                   text width=38mm, inner sep=2mm, font=\small},
-    store/.style={draw, rounded corners, anchor=center, text width=24mm,
+    store/.style={draw, rounded corners, fill=white, anchor=center, text width=24mm,
                   minimum height=28mm, inner sep=1.8mm, font=\small, align=center},
-    arr/.style={-{Latex[length=2.5mm]}},
+    arr/.style={-{Latex[length=2mm]}},
+    dcall/.style={-{Latex[length=2mm]}, draw=black!55, dashed},
+    edgelab/.style={font=\footnotesize, text=black!60, align=center},
     lin/.style={},
 ]
 
-% --- spine (x = 60) ---
-\node[proc] (nutrition) at (60, 0) {Nutrition agent};
+\node[proc] (nutrition) at (32, 0) {Nutrition agent};
 
-\node[data] (plan) at (60, -44) {
-    \textbf{Agent plan}
-    \nodepart{two} person, rationale, guideline citations
-    \nodepart{three} meal: slot in the day
-    \nodepart{four} recipe: dish name, preparation instructions
-    \nodepart{five} portion: food identifier, display name, mass in grams
+\node[proc] (tool) at (104, 0) {Totaller tool};
+
+\node[data] (plan) at (32, -26) {
+    \textbf{Agent plan}\\
+    rationale,\\
+    meals: list of portions + recipe
 };
 
-\node[proc] (hydration) at (60, -98) {Hydration};
+\node[proc] (hydration) at (104, -26) {Hydration};
 
-\node[datahydrated] (hplan) at (60, -148) {
-    \textbf{Hydrated plan}
-    \nodepart{two} person, rationale, guideline citations
-    \nodepart{three} meal: slot in the day, dish name, preparation instructions
-    \nodepart{four} portion: mass in grams
-    \nodepart{five} food record: identifier, product name, per-\qty{100}{\gram} nutrients, package size
+\node[data] (hplan) at (104, -54) {
+    \textbf{Hydrated plan}\\
+    rationale,\\ 
+    meals: list of portions with nutrients per-\qty{100}{\gram} + recipe
 };
 
-\node[proc] (totaller) at (60, -204) {Totaller};
+\node[proc] (totaller) at (104, -88) {Totaller};
 
-\node[data, rectangle split parts=4] (totals) at (60, -248) {
-    \textbf{Nutrient totals}
-    \nodepart{two} day totals per nutrient
-    \nodepart{three} per-meal breakdown
-    \nodepart{four} data-coverage caveats
+\node[data] (totals) at (104, -112) {
+    \textbf{Nutrient totals}\\
+    day and per-meal totals,\\
+    coverage caveats
 };
 
-% --- food knowledge base branch (left of hydration) ---
-\node[store] (kb) at (-52, -98) {Food\\knowledge\\base};
+\node[store] (kb) at (32, -64) {Food\\knowledge\\base};
 
-\node[entry] (dbentry) at (-8, -98) {
-    \textbf{Base entry}
-    \nodepart{two} identifier
-    \nodepart{three} product name as stored
-    \nodepart{four} per-\qty{100}{\gram} nutrient fields, package size
+\node[entry] (dbentry) at (32, -94) {
+    \textbf{Base entry}\\
+    identifier,\\
+    name,\\
+    nutrients per-\qty{100}{\gram}
 };
 
-% --- main flow (heads only on edges ending at a process) ---
+\draw[arr] (32, 16) -- (nutrition.north);
+\draw[arr] (totals.south) -- ++(0, -12);
+
 \draw[lin] (nutrition) -- (plan);
-\draw[arr] (plan.south) -- (hydration.north);
+\draw[arr] (plan.east) -- (hydration.west);
 \draw[lin] (hydration) -- (hplan);
 \draw[arr] (hplan.south) -- (totaller.north);
 \draw[lin] (totaller) -- (totals);
 
-% --- base lookup branch ---
-\draw[lin] (kb.east) -- (dbentry.west);
-\draw[arr] (dbentry.east) -- (hydration.west);
+\draw[dcall] ([yshift=3.5mm]nutrition.east) -- node[edgelab, above] {agent plan} ([yshift=3.5mm]tool.west);
+\draw[dcall] ([yshift=-3.5mm]tool.west) -- node[edgelab, below] {totals} ([yshift=-3.5mm]nutrition.east);
+\draw[arr] (tool.south) -- (hydration.north);
+\draw[dcall] (totals.east) -- (146, -112) -- (146, 0) -- (tool.east);
+
+\draw[lin] (kb.south) -- (dbentry.north);
+\draw[arr] (dbentry.east) -- (68, -94) -- (68, -30) -- ([yshift=-4mm]hydration.west);
 
 \end{tikzpicture}

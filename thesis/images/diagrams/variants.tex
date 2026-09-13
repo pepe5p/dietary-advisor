@@ -8,34 +8,34 @@
 
 % --- baseline ---
 \node[box] (b_agents) {Nutrition agent};
-\node[box, below=of b_agents] (b_lookup) {Food knowledge database};
+\node[box, below=of b_agents] (b_lookup) {Food knowledge base};
 \node[off, below=of b_lookup] (b_tot) {Deterministic totaller};
 \node[off, below=of b_tot] (b_ref) {Critique-and-refine loop};
 \node[frame, fit=(b_agents)(b_ref)] (b_frame) {};
-\node[title, above=1.5mm of b_frame.north] {baseline};
+\node[title, above=1.5mm of b_frame.north] {\texttt{baseline}};
 
 % --- totaller-only ---
 \node[box, right=16mm of b_agents] (t_agents) {Nutrition agent};
-\node[box, below=of t_agents] (t_lookup) {Food knowledge database};
+\node[box, below=of t_agents] (t_lookup) {Food knowledge base};
 \node[box, below=of t_lookup] (t_tot) {Deterministic totaller};
 \node[off, below=of t_tot] (t_ref) {Critique-and-refine loop};
 \node[frame, fit=(t_agents)(t_ref)] (t_frame) {};
-\node[title, above=1.5mm of t_frame.north] {totaller-only};
+\node[title, above=1.5mm of t_frame.north] {\texttt{totaller-only}};
 
 % --- reflection-only ---
 \node[box, below=18mm of b_ref] (r_agents) {Nutrition agent};
-\node[box, below=of r_agents] (r_lookup) {Food knowledge database};
+\node[box, below=of r_agents] (r_lookup) {Food knowledge base};
 \node[off, below=of r_lookup] (r_tot) {Deterministic totaller};
 \node[box, below=of r_tot] (r_ref) {Critique-and-refine loop};
 \node[frame, fit=(r_agents)(r_ref)] (r_frame) {};
-\node[title, above=1.5mm of r_frame.north] {reflection-only};
+\node[title, above=1.5mm of r_frame.north] {\texttt{reflection-only}};
 
 % --- full ---
 \node[box, right=16mm of r_agents] (f_agents) {Nutrition agent};
-\node[box, below=of f_agents] (f_lookup) {Food knowledge database};
+\node[box, below=of f_agents] (f_lookup) {Food knowledge base};
 \node[box, below=of f_lookup] (f_tot) {Deterministic totaller};
 \node[box, below=of f_tot] (f_ref) {Critique-and-refine loop};
 \node[frame, fit=(f_agents)(f_ref)] (f_frame) {};
-\node[title, above=1.5mm of f_frame.north] {full};
+\node[title, above=1.5mm of f_frame.north] {\texttt{full}};
 
 \end{tikzpicture}

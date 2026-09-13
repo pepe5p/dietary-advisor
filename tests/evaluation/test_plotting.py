@@ -14,6 +14,7 @@ from evaluation.plotting.figures import (
     _error_bounds,
     _figure_title,
     render_experiment,
+    render_paired_scenarios,
     render_run_variability,
 )
 from evaluation.plotting.stats import (
@@ -161,6 +162,7 @@ def test_render_experiment_writes_one_png_per_plot_metric(tmp_path: Path) -> Non
 
     png_names = {path.name for path in paths if path.suffix == ".png"}
     assert png_names == {metric.filename for metric in PLOT_METRICS} | {TOKEN_STACK.filename}
+    assert "paired_scenarios.png" not in png_names
     assert "safety_adherence.png" not in png_names
     assert "tradeoff_judge_1.png" not in png_names
     for path in paths:
@@ -207,18 +209,67 @@ def test_render_experiment_writes_extra_model_groupings(tmp_path: Path) -> None:
     png_names = {path.name for path in paths if path.suffix == ".png"}
     assert "mae_pct_by_model.png" in png_names
     assert "mae_pct_by_effort.png" in png_names
-    assert "tokens.png" in png_names
-    assert "tokens_by_model.png" in png_names
-    assert "tokens_by_effort.png" in png_names
+    assert "tokens.png" not in png_names
+    assert "tokens_by_model.png" not in png_names
+    assert "tokens_by_effort.png" not in png_names
+    assert "elapsed_s_by_effort.png" in png_names
+    assert "elapsed_s_by_model.png" not in png_names
     dest = tmp_path / "figures" / "models"
     assert (dest / "mae_pct_by_model.png").stat().st_size > 0
     assert (dest / "mae_pct_by_effort.png").stat().st_size > 0
-    tradeoff = dest / "tradeoff_judge_1.png"
-    assert tradeoff in paths
-    assert tradeoff.stat().st_size > 0
-    assert tradeoff.with_suffix(".pdf").is_file()
+    assert "tradeoff_judge_1.png" not in png_names
     assert "tradeoff_judge_2.png" not in png_names
     assert "tradeoff_judge_mean.png" not in png_names
+    assert "paired_scenarios.png" not in png_names
+
+
+def test_render_experiment_writes_paired_scenarios_for_ablation(tmp_path: Path) -> None:
+    variants = (
+        VariantConfig(totaller_enabled=False, reflection_enabled=False).label,
+        VariantConfig(totaller_enabled=True, reflection_enabled=False).label,
+        VariantConfig(totaller_enabled=False, reflection_enabled=True).label,
+        VariantConfig(totaller_enabled=True, reflection_enabled=True).label,
+    )
+    records = [
+        _score_record(variant=variant, scenario_id=scenario, mae_pct=5.0, soft=0.7)
+        for variant in variants
+        for scenario in ("regular", "vegetarian-allergic")
+    ]
+    paths = render_experiment("ablation", {JUDGE_A.key: records, JUDGE_B.key: records}, output_dir=tmp_path)
+
+    png_path = tmp_path / "figures" / "ablation" / "paired_scenarios.png"
+    assert png_path in paths
+    assert png_path.stat().st_size > 0
+    assert png_path.with_suffix(".pdf").is_file()
+
+
+def test_render_paired_scenarios_writes_png_and_pdf_for_single_model(tmp_path: Path) -> None:
+    variants = ("baseline", "totaller", "reflective-loop", "totaller+reflective-loop")
+    records = [
+        _score_record(variant=variant, scenario_id=scenario, mae_pct=8.0, soft=0.7)
+        for variant in variants
+        for scenario in ("regular", "vegetarian-allergic")
+    ]
+    paths = render_paired_scenarios(
+        "ablation",
+        {JUDGE_A.key: records, JUDGE_B.key: records},
+        output_dir=tmp_path,
+    )
+
+    png_path = tmp_path / "figures" / "ablation" / "paired_scenarios.png"
+    assert paths[0] == png_path
+    assert png_path.stat().st_size > 0
+    assert png_path.with_suffix(".pdf").is_file()
+
+
+def test_render_paired_scenarios_skips_multi_model_grid(tmp_path: Path) -> None:
+    records = [
+        _score_record(llm_model="openrouter:google/gemini-3.6-flash#low", variant="totaller+reflective-loop"),
+        _score_record(llm_model="openrouter:openai/gpt-5.6-luna#xhigh", variant="totaller+reflective-loop"),
+    ]
+    paths = render_paired_scenarios("models", {JUDGE_A.key: records}, output_dir=tmp_path)
+
+    assert paths == []
 
 
 def test_grouped_metric_stats_by_model_combines_efforts() -> None:
@@ -589,8 +640,9 @@ def test_render_experiment_writes_tradeoff_per_judge(tmp_path: Path) -> None:
         output_dir=tmp_path,
     )
     dest = tmp_path / "figures" / "models"
-    for name in (f"tradeoff_{JUDGE_A.key}", f"tradeoff_{JUDGE_B.key}", "tradeoff_judge_mean"):
-        png = dest / f"{name}.png"
-        assert png in paths
-        assert png.stat().st_size > 0
-        assert png.with_suffix(".pdf").is_file()
+    png = dest / "tradeoff_judge_mean.png"
+    assert png in paths
+    assert png.stat().st_size > 0
+    assert png.with_suffix(".pdf").is_file()
+    assert dest.joinpath(f"tradeoff_{JUDGE_A.key}.png") not in paths
+    assert dest.joinpath(f"tradeoff_{JUDGE_B.key}.png") not in paths

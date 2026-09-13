@@ -1,23 +1,23 @@
 \chapter{Results and discussion}
 \label{cha:results}
 
-This chapter reports what the two experiments of \Cref{cha:methodology} measured and what those measurements license as conclusions.
+A plan that hits its energy and macronutrient targets can still ignore the request that produced it, and a plan the judges like can still miss those targets by a wide margin. The two experiments of \Cref{cha:methodology} were built to keep those dimensions apart, so a verdict on H1~is not allowed to stand in for a verdict on H2, and a model that wins on accuracy is not allowed to be declared best until preference and cost have been read against it. Where the dimensions disagree -- which happens in the model comparison and again for reasoning effort -- the disagreement is the finding, read off the per-judge series of \Cref{fig:results-models-soft,fig:results-effort-soft} against the accuracy figures beside them.
 
-The problem is two-dimensional: a plan must hit a numeric target and must satisfy what the user asked for, and \Cref{cha:methodology} measures those separately because neither is recoverable from the other. Neither dimension is reported on its own, and where the two disagree -- which happens in the model comparison and again for reasoning effort -- the disagreement is the finding, plotted directly in \Cref{fig:results-tradeoff-mean}.
+The chapter takes the two experiments in turn, then the effort recut of Experiment~2, then the cost of the two mechanisms and the stability of the judges. Comparative claims that can be paired by scenario use the sign test of \Cref{def:paired-sign-test}; everything else is read against the reported dispersion.
 
 \section{Experimental setup}
 \label{sec:results-setup}
 
-Both grids ran to completion: Experiment~1, the component ablation (\Cref{sec:methodology-variants}), with \texttt{gpt-5.6-luna} as its fixed model, and Experiment~2, the model comparison (\Cref{sec:methodology-model-grid}), with the system fixed at the full variant. Every mean reported here rests on the full complement of repetitions.
+Both grids ran to completion: Experiment~1, the component ablation (\Cref{sec:methodology-variants}), with \texttt{gpt-5.6-luna} at its provider's default medium effort as its fixed model, and Experiment~2, the model comparison (\Cref{sec:methodology-model-grid}), with the system fixed at the full variant. Every mean reported here rests on the full complement of repetitions.
 
-Every plan was scored by both judges of \Cref{sec:methodology-qualitative}: \texttt{gpt-5.6-luna} as Judge~1 and \texttt{deepseek-v4-flash-0731} as Judge~2. Judge~1 shares a model family with one of the twelve compared configurations, the overlap the second judge exists to expose; \Cref{sec:results-stability} reports whether it distorted anything. Judge-independent metrics -- energy and macronutrient error, iteration count, totaller calls and elapsed time -- are quoted without a judge attribution throughout.
+Every plan was scored by both judges of \Cref{sec:methodology-judge-protocol}: \texttt{gpt-5.6-luna} as Judge~1 and \texttt{deepseek-v4-flash-0731} as Judge~2. Judge~1 shares a model family with one of the twelve compared configurations, the overlap the second judge exists to expose; \Cref{sec:results-stability} reports whether it distorted anything. Judge-independent metrics -- energy and macronutrient error, iteration count, totaller calls and wall-clock time -- are quoted without a judge attribution throughout.
 
 \section{Component ablation}
 \label{sec:results-ablation}
 
-Experiment~1 compares the four variants of \Cref{sec:methodology-variants} on a fixed \texttt{gpt-5.6-luna} (\Cref{tab:results-ablation-summary}, \Cref{fig:results-ablation-mae}). Enabling the totaller alone reduces macro error (\Cref{def:macro-error}) from \qty{13.46}{\percent} to \qty{3.02}{\percent}, more than fourfold, and cuts MSE from \num{496} to \num{17}. The reflection loop alone reaches \qty{5.56}{\percent}, a smaller improvement bought at roughly three times the wall-clock time.
+Experiment~1 compares the four variants of \Cref{sec:methodology-variants} on a fixed \texttt{gpt-5.6-luna} (\Cref{tab:results-ablation-summary}, \Cref{fig:results-ablation-mae}). Enabling the totaller alone reduces macro error (\Cref{def:macro-error}) from \qty{13.46}{\percent} to \qty{3.02}{\percent}, more than fourfold, and cuts the squared macro error (\Cref{def:macro-error-squared}) from \num{496} to \num{17}. The \texttt{reflection-only} variant reaches \qty{5.56}{\percent}, a smaller improvement bought at roughly three times the wall-clock time.
 
-Enabling both yields the central result: at \qty{3.25}{\percent} macro error the full variant is not measurably different from the totaller alone. The gap is \qty{0.23}{\percent}, against standard errors of \qty{0.35}{\percent} and \qty{0.73}{\percent}, and their MSE figures run the other way, \num{25} against \num{17}. Once a deterministic aggregator checks the numbers, the critique-and-refine loop has no accuracy left to contribute; the two mechanisms are not complementary on this evidence. Its cost is taken up in \Cref{sec:results-overhead}.
+Enabling both yields the central result: at \qty{3.25}{\percent} macro error the \texttt{full} variant is not resolved from the totaller alone. The gap is \qty{0.23}{\percent}, against standard errors of \qty{0.35}{\percent} and \qty{0.73}{\percent}, and the blocked sign test of \Cref{def:paired-sign-test} is three improvements in five scenarios ($p = \num{0.500}$), so the comparison is inconclusive, not a demonstrated zero. Their squared-macro-error figures run the other way, \num{25} against \num{17}. Once a deterministic totaller checks the numbers, the two mechanisms are not shown to be complementary. The \texttt{full} variant's cost is taken up in \Cref{sec:results-overhead}.
 
 \begin{table}[htbp]
     \centering
@@ -31,13 +31,15 @@ Enabling both yields the central result: at \qty{3.25}{\percent} macro error the
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{images/generated/ablation/mae_pct.pdf}
-    \caption{Macro error by ablation variant, \texttt{gpt-5.6-luna}. Error bars: standard error of the mean.}
+    \caption{Macro error by ablation variant, \texttt{gpt-5.6-luna}.}
     \label{fig:results-ablation-mae}
 \end{figure}
 
-Run-to-run variation matters as much as the mean; where it is the point the text quotes the population standard deviation over individual runs, not the standard error the figures show. The baseline's standard deviation is \qty{14.76}{\percent} -- larger than its own mean error, and larger than the entire mean error of any other variant -- while the three remaining variants sit between \qty{1.34}{\percent} and \qty{4.32}{\percent}. Pooled this way, that figure mixes sampling noise with scenario difficulty and is not a clean measure of nondeterminism, but its point survives the separation: most of the baseline's deviation comes from a single scenario in which three repetitions of an identical request disagreed by nearly a factor of seven. An ungrounded plan is not merely worse on average but substantially less predictable -- for a system whose failures are silent, the more serious property.
+Run-to-run variation matters as much as the mean. Where the argument is about dispersion, the text quotes the population standard deviation over individual runs, not the standard error the figures show. The baseline's standard deviation is \qty{14.76}{\percent} -- larger than its own mean error, and larger than the entire mean error of any other variant -- while the three remaining variants sit between \qty{1.34}{\percent} and \qty{4.32}{\percent}. Pooled this way, that figure mixes sampling noise with scenario difficulty and is not a clean measure of nondeterminism, but its point survives the separation: most of the baseline's deviation comes from a single scenario in which three repetitions of an identical request disagreed by nearly a factor of seven. An ungrounded plan is not merely worse on average but substantially less predictable -- for a system whose failures are silent, the more serious property.
 
-On the second dimension the ablation is a null result (\Cref{fig:results-ablation-soft}). Both judges place all four variants within a narrow band -- roughly \numrange{0.79}{0.81} for Judge~1 and \numrange{0.80}{0.84} for Judge~2 -- so neither registers the fourfold accuracy difference of \Cref{fig:results-ablation-mae}. Neither mechanism changes how well a plan satisfies what the user asked for; the accuracy findings are claims about one dimension only. The two series also show a consistent offset: Judge~2 rates essentially every variant higher than Judge~1, by a margin comparable to the differences between the variants themselves -- the central caution of this chapter's qualitative results, taken up in \Cref{sec:results-stability}.
+On the second dimension the ablation is a null result (\Cref{fig:results-ablation-soft}). Both judges place all four variants within a narrow band -- roughly \numrange{0.79}{0.81} for Judge~1 and from \num{0.798} to \num{0.84} for Judge~2 -- so neither registers the fourfold accuracy difference of \Cref{fig:results-ablation-mae}. Neither judge registers a difference between the variants in how well a plan satisfies what the user asked for; the accuracy findings are claims about one dimension only. The two series also show a consistent offset: Judge~2 rates essentially every variant higher than Judge~1, by a margin comparable to the differences between the variants themselves -- the central caution of this chapter's qualitative results, taken up in \Cref{sec:results-stability}.
+
+The safety score (\Cref{def:safety-score}) is the other judged metric, and it is all but saturated. Judge~1 awards exactly \num{1.000} to every ablation variant, so the column has no discriminative power on this grid: no configuration is separated from any other. Judge~2 is only slightly more mobile. Across the ablation grid five of its sixty runs fall below one, in three variants: two totaller-only plans in the \texttt{vegetarian-allergic} scenario (\num{0.667} and \num{0.583}) and one in the \texttt{diabetes-hypertension} scenario (\num{0.667}); one baseline plan in \texttt{vegetarian-allergic} (\num{0.967}); and one full-variant plan in the same scenario (\num{0.667}). The remaining fifty-five sit at \num{1.000}. Those five runs are what pull the totaller-only mean to \num{0.928} and the baseline and full-variant means to \num{0.998} and \num{0.978}. The pooled run-to-run safety-score spread on the ablation grid is \num{0.000} under Judge~1 and \num{0.024} under Judge~2, against soft-score spreads of \num{0.019} and \num{0.027} on the same cells. Judge~1's safety column is a constant; Judge~2's moves as much as its soft score does, but all of that movement comes from the five runs above. The high scores are therefore better read as a ceiling imposed by a non-adversarial scenario set than as evidence that every plan was safe.
 
 \begin{figure}[htbp]
     \centering
@@ -46,17 +48,34 @@ On the second dimension the ablation is a null result (\Cref{fig:results-ablatio
     \label{fig:results-ablation-soft}
 \end{figure}
 
-\Cref{tab:results-per-scenario} breaks macro error down by scenario, where the two mechanisms part company most clearly. The totaller improves on the baseline in all five scenarios, and most where the unaided model was worst: the lactose-intolerant-athlete scenario falls from \qty{34.1}{\percent} to \qty{3.8}{\percent}, while the diabetes-hypertension scenario, the baseline's best at \qty{4.3}{\percent}, improves to \qty{3.3}{\percent}. Reflection is not uniformly beneficial: on its own it leaves the unconstrained scenario worse than the baseline (\qty{10.8}{\percent} against \qty{8.1}{\percent}), and on top of the totaller it worsens the dyslipidemia-obesity scenario from \qty{3.2}{\percent} to \qty{5.1}{\percent}. A critic revising a plan that was already numerically correct has room to make it wrong again.
+\Cref{tab:results-per-scenario} breaks macro error down by scenario, where the two mechanisms part company most clearly. The totaller improves on the baseline in all five scenarios, and most where the unaided model was worst: \texttt{lactose-intolerant-athlete-wants-cheesecake} falls from \qty{34.1}{\percent} to \qty{3.8}{\percent}, while \texttt{diabetes-hypertension}, the baseline's best at \qty{4.3}{\percent}, improves to \qty{3.3}{\percent}. Reflection is not uniformly beneficial: on its own it leaves \texttt{regular} worse than the baseline (\qty{10.8}{\percent} against \qty{8.1}{\percent}), and on top of the totaller it worsens \texttt{dyslipidemia-obesity} from \qty{3.2}{\percent} to \qty{5.1}{\percent}. A critic revising a plan that was already numerically correct has room to make it wrong again.
 
 \begin{table}[htbp]
     \centering
     \footnotesize
     \input{tables/ablation_per_scenario_mae.tex}
-    \caption{Mean macro error [\%] by scenario and variant, \texttt{gpt-5.6-luna}.}
+    \caption{Mean macro error by scenario and variant, \texttt{gpt-5.6-luna}.}
     \label{tab:results-per-scenario}
 \end{table}
 
-\textbf{H1} is supported, more strongly than the hypothesis asks: the totaller cuts macro error more than fourfold, the improvement holds in every scenario, and it compresses the standard deviation over individual runs from \qty{14.76}{\percent} to \qty{1.34}{\percent}. On the qualitative dimension no judge separates this variant from the baseline.
+The same per-scenario cell means, read as five blocked pairs (\Cref{sec:methodology-statistics}), are the input to \Cref{tab:results-paired-tests} and \Cref{fig:results-paired-scenarios}. H1~is uniform: every scenario's line falls from baseline to totaller-only, five improvements in five blocks, one-sided $p = \num{0.031}$. H2~is not: between totaller-only and the full variant the lines cross -- \texttt{dyslipidemia-obesity} and \texttt{regular} get worse -- and the sign test is three of five ($p = \num{0.500}$). That crossing is the reason the scenario is treated as a block, not as another draw from a pool. Reflection on its own improves macro error in four of the five blocks ($p = \num{0.188}$) and is separated from the baseline by neither judge.
+
+\begin{table}[htbp]
+    \centering
+    \footnotesize
+    \input{tables/paired_sign_tests.tex}
+    \caption{Exact one-sided sign tests on per-scenario cell means, Experiment~1.}
+    \label{tab:results-paired-tests}
+\end{table}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{images/generated/ablation/paired_scenarios.pdf}
+    \caption{Per-scenario cell means across the four ablation variants. Each line is one scenario.}
+    \label{fig:results-paired-scenarios}
+\end{figure}
+
+\textbf{H1}~(RQ1) is supported, more strongly than the hypothesis asks: the totaller cuts macro error more than fourfold, the improvement holds in every scenario (five of five blocks, one-sided $p = \num{0.031}$), and it compresses the standard deviation over individual runs from \qty{14.76}{\percent} to \qty{1.34}{\percent}. The second, independent look at the same mechanism points the same way: adding the totaller to the already reflective pipeline improves macro error in four of five blocks ($p = \num{0.188}$). On the qualitative dimension no judge separates this variant from the baseline.
 
 \section{Model comparison}
 \label{sec:results-model-comparison}
@@ -66,16 +85,16 @@ Experiment~2 holds the system at the full variant and varies the model and its r
 \begin{table}[htbp]
     \centering
     \footnotesize
-    \setlength{\tabcolsep}{3pt}
+    \setlength{\tabcolsep}{2.2pt}
     \input{tables/model_comparison_summary.tex}
-    \caption{The twelve model-and-effort configurations under the full variant.}
+    \caption[Model-and-effort configurations.]{The twelve model-and-effort configurations under the full variant. Effort is the provider label; \texttt{xhigh} is the top setting on \texttt{gpt-5.6-luna}.}
     \label{tab:results-model-summary}
 \end{table}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{images/generated/models/mae_pct.pdf}
-    \caption{Macro error for the twelve model-and-effort configurations. Error bars: standard error of the mean.}
+    \caption{Macro error for the twelve model-and-effort configurations.}
     \label{fig:results-models-mae}
 \end{figure}
 
@@ -86,23 +105,23 @@ Experiment~2 holds the system at the full variant and varies the model and its r
     \label{fig:results-models-soft}
 \end{figure}
 
-Accuracy alone identifies the wrong winner. Two configurations tie for the lowest error at \qty{1.08}{\percent}: \texttt{gemini-3.7-flash} at high effort and \texttt{gpt-5.6-luna} at its highest. They are not close on preference -- \num{0.813} against \num{0.774} under Judge~1, the latter fourth from last in the grid -- nor on latency, at \qty{118}{\second} against \qty{277}{\second}. An evaluation stopping at energy and macronutrient error would have declared them equivalent, when one takes more than twice as long to produce plans the judges like measurably less.
+Accuracy alone identifies the wrong winner. Two configurations tie for the lowest error at \qty{1.08}{\percent}: \texttt{gemini-3.7-flash} at high effort and \texttt{gpt-5.6-luna} at its highest. They are not close on preference -- \num{0.813} against \num{0.774} under Judge~1, the latter fourth from last in the grid -- nor on latency, at \qty{118}{\second} against \qty{276.8}{\second}. An evaluation stopping at energy and macronutrient error would have declared them equivalent, when one takes more than twice as long to produce plans the judges like measurably less.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{images/generated/models/tradeoff_judge_mean.pdf}
-    \caption{Macro error against soft score averaged over both judges, per configuration. The error axis is logarithmic.}
+    \caption[Accuracy--preference trade-off.]{Macro error against soft score, per configuration. The soft score is the mean of the two judges, so that each configuration is one point; the per-judge series are \Cref{fig:results-models-soft}.}
     \label{fig:results-tradeoff-mean}
 \end{figure}
 
-Requiring both dimensions at once narrows the field. \texttt{gemini-3.7-flash} at medium effort comes within \qty{0.45}{\percent} of the best error at \qty{1.53}{\percent} while earning the joint-highest soft score from Judge~1 (\num{0.822}) and the second-highest from Judge~2 (\num{0.839}), at \qty{81}{\second} per plan; no configuration beats it on both dimensions simultaneously (\Cref{fig:results-tradeoff-mean}). At the other end, \texttt{gemini-3.5-flash-lite} at its provider default is last on both, at \qty{24.47}{\percent} and \num{0.694}.
+Requiring both dimensions at once narrows the field. The configuration \texttt{gemini-3.7-flash} at medium effort comes within \qty{0.45}{\percent} of the best error at \qty{1.53}{\percent} while tying with \texttt{gemini-3.6-flash} at medium effort for the highest soft score from Judge~1 (\num{0.822}) and earning the second-highest from Judge~2 (\num{0.839}), at \qty{81}{\second} per plan; no configuration beats it on both dimensions simultaneously (\Cref{fig:results-tradeoff-mean}). At the other end of the grid, \texttt{gemini-3.5-flash-lite} at its provider default is last on both, at \qty{24.47}{\percent} and \num{0.694}.
 
-Collapsing the effort levels (\Cref{fig:results-models-by-model,fig:results-models-soft-by-model}) gives each base model a single pair of figures. \texttt{gemini-3.7-flash} leads on both dimensions (\qty{1.87}{\percent} and \num{0.808}) for \qty{86}{\second} a plan. \texttt{gemini-3.6-flash} and \texttt{gpt-5.6-luna} are indistinguishable on error (\qty{2.66}{\percent} against \qty{2.64}{\percent}), but preference separates them, at \num{0.807} against \num{0.791}, as does latency, at \qty{95}{\second} against \qty{147}{\second}. \texttt{gemini-3.5-flash-lite} trails on both (\qty{13.39}{\percent} and \num{0.730}), though it is between two and four times faster than anything else, which \Cref{sec:results-effort} returns to.
+Collapsing the effort levels (\Cref{fig:results-models-by-model,fig:results-models-soft-by-model}) gives each base model a single pair of figures. The same \texttt{gemini-3.7-flash} family leads on both dimensions (\qty{1.87}{\percent} and \num{0.808}) for \qty{86}{\second} a plan. The models \texttt{gemini-3.6-flash} and \texttt{gpt-5.6-luna} are indistinguishable on error (\qty{2.66}{\percent} against \qty{2.64}{\percent}), but preference separates them, at \num{0.807} against \num{0.791}, as does latency, at \qty{95}{\second} against \qty{147}{\second}. The weakest model, \texttt{gemini-3.5-flash-lite}, trails on both (\qty{13.39}{\percent} and \num{0.730}), though it is between two and four and a half times faster than anything else, which \Cref{sec:results-effort} returns to.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{images/generated/models/mae_pct_by_model.pdf}
-    \caption{Macro error aggregated over the three effort levels of each base model. Error bars: standard error of the mean.}
+    \caption{Macro error aggregated over the three effort levels of each base model.}
     \label{fig:results-models-by-model}
 \end{figure}
 
@@ -113,7 +132,7 @@ Collapsing the effort levels (\Cref{fig:results-models-by-model,fig:results-mode
     \label{fig:results-models-soft-by-model}
 \end{figure}
 
-The iteration counts in \Cref{tab:results-model-summary} are easy to misread. The critic runs on the same model as the generator it reviews (\Cref{sec:design-agents}), so the count reflects not the plans but how demanding that model is of itself. \texttt{gpt-5.6-luna} averages between \num{1.33} and \num{1.67} refinement passes, whereas \texttt{gemini-3.7-flash} averages \num{0.02} -- it approves its own first draft almost every time. The totaller-call column points the other way: \texttt{gemini-3.7-flash} invokes the totaller \num{3.69} times per run, the most of any base model, while \texttt{gpt-5.6-luna} invokes it the least, at \num{2.56}. The model that almost never enters its own reflection loop had already checked its arithmetic deterministically before the critic saw the draft, yet beats \texttt{gpt-5.6-luna} on both dimensions. A low iteration count is therefore not a quality signal: it may mark a more permissive self-critic, or one that has already done the grounding work the loop would otherwise do.
+The iteration counts in \Cref{tab:results-model-summary} are easy to misread. The critic runs on the same model as the generator it reviews (\Cref{sec:design-agents}), so the count reflects not the plans but how demanding that model is of itself. The model \texttt{gpt-5.6-luna} averages between \num{1.33} and \num{1.67} refinement passes, whereas \texttt{gemini-3.7-flash} averages \num{0.02} -- it approves its own first draft almost every time. The totaller-call column points the other way: \texttt{gemini-3.7-flash} invokes the totaller \num{3.69} times per run, the most of any base model, while \texttt{gpt-5.6-luna} invokes it the least, at \num{2.56}. The model that almost never enters its own reflection loop had already checked its arithmetic deterministically before the critic saw the draft, yet beats \texttt{gpt-5.6-luna} on both dimensions. A low iteration count is therefore not a quality signal: it may mark a more permissive self-critic, or one that has already done the grounding work the loop would otherwise do.
 
 \section{Reasoning effort}
 \label{sec:results-effort}
@@ -123,7 +142,7 @@ This section re-cuts Experiment~2 by effort. On accuracy, effort produces the mo
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{images/generated/models/mae_pct_by_effort.pdf}
-    \caption{Macro error by reasoning-effort bucket, across all four base models. Error bars: standard error of the mean.}
+    \caption{Macro error by reasoning-effort bucket, across all four base models.}
     \label{fig:results-effort-mae}
 \end{figure}
 
@@ -136,30 +155,30 @@ Preference does not follow (\Cref{fig:results-effort-soft}). Almost all of the q
     \label{fig:results-effort-soft}
 \end{figure}
 
-Effort beyond the middle setting therefore buys accuracy and nothing else, while reliably costing time. Mean elapsed time rises from \qty{52.0}{\second} to \qty{76.6}{\second} to \qty{142.6}{\second} across the three buckets (\Cref{fig:results-effort-elapsed}), and the extremes span wider still: \texttt{gemini-3.5-flash-lite} at default effort completes a plan in \qty{21.2}{\second}, \texttt{gpt-5.6-luna} at its highest takes \qty{276.8}{\second}. \ref{req:interactive-runtime}'s interactive-session requirement is met at the low end and not the top, making the top bucket defensible only where the numeric target is what matters and the wait is acceptable.
+Effort beyond the middle setting therefore buys accuracy and nothing else, while reliably costing time. Mean wall-clock time rises from \qty{52.0}{\second} to \qty{76.6}{\second} to \qty{142.55}{\second} across the three buckets (\Cref{fig:results-effort-elapsed}), and the extremes span wider still: \texttt{gemini-3.5-flash-lite} at default effort completes a plan in \qty{21.2}{\second}, \texttt{gpt-5.6-luna} at its highest takes \qty{276.8}{\second}. \ref{req:interactive-runtime}~bounds a run by what an interactive session can absorb without fixing a number, so these figures are best read directly: under a minute at low effort, a little over at medium, and well past two minutes at high, where the slowest configuration keeps a user waiting for most of five minutes. Only the first two sit comfortably inside a session someone waits through; the top bucket is defensible where the numeric target is what matters and the wait is acceptable.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{images/generated/models/elapsed_s_by_effort.pdf}
-    \caption{Wall-clock time per run by reasoning-effort bucket. Error bars: standard error of the mean.}
+    \caption{Wall-clock time per run by reasoning-effort bucket.}
     \label{fig:results-effort-elapsed}
 \end{figure}
 
 H3~asks how far effort can stand in for model capability; both dimensions answer the same way: substantially, but not enough. Raising \texttt{gemini-3.5-flash-lite} from default to high effort is the single largest improvement any configuration change produces, cutting error from \qty{24.47}{\percent} to \qty{6.50}{\percent} and lifting its Judge~1 soft score from \num{0.694} to \num{0.765} -- recovering roughly three quarters of its accuracy deficit and half of its preference deficit against the best configuration in the grid.
 
-It is not enough to make the substitution a good decision. \texttt{gemini-3.7-flash} at its \emph{lowest} effort reaches \qty{2.99}{\percent} and \num{0.788}, beating the effort-boosted weak model on both dimensions, in \qty{58}{\second} against \qty{44}{\second}. Those \qty{14}{\second} buy more than the entire effort escalation did. Substitution works in the direction H3~proposes, but only to rescue a model one is already committed to; where the model is a free choice, spending the latency budget on capability dominates.
+It is not enough to make the substitution a good decision. The configuration \texttt{gemini-3.7-flash} at its \emph{lowest} effort reaches \qty{2.99}{\percent} and \num{0.788}, beating the effort-boosted weak model on both dimensions, in \qty{58}{\second} against \qty{44}{\second}. Those \qty{14}{\second} buy more than the entire effort escalation did. Substitution works in the direction H3~proposes, but only to rescue a model one is already committed to; where the model is a free choice, spending the latency budget on capability dominates.
 
-\textbf{H3} is supported in all three parts, with that qualification: plan quality varies with model and effort, and raising the weakest model's effort recovers most of its deficit -- but effort is best understood as a way to rescue a model fixed by other constraints, not as an alternative to choosing a capable one.
+\textbf{H3}~(RQ3) is supported in all three parts on the accuracy dimension, and in the first two on the preference dimension: plan quality varies with model and effort, and raising the weakest model's effort recovers most of its deficit -- but preference satisfaction stops improving past the middle setting, and effort is best understood as a way to rescue a model fixed by other constraints, not as an alternative to choosing a capable one.
 
 \section{Reflection behaviour and computational overhead}
 \label{sec:results-overhead}
 
-\Cref{fig:results-ablation-elapsed} quantifies what the two mechanisms cost in elapsed time (\Cref{def:elapsed-time}). The totaller is cheap: it lifts a run from \qty{29.8}{\second} to \qty{39.2}{\second}, about a third, for the fourfold error reduction of \Cref{sec:results-ablation}. Reflection is expensive: it takes the same run past \qty{100}{\second} whether or not the totaller is enabled, roughly tripling the baseline, and adds nothing on either dimension once the totaller is present. Tokens tell the same story (\Cref{fig:results-ablation-tokens}, \Cref{def:token-spend}): the totaller lifts mean spend from about \num{35000} to \num{66000}, almost entirely in the cache-read share as each check resends the candidate plan, and reflection takes it to about \num{127000}, since every critic and refiner pass repeats a large share of the context.
+\Cref{fig:results-ablation-elapsed} quantifies what the two mechanisms cost in wall-clock time (\Cref{def:wall-clock-time}). The totaller is cheap: it lifts a run from \qty{29.8}{\second} to \qty{39.2}{\second}, about a third, for the fourfold error reduction of \Cref{sec:results-ablation}. Reflection is expensive: it takes the same run past \qty{100}{\second} whether or not the totaller is enabled, roughly tripling the unaided run, and no benefit on either dimension is detectable once the totaller is present. Tokens tell the same story (\Cref{fig:results-ablation-tokens}, \Cref{def:token-spend}): the totaller lifts mean spend from about \num{35000} to \num{66000}, almost entirely in the cache-read share as each check resends the candidate plan, and reflection takes it to about \num{127000}, since every critic and refiner pass repeats a large share of the context.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{images/generated/ablation/elapsed_s.pdf}
-    \caption{Wall-clock time per run by ablation variant, \texttt{gpt-5.6-luna}. Error bars: standard error of the mean.}
+    \caption{Wall-clock time per run by ablation variant, \texttt{gpt-5.6-luna}.}
     \label{fig:results-ablation-elapsed}
 \end{figure}
 
@@ -175,47 +194,46 @@ It is not enough to make the substitution a good decision. \texttt{gemini-3.7-fl
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{images/generated/ablation/iterations.pdf}
-    \caption{Mean refinement passes per run by ablation variant, \texttt{gpt-5.6-luna}. Error bars: standard error of the mean.}
+    \caption{Mean refinement passes per run by ablation variant, \texttt{gpt-5.6-luna}.}
     \label{fig:results-ablation-iterations}
 \end{figure}
 
-\Cref{fig:results-ablation-totaller-calls} records how often the model itself invoked the totaller (\Cref{def:totaller-calls}): \num{1.47} calls for the totaller-only variant, \num{2.80} for the full variant. The critique-and-refine loop nearly doubles how often a plan is checked deterministically, because the refiner re-verifies on each pass -- part of why reflection roughly doubles input tokens while buying no accuracy the totaller had not already delivered.
+\Cref{fig:results-ablation-totaller-calls} records how often the model itself invoked the totaller (\Cref{def:totaller-calls}): \num{1.47} calls for the totaller-only variant, \num{2.80} for the full variant. The critique-and-refine loop nearly doubles how often a plan is checked deterministically, because the refiner re-verifies on each pass -- part of why reflection roughly doubles input tokens while no accuracy gain beyond the totaller's is detectable.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{images/generated/ablation/totaller_calls.pdf}
-    \caption{Mean totaller invocations per run by ablation variant, \texttt{gpt-5.6-luna}. Error bars: standard error of the mean.}
+    \caption{Mean totaller invocations per run by ablation variant, \texttt{gpt-5.6-luna}.}
     \label{fig:results-ablation-totaller-calls}
 \end{figure}
 
-\textbf{H2} is unsupported: neither judge detects a soft-score or safety-score improvement from reflection, and \Cref{sec:results-stability} shows any such effect would be smaller than the run-to-run noise. Added to the totaller the loop moves macro error by less than the standard error of either mean, at roughly triple the wall-clock time. What remains in its favour -- its own behaviour and what individual critiques visibly correct -- the aggregate metrics do not reward.
+\textbf{H2}~(RQ2) splits in two, and the two halves answer differently. Added to the totaller, the loop is not supported: no effect is detectable at this sample size. The blocked sign test of totaller-only against the full variant (\Cref{tab:results-paired-tests}) is three of five on macro error ($p = \num{0.500}$); two of five and, after one tie, three of four remaining blocks on the two judges' soft scores ($p = \num{0.812}$ and $p = \num{0.312}$); and on the safety score Judge~1 is saturated while Judge~2 improves in two of the two blocks that are not ties ($p = \num{0.250}$). Five blocks cannot demonstrate the absence of an effect. Added to the totaller the loop moves the pooled macro-error means by less than the standard error of either mean. The only movements that exceed both standard errors sit on Judge~2 (soft score \num{0.039}, safety \num{0.050}) and remain indistinguishable from that judge's run-to-run spread (\Cref{sec:results-stability}). All of this comes at roughly triple the wall-clock time. On its own, against the unaided baseline, the loop does reduce macro error -- from \qty{13.46}{\percent} to \qty{5.56}{\percent}, improving in four of five blocks ($p = \num{0.188}$, \Cref{sec:results-ablation}) -- but it buys that at the same threefold cost and without separating from the baseline on either judged metric, which is the dimension H2~was stated in. The aggregate metrics do not reward what remains in the loop's favour: its own behaviour and what individual critiques visibly correct.
 
 \section{Stability and judge agreement}
 \label{sec:results-stability}
 
-Every mean here averages over repetitions of a nondeterministic process, so how much an individual run deviates from its configuration's mean bounds the weight the reported differences can carry. \Cref{fig:results-stability} reports the cell spread and run-to-run variability of \Cref{def:spread,def:variability}. Pooled over every cell of both grids, the soft-score spread is \num{0.026} under Judge~1 and \num{0.030} under Judge~2. Both are comfortably smaller than the roughly \num{0.13} gap between the best and worst configurations, so the qualitative ordering is not a sampling artefact; but they equal or exceed the gaps between the four ablation variants, a quantitative reason not to read into that ordering.
+Every mean here averages over repetitions of a nondeterministic process, so how much an individual run deviates from its configuration's mean bounds the weight the reported differences can carry. \Cref{fig:results-stability} reports the cell spread and run-to-run variability of \Cref{def:spread,def:variability}. Pooled over every cell of both grids, the soft-score cell spread is \num{0.026} under Judge~1 and \num{0.030} under Judge~2. The corresponding safety-score cell spreads are \num{0.004} and \num{0.014}: Judge~1 is nearly constant because most cells sit at one, and Judge~2's larger figure is still smaller than the soft-score spread. Both soft-score figures are comfortably smaller than the roughly \num{0.13} gap between the best and worst configurations, so the qualitative ordering is not a sampling artefact. Against the four ablation variants the picture splits by judge: Judge~1's ablation-grid spread of \num{0.019} exceeds the \num{0.011} gap between those variants, while Judge~2's \num{0.039} gap exceeds its ablation-grid spread of \num{0.027} -- still not grounds to read a reliable ordering into that grid.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{images/generated/stability/run_variability.pdf}
-    \caption{Run-to-run variability of the soft score (\Cref{def:spread}), by model and pooled, both judges.}
+    \caption[Run-to-run soft-score variability.]{Run-to-run variability of the soft score (\Cref{def:spread}), by model and pooled, both judges.}
     \label{fig:results-stability}
 \end{figure}
 
-The two judges behave as \Cref{sec:impl-judges} intended. Judge~2 scores higher than Judge~1 almost everywhere -- by roughly \numrange{0.01}{0.08} -- so absolute soft-score values are judge-dependent and should never be quoted as properties of the plans alone. Their \emph{rankings} largely agree: both place \texttt{gemini-3.5-flash-lite} at default effort last by a wide margin, both rank its three configurations in increasing order of effort, and both fail to separate the ablation variants. The one visible disagreement is instructive: Judge~1 ranks \texttt{gpt-5.6-luna} at its highest effort last of that model's three, at \num{0.774}, whereas Judge~2 places it comfortably above the low-effort one, at \num{0.829}. The judge sharing a family with this model is thus harsher on it, the opposite of the self-preference bias the design guarded against; the family overlap did not inflate that model's scores.
+The two judges match the protocol of \Cref{sec:methodology-judge-protocol}. Judge~2 scores higher than Judge~1 almost everywhere -- by roughly \numrange{0.01}{0.08} -- so absolute soft-score values are judge-dependent and should never be quoted as properties of the plans alone. Their \emph{rankings} largely agree: both place \texttt{gemini-3.5-flash-lite} at default effort last by a wide margin, both rank its three configurations in increasing order of effort, and both fail to separate the ablation variants. The one visible disagreement is instructive: Judge~1 ranks \texttt{gpt-5.6-luna} at its highest effort last of that model's three, at \num{0.774}, whereas Judge~2 places it comfortably above the low-effort one, at \num{0.829}. The judge sharing a family with this model is thus harsher on it, the opposite of the self-preference bias the design guarded against; the family overlap did not inflate that model's scores.
+
+They disagree more sharply on the one question that is in principle checkable: whether a plan violated an allergen exclusion or a diet pattern. On nine runs -- all of them \texttt{vegetarian-allergic} -- Judge~1 listed no safety violation and scored the plan at \num{1.000}, while Judge~2 listed at least one. The typical disputes are coconut oil or coconut milk treated as a tree nut under food-labelling rules, and sunflower-seed products treated as a cross-contact risk, not as a declared allergen. The same split appears as small gaps in the model-comparison safety column, for example \texttt{gemini-3.6-flash} at low effort (\num{0.992} against \num{0.969}) and \texttt{gpt-5.6-luna} at its highest effort (\num{1.000} against \num{0.991}). Where two judges reading the same plan against the same rubric cannot agree on a hard exclusion, a judged safety score is the wrong instrument: the exclusion belongs to a deterministic checker.
 
 \section{Threats to validity}
 \label{sec:results-threats}
-\label{sec:conclusions-limitations}
 
 Several limitations bound how far these results generalise.
 
-The scenario set is five profiles, chosen to vary in what they demand -- an unconstrained day, a hard exclusion against a conflicting request, interacting chronic conditions -- but too few to support claims about dietary planning in general, and the high safety scores may reflect that none is adversarial in the way a determined user could be. More scenarios would have exceeded the grid budget.
+The scenario set is five profiles, chosen to vary in what they demand -- an unconstrained day, a hard exclusion against a conflicting request, interacting chronic conditions -- but too few to support claims about dietary planning in general, and the high safety scores may reflect that none is adversarial in the way a determined user could be. Five blocks also cap the resolution of the paired sign test of \Cref{sec:methodology-statistics}: they are enough to register a uniform fourfold drop and not enough to decide a mixed one. More scenarios would have exceeded the grid budget.
 
 Both judges are language models. The second judge makes vendor-specific bias visible and \Cref{sec:results-stability} shows it did not distort the rankings, but a bias shared by both -- a common preference for longer rationales, say -- would remain invisible from inside this evaluation. No human expert reviewed any plan, so every qualitative number is a proxy for the judgement that would actually matter.
 
 Reasoning-effort levels are vendor-defined labels, not calibrated quantities. Within-model effort comparisons are sound, since only the label changes; the pooled cross-model comparison of \Cref{sec:results-effort} assumes a correspondence between vendors' scales that no provider guarantees, and should be read as a direction, not a measurement.
 
-The system produces a single, non-interactive plan per session; nothing here speaks to a multi-turn, incrementally edited planning conversation.
-
-Finally, this evaluation is one snapshot of a fast-moving set of hosted models, any of which may be silently updated behind the same identifier. The architectural conclusions -- that deterministic grounding is cheap and effective, that self-critique is expensive and bought nothing the grounding had not already delivered, that effort settings deserve tuning -- are more durable than the numbers attached to any named model.
+Finally, this evaluation is one snapshot of a fast-moving set of hosted models, any of which may be silently updated behind the same identifier. The architectural conclusions -- that deterministic grounding is cheap and effective, that the critique-and-refine loop is expensive and, at this sample size, bought no measurable gain the grounding had not already delivered, that effort settings deserve tuning -- are more durable than the numbers attached to any named model.

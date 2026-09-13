@@ -78,7 +78,7 @@ _MAX_EXCERPTS = 12
 class VariantConfig:
     """Feature flags controlling which supporting modules are active.
 
-    Each flag maps 1:1 to one of the three ablatable modules in `desc.md`.
+    Each flag maps 1:1 to one ablatable module.
     Totaller and reflection default on; RAG defaults off. The patient profile
     and the Open Food Facts food lookup are always active (part of the baseline
     task), so neither is a flag - see AGENTS.md.

@@ -1,21 +1,23 @@
 \begin{tikzpicture}[
     x=1mm, y=1mm,
     box/.style={draw, rounded corners, anchor=center, text width=34mm,
-                minimum height=11mm, inner sep=1.2mm, font=\scriptsize, align=center},
-    agent/.style={box, minimum height=20mm},
+                minimum height=11mm, inner sep=1.2mm, font=\footnotesize, align=center},
+    agent/.style={box, minimum height=20mm, fill=black!8},
     side/.style={draw, rounded corners, anchor=center, text width=22mm,
-                 minimum height=9mm, inner sep=1.2mm, font=\scriptsize, align=center},
+                 minimum height=9mm, inner sep=1.2mm, font=\footnotesize, align=center},
     lane/.style={draw, rounded corners, anchor=center, text width=18mm,
-                 inner sep=1.2mm, font=\scriptsize, align=center},
-    dcall/.style={-{Latex[length=1.6mm]}, draw=black!55, dashed},
-    ret/.style={-{Latex[length=1.6mm]}, draw=black!55, dashed},
-    ensured/.style={{Latex[length=1.6mm]}-{Latex[length=1.6mm]}},
-    edgelab/.style={font=\scriptsize, text=black!60, align=center},
+                 inner sep=1.2mm, font=\footnotesize, align=center},
+    dcall/.style={-{Latex[length=2mm]}, draw=black!55, dashed},
+    ret/.style={-{Latex[length=2mm]}, draw=black!55, dashed},
+    feed/.style={-{Latex[length=1.6mm]}, draw=black!50, densely dotted},
+    edgelab/.style={font=\footnotesize, text=black!60, align=center},
     arr/.style={-{Latex[length=2mm]}},
     % validator marker: a hollow triangle sitting on an edge, deliberately
     % unlike the solid arrow heads used for flow
     pics/vtri/.style={code={\filldraw[fill=white, draw=black]
         (-1.8, -2.2) -- (-1.8, 2.2) -- (2.0, 0) -- cycle;}},
+    % hydrate-and-total marker: a hollow circle sitting on an edge
+    pics/hcirc/.style={code={\filldraw[fill=white, draw=black] (0, 0) circle (2.2mm);}},
 ]
 
 % --- centre column (x = 48) ---
@@ -23,14 +25,13 @@
 \node[agent] (nutrition) at (48, -30) {Nutrition agent};
 \node[agent] (critic) at (48, -70) {Critic};
 \node[agent] (refiner) at (48, -110) {Refiner};
-\node[agent] (hydration) at (48, -144) {Hydration};
 
 % --- profiles store, top left ---
 \node[side] (profiles) at (0, 0) {Profiles store};
 
 % --- tool lanes on opposite sides ---
-\node[lane, minimum height=140mm] (lookup) at (-10, -85) {Food knowledge database};
-\node[lane, minimum height=108mm] (totaller) at (106, -70) {Totaller};
+\node[lane, minimum height=120mm] (lookup) at (-10, -76) {Food knowledge base};
+\node[lane, minimum height=120mm] (totaller) at (106, -76) {Totaller};
 
 % --- attachment points, taken from the block borders themselves ---
 \coordinate (n_call_w) at ([yshift=6mm]nutrition.west);
@@ -43,41 +44,37 @@
 \coordinate (r_call_e) at ([yshift=4mm]refiner.east);
 \coordinate (r_ret_e)  at ([yshift=-4mm]refiner.east);
 \coordinate (c_out)    at ([yshift=-6mm]critic.west);
-\coordinate (h_in)     at ([yshift=6mm]hydration.west);
+
+% --- hydrate-and-total points, one per plan-carrying edge ---
+\coordinate (h_plan)     at (48, -52);
+\coordinate (h_refined)  at (54, -88);
 
 % --- main vertical flow ---
 \draw[arr] (48, 14) -- node[edgelab, right] {prompt} (runner);
-\draw[arr] (runner) -- node[edgelab, right] {runs} (nutrition);
+\draw[arr] (runner) -- node[edgelab, right] {prompt + profile} (nutrition);
 \pic[rotate=-90] at ([yshift=-2mm]nutrition.south) {vtri};
-\draw[arr] ([yshift=-4mm]nutrition.south) -- node[edgelab, right] {plan} (critic.north);
-\draw[arr] (hydration) -- node[edgelab, right] {hydrated plan} (48, -160);
+\draw[arr] ([yshift=-4mm]nutrition.south) -- node[edgelab, right, pos=0.2] {plan} (critic.north);
 
 % --- critic and refiner: two parallel edges, opposite directions ---
 \pic[rotate=-90] at ([xshift=-6mm, yshift=-2mm]critic.south) {vtri};
-\draw[arr] ([xshift=-6mm, yshift=-4mm]critic.south) -- node[edgelab, anchor=east, pos=0.55] {feedback} ([xshift=-6mm]refiner.north);
+\draw[arr] ([xshift=-6mm, yshift=-4mm]critic.south) -- node[edgelab, anchor=east, pos=0.7] {feedback} ([xshift=-6mm]refiner.north);
 \pic[rotate=90] at ([xshift=6mm, yshift=2mm]refiner.north) {vtri};
-\draw[arr] ([xshift=6mm, yshift=4mm]refiner.north) -- node[edgelab, anchor=west, pos=0.55] {refined plan} ([xshift=6mm]critic.south);
+\draw[arr] ([xshift=6mm, yshift=4mm]refiner.north) -- node[edgelab, anchor=west, pos=0.85] {refined plan} ([xshift=6mm]critic.south);
 
-% --- approved plan: critic -> hydration ---
-\draw[arr] (c_out) -- (14, -76) -- (14, -138) -- (h_in);
+% --- approved plan: critic -> out of the pipeline ---
+\draw[arr] (c_out) -- (14, -76) -- (14, -136);
 \node[edgelab, anchor=south] at (20, -75) {approved plan};
 
 % --- profiles feed ---
 \draw[arr] (profiles) -- node[edgelab, above] {profile} (runner);
 
-% --- left lane: food knowledge database (call validated on the way in) ---
+% --- left lane: food knowledge base (call validated on the way in) ---
 \pic[rotate=180] at ([xshift=-2mm]n_call_w) {vtri};
 \draw[dcall] ([xshift=-4mm]n_call_w) -- node[edgelab, above, pos=0.7] {tool call} (n_call_w -| lookup.east);
 \draw[ret] (n_ret_w -| lookup.east) -- node[edgelab, below, pos=0.3] {tool response} (n_ret_w);
 \pic[rotate=180] at ([xshift=-2mm]r_call_w) {vtri};
 \draw[dcall] ([xshift=-4mm]r_call_w) -- node[edgelab, above, pos=0.7] {tool call} (r_call_w -| lookup.east);
 \draw[ret] (r_ret_w -| lookup.east) -- node[edgelab, below, pos=0.3] {tool response} (r_ret_w);
-
-% hydration <-> food knowledge database: deterministic, no validator
-\coordinate (h_dbc) at ([yshift=0mm]hydration.west);
-\coordinate (h_dbr) at ([yshift=-6mm]hydration.west);
-\draw[arr] (h_dbc) -- node[edgelab, above, pos=0.7] {call} (h_dbc -| lookup.east);
-\draw[-{Latex[length=1.6mm]}] (h_dbr -| lookup.east) -- node[edgelab, below, pos=0.3] {result} (h_dbr);
 
 % --- right lane: totaller (call validated on the way in) ---
 \pic at ([xshift=2mm]n_call_e) {vtri};
@@ -87,14 +84,25 @@
 \draw[dcall] ([xshift=4mm]r_call_e) -- node[edgelab, above, pos=0.5] {tool call} (r_call_e -| totaller.west);
 \draw[ret] (r_ret_e -| totaller.west) -- node[edgelab, below, pos=0.5] {tool response} (r_ret_e);
 
-% critic <-> totaller: call validated on the way in
-\coordinate (c_call_e) at ([yshift=4mm]critic.east);
-\coordinate (c_ret_e)  at ([yshift=-4mm]critic.east);
-\draw[arr] (c_call_e) -- node[edgelab, above, pos=0.5] {call} (c_call_e -| totaller.west);
-\draw[-{Latex[length=1.6mm]}] (c_ret_e -| totaller.west) -- node[edgelab, below, pos=0.5] {result} (c_ret_e);
+% --- both lanes feed every hydrate-and-total point ---
+\draw[feed] (h_plan -| lookup.east) -- ([xshift=-2.6mm]h_plan);
+\draw[feed] (h_plan -| totaller.west) -- ([xshift=2.6mm]h_plan);
+\draw[feed] (h_refined -| lookup.east) -- ([xshift=-2.6mm]h_refined);
+\draw[feed] (h_refined -| totaller.west) -- ([xshift=2.6mm]h_refined);
+
+\pic at (h_plan) {hcirc};
+\pic at (h_refined) {hcirc};
 
 % --- legend ---
-\pic at (-19, -166) {vtri};
-\node[edgelab, anchor=west, text=black] at (-15, -166) {pydantic-ai validator};
+\pic at (-19, -162) {vtri};
+\node[edgelab, anchor=west, text=black] at (-15, -162) {output validator};
+\pic at (24, -162) {hcirc};
+\node[edgelab, anchor=west, text=black] at (28, -162) {hydrate and total};
+\node[draw, fill=black!8, rounded corners, minimum height=5mm, text width=16mm,
+      font=\footnotesize, align=center, anchor=west] at (-19, -172) {model};
+\node[edgelab, anchor=west, text=black] at (0, -172) {language-model call};
+\node[draw, rounded corners, minimum height=5mm, text width=16mm,
+      font=\footnotesize, align=center, anchor=west] at (42, -172) {box};
+\node[edgelab, anchor=west, text=black] at (61, -172) {deterministic};
 
 \end{tikzpicture}

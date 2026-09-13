@@ -1,67 +1,66 @@
 \begin{tikzpicture}[
-    box/.style={draw, rounded corners, align=center, minimum height=8mm, minimum width=42mm, inner sep=1.6mm, font=\small},
-    ebox/.style={draw, rounded corners, align=center, minimum height=9mm, minimum width=30mm, inner sep=1.4mm, font=\small},
+    box/.style={draw, rounded corners, align=center, minimum height=7mm, minimum width=34mm, inner sep=1.3mm, font=\small},
+    ebox/.style={draw, rounded corners, align=center, minimum height=7mm, minimum width=26mm, inner sep=1.1mm, font=\small},
     arr/.style={-{Latex[length=2mm]}},
 ]
 
-% --- runtime (left) ---
-\node[font=\small\bfseries] (rtitle) at (0, -1.9) {dietary\_advisor};
+% --- evaluation (top left) ---
+\node[font=\small\bfseries] (etitle) at (0, 0) {evaluation};
 
-\node[box] (rcli) at (0, -2.7) {\textbf{cli}};
-\node[box] (pipeline) at (0, -4.1) {\textbf{pipeline}};
-\node[box] (reflection) at (0, -5.5) {\textbf{reflection}};
-\node[box] (agents) at (0, -6.9) {\textbf{agents}};
-\node[box] (hydration) at (0, -8.3) {\textbf{hydration}};
-
-\node[box, minimum width=30mm] (fooddb) at (-1.6, -9.9) {\textbf{food\_db}};
-\node[box, minimum width=30mm] (totaller) at (1.6, -9.9) {\textbf{totaller}};
+\node[ebox] (ecli) at (0, -0.75) {\textbf{cli}};
+\node[ebox, minimum width=30mm] (caserunner) at (-3.4, -1.9) {\textbf{case\_runner}};
+\node[ebox] (scoring) at (0, -1.9) {\textbf{scoring}};
+\node[ebox] (reporting) at (3.4, -1.9) {\textbf{reporting}};
+\node[ebox, minimum width=30mm] (validation) at (-2.0, -3.05) {\textbf{validation}};
+\node[ebox] (judges) at (2.2, -3.05) {\textbf{judges}};
 
 \begin{scope}[on background layer]
-    \node[draw, rounded corners, inner sep=4.5mm,
-          fit=(rtitle)(rcli)(pipeline)(reflection)(agents)(hydration)(fooddb)(totaller)] (runtime) {};
+    \node[draw, rounded corners, inner sep=3.2mm,
+          fit=(etitle)(ecli)(caserunner)(scoring)(reporting)(validation)(judges)] (evalpkg) {};
+\end{scope}
+
+\draw[arr] (ecli) -- (caserunner);
+\draw[arr] (ecli) -- (scoring);
+\draw[arr] (ecli) -- (reporting);
+\draw[arr] (reporting) -- (scoring);
+\draw[arr] (scoring) -- (judges);
+\draw[arr] (scoring) -- (validation);
+\draw[arr] (caserunner) -- (validation);
+
+% --- dietary_advisor (bottom right) ---
+\node[font=\small\bfseries] (rtitle) at (5.4, -5.5) {dietary\_advisor};
+
+\node[box] (rcli) at (5.4, -6.25) {\textbf{cli}};
+\node[box] (pipeline) at (5.4, -7.35) {\textbf{pipeline}};
+\node[box] (reflection) at (5.4, -8.45) {\textbf{reflection}};
+\node[box] (agents) at (5.4, -9.55) {\textbf{agents}};
+\node[box] (hydration) at (5.4, -10.65) {\textbf{hydration}};
+
+\node[box, minimum width=26mm, minimum height=8.0mm] (profile) at (9.3, -6.25) {\textbf{profile}};
+\node[box, minimum width=26mm, minimum height=8.0mm] (telemetry) at (9.3, -9.55) {\textbf{telemetry}};
+
+\node[box, minimum width=26mm] (totaller) at (3.95, -11.95) {\textbf{totaller}};
+\node[box, minimum width=26mm] (fooddb) at (6.85, -11.95) {\textbf{food\_db}};
+
+\begin{scope}[on background layer]
+    \node[draw, rounded corners, inner sep=3.8mm,
+          fit=(rtitle)(rcli)(pipeline)(reflection)(agents)(hydration)(fooddb)(totaller)(profile)(telemetry)] (runtime) {};
 \end{scope}
 
 \draw[arr] (rcli) -- (pipeline);
 \draw[arr] (pipeline) -- (reflection);
 \draw[arr] (reflection) -- (agents);
 \draw[arr] (agents) -- (hydration);
-\draw[arr] (hydration.south) -- (fooddb.north);
 \draw[arr] (hydration.south) -- (totaller.north);
+\draw[arr] (hydration.south) -- (fooddb.north);
+\draw[arr] (pipeline.east) -- ++(0.45, 0) |- ([yshift=1.2mm]agents.east);
+\draw[arr] ([yshift=-1.2mm]agents.west) -| ([xshift=-6mm]totaller.north);
+\draw[arr] (agents.east) -| ([xshift=6mm]fooddb.north);
+\draw[arr] (rcli.east) -- (profile.west);
+\draw[arr] (pipeline.east) -| (telemetry.north);
 
-% internal bypasses: pipeline->agents and agents->food_db on the left
-\draw[arr] (pipeline.west) -- (-3.2, -4.1) -- (-3.2, -6.75) -- ([yshift=1.5mm]agents.west);
-\draw[arr] ([yshift=-1.5mm]agents.west) -| ([xshift=-10mm]fooddb.north);
-\draw[arr] (agents.east) -| ([xshift=10mm]totaller.north);
-
-% --- evaluation harness (right) ---
-\node[ebox, minimum width=26mm] (ecli) at (12, -4.6) {\textbf{cli}};
-
-\node[ebox, minimum width=34mm] (caserunner) at (8, -6.3) {\textbf{case\_runner}};
-\node[ebox] (scoring) at (12, -6.3) {\textbf{scoring}};
-\node[ebox] (reporting) at (16, -6.3) {\textbf{reporting}};
-
-\node[ebox, minimum width=34mm] (validation) at (10, -8.3) {\textbf{validation}};
-\node[ebox, minimum width=26mm] (judges) at (14, -8.1) {\textbf{judges}};
-
-\begin{scope}[on background layer]
-    \node[font=\small\bfseries] (etitle) at (12, -3.65) {evaluation};
-    \node[draw, rounded corners, inner sep=3.5mm,
-          fit=(etitle)(ecli)(caserunner)(scoring)(reporting)(validation)(judges)] (evalpkg) {};
-\end{scope}
-
-\draw[arr] (ecli.south) -- (caserunner.north);
-\draw[arr] (ecli.south) -- (scoring.north);
-\draw[arr] (ecli.south) -- (reporting.north);
-
-\draw[arr] (reporting.west) -- (scoring.east);
-
-\draw[arr] (scoring.south) -- (judges.north);
-\draw[arr] (scoring.south) -- (validation.north);
-\draw[arr] (caserunner.south) -- (validation.north);
-
-% cross-package: harness into the runtime modules it imports
-\draw[arr] (caserunner.west) -- (4.6, -6.3) -- (4.6, -4.1) -- (pipeline.east);
-\draw[arr] (validation.west) -- (4.0, -8.3) -- (hydration.east);
-\draw[arr] (validation.west) -- (4.6, -8.3) -- (4.6, -9.9) -- (totaller.east);
+\draw[arr] ([xshift=-7mm]caserunner.south) |- (pipeline.west);
+\draw[arr] (validation.south) |- (hydration.west);
+\draw[arr] (validation.south) |- (totaller.west);
 
 \end{tikzpicture}

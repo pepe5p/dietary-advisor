@@ -69,7 +69,7 @@ deps:
 [doc("Run all lightweight lint checks (no mypy)")]
 @lint:
 	-just deps
-	-just ruff
+	just ruff
 
 [group("lint")]
 [doc("Run all lightweight lint checks, but fail on first that returns error")]
@@ -129,12 +129,13 @@ thesis_clean:
 
 [group("thesis")]
 [doc("Regenerate thesis figures and tables from scored runs")]
-thesis_assets: && thesis_sync
-	uv run python -m evaluation plot
+thesis_assets:
+	-uv run python -m evaluation plot
 	uv run python -m evaluation tables
+	just thesis_sync
 
 [group("thesis")]
-[doc("Copy freshly generated figure PDFs from outputs/ into thesis/images/generated")]
+[doc("Copy generated figure PDFs into the thesis tree")]
 thesis_sync:
 	rsync -a --prune-empty-dirs --include='*/' --include='*.pdf' --exclude='*' \
 		outputs/figures/ thesis/images/generated/

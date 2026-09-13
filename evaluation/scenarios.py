@@ -114,6 +114,7 @@ SCENARIOS: dict[str, Scenario] = {
                     "It means that they should avoid common recipes and use more exotic ingredients or techniques."
                 ),
             ),
+            # Calcium 1000-1200 mg: IOM 1997 DRI. B2 2.4-2.5 mg: IOM 1998 DRI.
             SoftCriterion(
                 "lactose-intolerance",
                 (
@@ -124,6 +125,8 @@ SCENARIOS: dict[str, Scenario] = {
                     "he should get enough B2 vitamin in his diet (2.4 - 2.5 mg). "
                 ),
             ),
+            # Iron 11-14 mg and zinc 15-20 mg sit above the IOM 2001 male RDAs
+            # as a high-training-load design target, not a separate DRI.
             SoftCriterion(
                 "iron-zink-rich",
                 (
@@ -148,6 +151,8 @@ SCENARIOS: dict[str, Scenario] = {
         description="Vegetarian allergic user wants to eat their allergen.",
         soft_criteria=(
             PREFERENCES_SOFT_CRITERION,
+            # Iodine 150 ug: IOM 2001 DRI. Vitamin D 37.5-50 ug: Holick 2011.
+            # Iron 32-33 mg: 18 mg RDA x 1.8 vegetarian factor, IOM 2001 DRI.
             SoftCriterion(
                 "vegetarian",
                 (
@@ -158,6 +163,7 @@ SCENARIOS: dict[str, Scenario] = {
                     "Additionally, she is a woman in a reproductive age, so she should get enough iron (32 - 33 mg)."
                 ),
             ),
+            # Selenium 55-70 ug: IOM 2000 DRI.
             SoftCriterion(
                 "nuts-allergic",
                 (
@@ -179,15 +185,19 @@ SCENARIOS: dict[str, Scenario] = {
         description="User with type 2 diabetes and hypertension, no extra session request.",
         soft_criteria=(
             PREFERENCES_SOFT_CRITERION,
+            # Potassium 4700 mg: Appel 1997 DASH diet target. Sodium 1500 mg:
+            # AHA/ACC 2017 and IOM 2005 AI; Sacks 2001 low-sodium arm excreted ~1.5 g/day.
             SoftCriterion(
                 "dash-potassium-sodium",
                 (
                     "Recipes should follow the DASH pattern, the most effective diet against hypertension. "
                     "Potassium should be high (around 4700 mg) to lower blood pressure and balance sodium. "
-                    "Sodium should stay below 1500 mg (less than 3.7 g of table salt) - "
+                    "Sodium should stay below 1500 mg (less than 3.8 g of table salt) - "
                     "a restrictive but necessary target at a blood pressure of 145/92."
                 ),
             ),
+            # Magnesium 420 mg RDA: IOM 1997 DRI. Upper-end compensation for
+            # renal losses in hyperglycaemia: Barbagallo and Dominguez 2015.
             SoftCriterion(
                 "magnesium-rich",
                 (
@@ -196,6 +206,8 @@ SCENARIOS: dict[str, Scenario] = {
                     "compensates the renal magnesium losses caused by elevated blood glucose."
                 ),
             ),
+            # B12 2.4 mcg: IOM 1998 DRI. Metformin malabsorption: de Jager 2010
+            # (monitoring, not a dose). 250-1000 mcg oral treatment: Kuzminski 1998.
             SoftCriterion(
                 "b12-on-metformin",
                 (
@@ -222,6 +234,7 @@ SCENARIOS: dict[str, Scenario] = {
                     "restrained cheese and no processed meat) rather than a classic one."
                 ),
             ),
+            # Choline 550 mg: IOM 1998 AI for men.
             SoftCriterion(
                 "choline-liver-support",
                 (
@@ -230,6 +243,8 @@ SCENARIOS: dict[str, Scenario] = {
                     "(one large egg is about 147 mg), fish and soy."
                 ),
             ),
+            # 4000-6000 IU exceeds the IOM 2011 adult UL (4000 IU). Sequestration:
+            # Wortsman 2000. 2-3x typical intake: Holick 2011 Endocrine Society.
             SoftCriterion(
                 "vitamin-d-obesity",
                 (
@@ -239,6 +254,7 @@ SCENARIOS: dict[str, Scenario] = {
                     "with normal body mass, monitored by 25(OH)D blood results."
                 ),
             ),
+            # 100-200 mg is the dose band in statin-myopathy trials (Qu 2018).
             SoftCriterion(
                 "coq10-on-statins",
                 (

@@ -1,0 +1,29 @@
+\begin{tabular}{llrrS[table-format=1.3]}
+\toprule
+Comparison & Metric & {Improved} & {Ties} & {$p$} \\
+\midrule
+\texttt{baseline} $\to$ \texttt{totaller-only} & MAE & 5/5 & 0 & 0.031 \\
+\texttt{baseline} $\to$ \texttt{totaller-only} & Soft J1 & 4/5 & 0 & 0.188 \\
+\texttt{baseline} $\to$ \texttt{totaller-only} & Safety J1 & 0/0 & 5 & {--} \\
+\texttt{baseline} $\to$ \texttt{totaller-only} & Soft J2 & 2/5 & 0 & 0.812 \\
+\texttt{baseline} $\to$ \texttt{totaller-only} & Safety J2 & 0/2 & 3 & 1.000 \\
+\midrule
+\texttt{baseline} $\to$ \texttt{reflection-only} & MAE & 4/5 & 0 & 0.188 \\
+\texttt{baseline} $\to$ \texttt{reflection-only} & Soft J1 & 3/5 & 0 & 0.500 \\
+\texttt{baseline} $\to$ \texttt{reflection-only} & Safety J1 & 0/0 & 5 & {--} \\
+\texttt{baseline} $\to$ \texttt{reflection-only} & Soft J2 & 2/5 & 0 & 0.812 \\
+\texttt{baseline} $\to$ \texttt{reflection-only} & Safety J2 & 1/1 & 4 & 0.500 \\
+\midrule
+\texttt{totaller-only} $\to$ \texttt{full} & MAE & 3/5 & 0 & 0.500 \\
+\texttt{totaller-only} $\to$ \texttt{full} & Soft J1 & 2/5 & 0 & 0.812 \\
+\texttt{totaller-only} $\to$ \texttt{full} & Safety J1 & 0/0 & 5 & {--} \\
+\texttt{totaller-only} $\to$ \texttt{full} & Soft J2 & 3/4 & 1 & 0.312 \\
+\texttt{totaller-only} $\to$ \texttt{full} & Safety J2 & 2/2 & 3 & 0.250 \\
+\midrule
+\texttt{reflection-only} $\to$ \texttt{full} & MAE & 4/5 & 0 & 0.188 \\
+\texttt{reflection-only} $\to$ \texttt{full} & Soft J1 & 2/5 & 0 & 0.812 \\
+\texttt{reflection-only} $\to$ \texttt{full} & Safety J1 & 0/0 & 5 & {--} \\
+\texttt{reflection-only} $\to$ \texttt{full} & Soft J2 & 4/5 & 0 & 0.188 \\
+\texttt{reflection-only} $\to$ \texttt{full} & Safety J2 & 0/1 & 4 & 1.000 \\
+\bottomrule
+\end{tabular}

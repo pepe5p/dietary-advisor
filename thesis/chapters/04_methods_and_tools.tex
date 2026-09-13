@@ -1,7 +1,7 @@
 \chapter{Review of methods and tools}
 \label{cha:methods-and-tools}
 
-Two themes recur across the choices below. The first is a preference for offline, version-pinned artefacts over live services: a food database queried dozens of times while composing a single plan cannot depend on a rate-limited network call, and a result set that changes underneath a running experiment cannot be reproduced. The second is that a component's correctness guarantees matter more than its raw performance wherever a wrong answer would be indistinguishable from a right one, which is why exact arithmetic and a validated schema are preferred. Concrete model identifiers appear in \Cref{cha:results}.
+Two themes recur across the choices below. The first is a preference for offline, version-pinned artefacts over live services: a food knowledge base queried dozens of times while composing a single plan cannot depend on a rate-limited network call, and a result set that changes underneath a running experiment cannot be reproduced. The second is that a component's correctness guarantees matter more than its raw performance wherever a wrong answer would be indistinguishable from a right one, which is why a validated schema is preferred over a convention the caller is trusted to follow. Each section names the alternatives that were considered and the reason one of them was carried into \Cref{cha:design}. Concrete model identifiers appear in \Cref{cha:results}.
 
 \section{Implementation platform}
 \label{sec:tools-platform}
@@ -15,11 +15,11 @@ Three broad approaches were available for orchestrating a language model that mu
 
 \begin{itemize}
     \item \textbf{Raw provider SDKs.} Offer maximum control and no framework dependency, but require re-implementing the same conversation-loop, retry and validation logic for every provider, since each provider's tool-calling wire format differs.
-    \item \textbf{General-purpose orchestration frameworks (e.g.\ LangChain, LangGraph).} Abstract over multiple providers and add constructs for multi-step or graph-structured workflows, at the cost of a large surface area aimed at use cases (long-running stateful graphs, complex branching) that this system's mostly linear pipeline (\Cref{sec:design-pipeline}) does not need. Their structured-output support has also historically been an add-on to a chat-completion abstraction.
-    \item \textbf{A schema-first, type-centric agent library (pydantic-ai).} Treats a strongly typed data-validation model as the primary interface for both structured output and tool signatures, delegates provider-specific formatting to per-provider adapters, and exposes an output-validator hook that can reject a structurally valid but semantically wrong response and trigger an automatic retry with an explanatory message.
+    \item \textbf{General-purpose orchestration frameworks (e.g.\ LangChain,\footnote{\url{https://python.langchain.com/} (accessed 2026-09-13).} LangGraph\footnote{\url{https://langchain-ai.github.io/langgraph/} (accessed 2026-09-13).}).} Abstract over multiple providers and add constructs for multi-step or graph-structured workflows, at the cost of a large surface area aimed at use cases (long-running stateful graphs, complex branching) that this system's mostly linear pipeline (\Cref{sec:design-pipeline}) does not need. Their structured-output support has also historically been an add-on to a chat-completion abstraction.
+    \item \textbf{A schema-first, type-centric agent library (pydantic-ai).\footnote{\url{https://ai.pydantic.dev/} (accessed 2026-09-13).}} Treats a strongly typed data-validation model as the primary interface for both structured output and tool signatures, delegates provider-specific formatting to per-provider adapters, and exposes an output-validator hook that can reject a structurally valid but semantically wrong response and trigger an automatic retry with an explanatory message.
 \end{itemize}
 
-pydantic-ai was chosen. Its output-validator hook is the mechanism the no-invented-foods contract in \Cref{sec:design-no-invented-foods} depends on directly: every plan is validated against the real food database before acceptance, and a failure produces a targeted retry, not a silent pass-through. Its provider adapters also make \ref{req:provider-agnostic}~(provider-agnostic model access) close to free, since switching the underlying model is a configuration change.
+pydantic-ai was chosen. Its output-validator hook is the mechanism the no-invented-foods contract in \Cref{sec:design-no-invented-foods} depends on directly: every plan is validated against the real food knowledge base before acceptance, and a failure produces a targeted retry, not a silent pass-through. Its provider adapters also make \ref{req:provider-agnostic}~(provider-agnostic model access) close to free, since switching the underlying model is a configuration change.
 
 \section{Model access}
 \label{sec:tools-model-access}
@@ -31,7 +31,7 @@ Contemporary reasoning models expose a second, independent control: a \emph{reas
 \section{Food composition data access}
 \label{sec:tools-food-data}
 
-A grounding strategy of the kind described in \Cref{sec:background-tool-use,sec:background-self-correction} is only as good as the knowledge base it grounds against. Two large, openly available sources cover complementary needs. The USDA FoodData Central Foundation Foods and SR Legacy datasets\footnote{\url{https://fdc.nal.usda.gov/} (accessed 2026-09-06).} provide laboratory-analysed nutrient profiles for generic, minimally processed foods, with broad applicability but no coverage of branded products. Open Food Facts\footnote{\url{https://world.openfoodfacts.org/} (accessed 2026-09-06).} is a crowd-sourced, international database of branded, packaged products; it has far denser coverage of packaged food, but far less consistent completeness of any individual nutrient field, since it depends on what each contributor transcribed. How the two are combined, and how an absent field is kept from silently becoming a zero, is taken up in \Cref{sec:design-food-db,sec:impl-missing-nutrients}.
+A grounding strategy of the kind described in \Cref{sec:background-tool-use,sec:background-self-correction} is only as good as the knowledge base it grounds against. Two large, openly available sources cover complementary needs. The USDA FoodData Central Foundation Foods and SR Legacy datasets\footnote{\url{https://fdc.nal.usda.gov/} (accessed 2026-09-13).} provide laboratory-analysed nutrient profiles for generic, minimally processed foods, with broad applicability but no coverage of branded products. Open Food Facts\footnote{\url{https://world.openfoodfacts.org/} (accessed 2026-09-13).} is a crowd-sourced, international database of branded, packaged products; it has far denser coverage of packaged food, but far less consistent completeness of any individual nutrient field, since it depends on what each contributor transcribed. How the two are combined, and how an absent field is kept from silently becoming a zero, is taken up in \Cref{sec:design-food-db,sec:impl-missing-nutrients}.
 
 Each source can be accessed through a live query API or a bulk offline export. A live API always reflects the provider's latest data, but introduces a network dependency and rate limits into every food lookup, which a system that may issue dozens of lookups per plan cannot tolerate on latency or reliability grounds. A commercial nutrition data API was also considered, but rejected on licensing and reproducibility grounds: a bulk offline export can be version-pinned and redistributed alongside the results it produced, which a commercial API's licence terms and rate limits make difficult. Bulk offline exports of both sources were chosen, downloaded once during a setup step (\Cref{sec:design-food-db}) and never queried live at request time.
 
@@ -41,71 +41,66 @@ Each source can be accessed through a live query API or a bulk offline export. A
 The food knowledge base must support three access patterns: exact and fuzzy text search over food names, similarity search over a per-food embedding vector, and relational lookups by identifier. Three engines were compared.
 
 \begin{itemize}
-    \item \textbf{SQLite with the FTS5 extension.} Zero-configuration and sufficient for lexical search, but with no first-party vector index; nearest-neighbour search would need a separate extension of uneven maturity.
-    \item \textbf{PostgreSQL with the pgvector extension.} A mature relational database with full-text and vector search as extensions, and the natural choice under concurrent multi-client write traffic -- but a server process to provision and keep running, disproportionate for a dataset built once during setup and only ever read.
-    \item \textbf{DuckDB~\cite{raasveldt2019duckdb}, an embedded, single-file analytical database with first-class full-text and vector similarity extensions.} Requires no server process, ships with a mature Python binding, and is optimised for the read-mostly analytical queries (fuzzy text match plus vector distance, fused into one ranked result set) this system performs.
+    \item \textbf{SQLite with the FTS5 extension.\footnote{\url{https://www.sqlite.org/fts5.html} (accessed 2026-09-13).}} Zero-configuration and sufficient for lexical search, but with no first-party vector index; nearest-neighbour search would need a third-party extension, versioned and tested outside the engine itself.
+    \item \textbf{PostgreSQL with the pgvector extension.\footnote{\url{https://github.com/pgvector/pgvector} (accessed 2026-09-13).}} A mature relational database with full-text and vector search as extensions, and the natural choice under concurrent multi-client write traffic -- but a server process to provision and keep running, disproportionate for a dataset built once during setup and only ever read.
+    \item \textbf{DuckDB~\cite{raasveldt2019duckdb}.} An embedded analytical database that requires no server process, ships with a Python binding, and is optimised for read-mostly analytical queries. Full-text search and vector similarity are later first-party extensions~\cite{duckdb2026fts,duckdb2026vss}, not part of the 2019 system the paper introduces.
 \end{itemize}
 
-DuckDB was chosen. Its single-file, embedded model matches a food database built once offline and shipped read-only, and its native extensions cover both retrieval channels of \Cref{sec:tools-retrieval} without a second engine.
+DuckDB was chosen. Its embedded model matches a food knowledge base built once offline and shipped read-only, and the two extensions cover both retrieval channels of \Cref{sec:tools-retrieval} without a second engine.
 
 \section{Hybrid retrieval strategy}
 \label{sec:tools-retrieval}
 
-Searching the food knowledge base for, say, ``mozzarella'' must succeed whether the query is an exact lexical match for a product name or a semantic near-match for a differently worded description. Two retrieval families address these cases with complementary strengths.
+Searching the food knowledge base for, say, \enquote{mozzarella} must succeed whether the query is an exact lexical match for a product name or a semantic near-match for a differently worded description. Two retrieval families address these cases with complementary strengths.
 
-Lexical ranking (the BM25 scoring function~\cite{robertson2009probabilistic}) is fast and needs no learned model, but is blind to synonymy: a query for ``courgette'' will not match a product labelled only ``zucchini''. Dense retrieval, embedding query and catalogue entries into one vector space and ranking by similarity, captures such semantic relationships, but can under-rank a close lexical match that embeds slightly off-distribution, and is more expensive to compute and index.
+Lexical ranking (the BM25 scoring function~\cite{robertson2009probabilistic}) is fast and needs no learned model, but is blind to synonymy: a query for \enquote{courgette} will not match a product labelled only \enquote{zucchini}. Dense retrieval, embedding query and catalogue entries into one vector space and ranking by similarity, captures such semantic relationships, but can under-rank a close lexical match that embeds slightly off-distribution, and is more expensive to compute and index.
 
-Combining the two rankings requires a fusion strategy. Score-based fusion (a weighted sum of raw similarity scores) requires normalising the scores onto a comparable scale, which is fragile because BM25 and cosine-similarity scores have different, corpus-dependent distributions. Reciprocal rank fusion sidesteps this by combining only each result's \emph{rank} within its own list, via $\mathrm{RRF}(d) = \sum_i \frac{1}{k + \mathrm{rank}_i(d)}$ summed over each list $i$ a document $d$ appears in, with $k$ a small constant (conventionally 60) discounting low ranks; it was shown to consistently outperform both individual rankings and a more complex ranking-committee alternative across several benchmarks, without training data or score calibration~\cite{cormack2009reciprocal}. It was chosen for exactly this rank-only, calibration-free property.
+Combining the two rankings requires a fusion strategy. Score-based fusion (a weighted sum of raw similarity scores) requires normalising the scores onto a comparable scale, which is fragile because BM25 and cosine-similarity scores have different, corpus-dependent distributions. Reciprocal rank fusion sidesteps this by combining only each result's \emph{rank} within its own list, via $\mathrm{RRF}(d) = \sum_i \frac{1}{k + \mathrm{rank}_i(d)}$ summed over each list $i$ a document $d$ appears in, with $k$ a small constant (conventionally \num{60}) that dampens the impact of a single high ranking. Without training data or score calibration it exceeded Condorcet Fuse on every reported collection and CombMNZ on all but two: CombMNZ was ahead by \num{0.003} mean average precision on TREC~3, for which no per-collection significance test is reported, and by a margin the authors put at $p \approx \num{0.2}$ on LETOR~3. It also outperformed the best individual ranking in each experiment except TREC~9, where that ranking was produced with a human in the loop~\cite{cormack2009reciprocal}. It was chosen for exactly this rank-only, calibration-free property.
 
 \Cref{fig:diagram-rrf-example} works the formula through on one query. Beyond calibration-freedom, it exposes the decisive behaviour: a candidate both channels rank highly is more likely the intended food than one a single channel ranks first, and rank-only fusion prefers it without being told to. \Cref{sec:design-hybrid-search} describes the scheme as wired into the lookup tool.
 
 \begin{figure}[htbp]
     \centering
-    \resizebox{\textwidth}{!}{\input{images/diagrams/rrf_example.tex}}
-    \caption{Reciprocal rank fusion worked through on one query.}
+    \resizebox{0.92\textwidth}{!}{\input{images/diagrams/rrf_example.tex}}
+    \caption{Reciprocal rank fusion on a mozzarella query.}
     \label{fig:diagram-rrf-example}
 \end{figure}
 
 \section{Embedding model and vector index}
 \label{sec:tools-embeddings}
 
-Dense retrieval requires an embedding model to turn a food description into a vector, and an index to search that vector space at scale. For the index, Hierarchical Navigable Small World graphs (HNSW) were chosen over a brute-force scan: HNSW answers a query in logarithmic instead of linear time in catalogue size, at a small, tunable cost in recall~\cite{malkov2018efficient}, and is a native index type in the storage engine of \Cref{sec:tools-storage}, avoiding a second vector database.
+Dense retrieval requires an embedding model to turn a food description into a vector, and an index to search that vector space at scale. For the index, Hierarchical Navigable Small World graphs (HNSW) were chosen over a brute-force scan: under the paper's bounded-degree assumptions the query cost grows logarithmically, not linearly, with the size of the knowledge base, at a small, tunable cost in recall~\cite{malkov2018efficient}. Those assumptions were demonstrated on low-dimensional data; this catalogue uses 1024-dimensional embeddings, so the practical gain is sub-linear search with a native index type in the storage engine of \Cref{sec:tools-storage}, avoiding a second vector database.
 
-For the embedding model, three options existed: a hosted embedding API, a small English-only local model, and a larger multilingual local model. A hosted API was rejected for the same latency and reproducibility reasons as a live food-data API in \Cref{sec:tools-food-data}. A small English-only model would be cheapest to run but would degrade on the many non-English names in an internationally sourced catalogue. A multilingual model capable of dense, sparse and multi-vector retrieval from one set of weights, trained to generalise across more than a hundred languages and document lengths~\cite{chen2024bgem3}, was chosen instead, run locally so that embedding the catalogue during setup and embedding a query at request time both stay off the network.
-
-\section{Deterministic nutrient aggregation}
-\label{sec:tools-aggregation}
-
-Once food quantities have been resolved to real database entries, their nutrient contributions must be summed. Three ways were considered. Floating-point arithmetic is fast, but accumulates rounding error across the dozens of additions and unit-scaling multiplications a day's plan requires -- exactly the silent numeric drift a system built to eliminate LLM-introduced drift should not reintroduce at the verification layer. A mixed-integer linear programming solver, of the kind reviewed in \Cref{sec:background-diet-optimisation}, would let the aggregator double as an optimiser, but was rejected as disproportionate: the model already proposes concrete recipes and quantities, leaving no decision variable to optimise over, only a sum to compute. Exact rational arithmetic, representing every quantity as an exact fraction, was chosen instead: it costs a small, bounded amount of extra computation and eliminates rounding error entirely, so any residual error between a delivered and a targeted total is attributable to food choices and quantities, never to the arithmetic that scored them.
+For the embedding model, three options existed: a hosted embedding API, a small English-only local model, and a larger multilingual local model. A hosted API was rejected for the same latency and reproducibility reasons as a live food-data API in \Cref{sec:tools-food-data}. A small English-only model would be cheapest to run but would degrade on the many non-English names in an internationally sourced catalogue. BGE-M3, a multilingual model capable of dense, sparse and multi-vector retrieval from one set of weights, trained to generalise across more than a hundred languages and document lengths~\cite{chen2024bgem3}, was chosen instead, run locally so that embedding the catalogue during setup and embedding a query at request time both stay off the network.
 
 \section{Self-correction scheme}
 \label{sec:tools-self-correction}
 
-\Cref{sec:background-self-correction} identified two points on a spectrum of self-correction: a critique-and-refine loop grounded in a model's own re-reading of its output, and one grounded in feedback from an external tool. A fully tool-grounded critic, in the style of \textsc{CRITIC}~\cite{gou2024critic}, able to issue its own food-database lookups, was considered but set aside for a narrower design: the critic is tool-less but is still shown the deterministic totaller's output when the totaller is enabled. This keeps most of the grounding benefit while giving the critic a fixed, predictable set of inputs and not the ability to trigger unbounded retrieval. \Cref{sec:design-reflection} describes the resulting loop, and \Cref{cha:results} reports how much of the grounding gain survives when the critic, not only the generator, sees the computed totals.
+\Cref{sec:background-self-correction} identified two points on a spectrum of self-correction: a critique-and-refine loop grounded in a model's own re-reading of its output, and one grounded in feedback from an external tool. A fully tool-grounded critic, in the style of \textsc{CRITIC}~\cite{gou2024critic}, whose review is checked against external tool feedback, was considered but set aside for a narrower design: the critic is tool-less but is still shown the deterministic totaller's output when the totaller is enabled. This keeps most of the grounding benefit while giving the critic a fixed, predictable set of inputs and not the ability to trigger unbounded retrieval. \Cref{sec:design-reflection} describes the resulting loop, and \Cref{cha:results} reports how much of the grounding gain survives when the critic, not only the generator, sees the computed totals.
 
-\Cref{fig:diagram-self-correction} traces each self-correcting configuration over a single run, beside the reference design.
+\Cref{fig:diagram-self-correction} traces the reference design beside the three ablation variants of this thesis, one of which has no review loop.
 
 \begin{figure}[htbp]
     \centering
-    \resizebox{0.92\textwidth}{!}{\input{images/diagrams/self_correction.tex}}
-    \caption{Each self-correcting configuration over one run, beside the reference design.}
+    \resizebox{\textwidth}{!}{\input{images/diagrams/self_correction.tex}}
+    \caption{Critique-and-refine configurations used in this thesis compared with CRITIC design.}
     \label{fig:diagram-self-correction}
 \end{figure}
 
 \section{Evaluation tooling}
 \label{sec:tools-evaluation}
 
-The evaluation harness needs three capabilities distinct from the runtime it evaluates: driving a large, resumable grid of pipeline runs across models, configurations and scenarios; scoring both the numeric and open-ended, natural-language aspects of a run; and turning the scores into readable summaries and figures. It was built as a separate command-line application, following the package-layering rule that keeps evaluation-only code out of the runtime path (\Cref{sec:design-layering}). The qualitative scoring stage reuses the schema-first agent framework of \Cref{sec:tools-agent-framework}, configured with a per-criterion rubric and following the G-Eval pattern of \Cref{sec:background-evaluation}. The judge protocol is specified in \Cref{sec:methodology-qualitative}.
+The evaluation harness needs three capabilities distinct from the runtime it evaluates: driving a large, resumable grid of pipeline runs across models, configurations and scenarios; scoring both the numeric and open-ended, natural-language aspects of a run; and turning the scores into readable summaries and figures. It was built as a separate command-line application, following the package-layering rule that keeps evaluation-only code out of the runtime path (\Cref{sec:design-layering}). The qualitative scoring stage reuses the schema-first agent framework of \Cref{sec:tools-agent-framework}, configured with a per-criterion rubric and following the G-Eval pattern of \Cref{sec:background-evaluation}. The judge protocol is specified in \Cref{sec:methodology-judge-protocol}.
 
 \section{Summary of the choices made}
 \label{sec:tools-summary}
 
-\Cref{tab:tool-choices} collects every decision above alongside the alternatives it was chosen over.
+The decisions of this chapter are the contract the design in \Cref{cha:design} is written against. Each row of \Cref{tab:tool-choices} names the component that later chapters treat as given, and the alternative it was chosen over, so that a later change of tool can be traced to a rejected option and not to an unspoken default. Two preferences run through the table. Offline, version-pinned artefacts were preferred wherever a live service would make a grid irreproducible. Correctness guarantees were preferred wherever a wrong answer would be indistinguishable from a right one. Those preferences, and not raw throughput, are why the chapters that follow assume an embedded food knowledge base, offline bulk data, and a schema-first agent framework.
 
 \begin{table}[htbp]
     \centering
     \small
     \input{images/diagrams/tool_choices.tex}
-    \caption{Technology decisions of this chapter: the alternatives rejected and the choice carried into \Cref{cha:design}.}
+    \caption{Technology decisions carried into \Cref{cha:design}.}
     \label{tab:tool-choices}
 \end{table}

@@ -1,28 +1,28 @@
 \chapter{One complete session}
 \label{cha:worked-example}
 
-This appendix walks through one run of the pipeline of \Cref{cha:design}. It is the \emph{regular} scenario (\Cref{sec:methodology-scenarios}: fixed macro targets -- roughly 2728~kcal, 124.8~g protein, 386.7~g carbohydrate, 75.8~g fat -- and no free-form request), planned by \texttt{gemini-3.7-flash} with the totaller and reflection loop active. It is illustrative, not a measurement; systematic figures belong to \Cref{cha:results}.
+This appendix walks through one run of the pipeline of \Cref{cha:design}, in the order the pipeline itself takes: a lookup, the plan the model emitted from it, the hydrated result, the day's totals against target, the coverage caveats attached to them, and the explanation delivered alongside. It is the \texttt{regular} scenario (\Cref{sec:methodology-scenarios}: fixed macro targets of roughly \qty{2728}{\kcal}, \qty{124.8}{\gram} protein, \qty{386.7}{\gram} carbohydrate and \qty{75.8}{\gram} fat, and no free-form request), planned by \texttt{gemini-3.7-flash} at high effort with the totaller and reflection loop active. It is illustrative, not a measurement; systematic figures belong to \Cref{cha:results}.
 
-\Cref{lst:example-lookup} shows the lookup tool's response to a query for \texttt{rolled oats}, capped at one hit per source. It returns both channels at once -- a branded Polish Open Food Facts entry and a generic USDA one -- each with per-100~g nutrients and the source-prefixed \texttt{code} the agent must copy verbatim.
+\Cref{lst:example-lookup} shows the lookup tool's response to a query for \texttt{rolled oats}, trimmed to one hit per source for typesetting. It returns both channels at once -- a branded Polish Open Food Facts entry and a generic USDA one -- each with per-\qty{100}{\gram} nutrients and the source-prefixed \texttt{code} the agent must copy verbatim. The listing is valid JSON: the raw tool payload's ellipsis markers and raw HTML in \texttt{ingredients\_text} were removed so it can be typeset as a listing.
 
-\lstinputlisting[caption={The lookup tool's JSON response for one query, one hit per source.},label={lst:example-lookup}]{listings/example_lookup.json}
+\lstinputlisting[caption={Lookup response for \texttt{rolled oats}, reformatted for typesetting.},label={lst:example-lookup}]{listings/example_lookup.json}
 
-\Cref{lst:example-plan} shows the breakfast meal as the model emitted it: each portion a reference (code, name, grams), with no nutrient values. This single meal mixes both catalogues -- Open Food Facts codes for the Polish branded oats, milk and honey, USDA codes for the generic chia, apple, walnuts and cinnamon.
+From hits like these the model composes the day. \Cref{lst:example-plan} shows the breakfast meal as it emitted it: each portion a reference (code, name, grams), with no nutrient values. This single meal mixes both catalogues -- Open Food Facts codes for the Polish branded oats, milk and honey, USDA codes for the generic chia, apple, walnuts and cinnamon.
 
-\lstinputlisting[caption={The breakfast meal as the nutrition agent emitted it: references only, plus preparation instructions.},label={lst:example-plan}]{listings/example_plan.json}
+\lstinputlisting[caption={Breakfast plan as emitted (references only).},label={lst:example-plan}]{listings/example_plan.json}
 
-Hydration resolves every reference to a database row and runs the totaller, filling in the numbers. \Cref{tab:example-breakfast-items} shows the same breakfast meal after that step; the output carries an equivalent breakdown for every meal.
+Hydration then resolves every reference to a food knowledge base row and runs the totaller, filling in the numbers. \Cref{tab:example-breakfast-items} shows the same breakfast meal after that step; the output carries an equivalent breakdown for every meal.
 
 \begin{table}[htbp]
     \centering
     \footnotesize
     \setlength{\tabcolsep}{3pt}
     \input{tables/example_breakfast_items.tex}
-    \caption{The breakfast meal after hydration: per-portion masses, macronutrients, meal total, and micronutrients. Long names are trimmed.}
+    \caption[Hydrated breakfast totals.]{The breakfast meal after hydration. Each row is rounded independently, so a meal total need not equal the sum of the displayed portion figures.}
     \label{tab:example-breakfast-items}
 \end{table}
 
-\Cref{tab:example-mealplan} gives the whole plan, one row per meal, with products, meal totals and recipe.
+\Cref{tab:example-mealplan} gives the whole plan the same way, one row per meal, with products, meal totals and recipe.
 
 \begin{table}[htbp]
     \centering
@@ -30,31 +30,31 @@ Hydration resolves every reference to a database row and runs the totaller, fill
     \setlength{\tabcolsep}{4pt}
     \renewcommand{\arraystretch}{1.15}
     \input{tables/example_mealplan.tex}
-    \caption{The full meal plan: one row per meal, with products, energy and macronutrient totals, and recipe. Product lists and recipes are trimmed (\texttt{[\ldots]}).}
+    \caption[Full-day meal plan (trimmed).]{The full meal plan: one row per meal, with products, energy and macronutrient totals, and recipe. Product lists and recipes are trimmed (\texttt{[\ldots]}).}
     \label{tab:example-mealplan}
 \end{table}
 
-Energy, protein and fat land within about a percent of target and carbohydrate within a few percent (\Cref{tab:example-totals}); the reflection loop reported no issues and ran zero refinement passes. Fiber sits well above target but is kept out of the macro error metrics as the nutrient most often missing from a crowd-sourced record (\Cref{sec:impl-missing-nutrients}).
+Summed over the day, energy, protein and fat land within about a percent of target and carbohydrate within a few percent (\Cref{tab:example-totals}); the reflection loop reported no issues and ran zero refinement passes. Fibre is reported per nutrient but is not part of the macro error metrics.
 
 \begin{table}[htbp]
     \centering
     \footnotesize
     \input{tables/example_totals.tex}
-    \caption{The day's nutrient totals against the run's macro targets. A dash marks an untargeted nutrient.}
+    \caption[Day totals vs targets.]{The day's nutrient totals against the run's macro targets. A dash marks an untargeted nutrient. Meal-level carbohydrate figures in \Cref{tab:example-mealplan} sum to \qty{397.4}{\gram}; the day total here is \qty{397.5}{\gram} because each figure is rounded independently. Salt is a coverage-incomplete field, not a conversion of the sodium total; see \Cref{tab:example-caveats}.}
     \label{tab:example-totals}
 \end{table}
 
-The totaller also reports which totals are understated because a food leaves a nutrient blank (\Cref{tab:example-caveats}). Salt is flagged across the twenty USDA foods that do not model it, and the Open Food Facts milk, honey and skyr for the micronutrients they leave blank.
+Those totals do not stand alone. The totaller also reports which of them are understated because a food leaves a nutrient blank (\Cref{tab:example-caveats}). Salt is flagged across the twenty USDA foods that do not model it, and the Open Food Facts milk, honey and skyr for the micronutrients they leave blank.
 
 \begin{table}[htbp]
     \centering
     \footnotesize
     \input{tables/example_caveats.tex}
-    \caption{Data-coverage caveats: per nutrient, the number of plan foods with no value, their share of plan mass, and the understated total.}
+    \caption[Nutrient coverage caveats.]{Data-coverage caveats: per nutrient, the number of plan foods with no value, their share of plan mass, and the understated total.}
     \label{tab:example-caveats}
 \end{table}
 
-The output also carries the plan's \emph{rationale} field (\Cref{fig:example-rationale}): an opening summary, dietary choices, and a supplementation section. The last is the kind of note the agent's prompt was extended to invite (\Cref{sec:impl-prompt-fixes}); here it flags vitamin~D as under-covered by food alone, citing the day's total of about 1.3~$\mu$g.
+Finally, the output carries the plan's \emph{rationale} field (\Cref{fig:example-rationale}): an opening summary, dietary choices, and a supplementation section. The last is the kind of note the agent's prompt was extended to invite (\Cref{sec:impl-prompt-fixes}); here it flags vitamin~D as under-covered by food alone, citing the day's total of about \qty{1.3}{\micro\gram}. That figure is the model's own prose, not a field the system reports as data, and nothing downstream parses it (\Cref{sec:design-no-invented-foods}).
 
 \begin{figure}[htbp]
     \centering
@@ -63,6 +63,6 @@ The output also carries the plan's \emph{rationale} field (\Cref{fig:example-rat
         \textbf{Rationale:}\\[0.4em]
         \input{listings/example_rationale.tex}
     \end{minipage}
-    \caption{Opening of the patient-facing rationale, trimmed to the start of each section (\texttt{[\ldots]}).}
+    \caption[Plan rationale (trimmed).]{Opening of the patient-facing rationale, trimmed to the start of each section (\texttt{[\ldots]}) and reformatted for typesetting.}
     \label{fig:example-rationale}
 \end{figure}

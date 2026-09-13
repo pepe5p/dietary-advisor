@@ -37,7 +37,7 @@
     {query: \texttt{mozzarella}};
 
 \node[box, anchor=north] (rrf) at ($(lex.south)!0.5!(dense.south) + (0mm, -14mm)$)
-    {$\sum_i \frac{1}{60 + \mathrm{rank}_i(d)}$};
+    {$\sum_i \frac{1}{k + \mathrm{rank}_i(d)}$, $k = 60$};
 \node[title, anchor=south] at ($(rrf.north) + (0mm, 1.5mm)$) {Reciprocal rank fusion};
 
 \draw[arr] (lex.south) |- (rrf.west);

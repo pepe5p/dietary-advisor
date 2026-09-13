@@ -1,7 +1,7 @@
 \chapter{Implementation: challenges and solutions}
 \label{cha:implementation}
 
-Building the system surfaced problems not visible at the design stage. Most difficulties were a component quietly producing something that looked right, and most solutions removed the opportunity to be wrong instead of adding an instruction not to be.
+Building the system surfaced problems not visible at the design stage. Most difficulties came from a component quietly producing something that looked right -- an invented nutrient in a typed field, a missing fibre value treated as zero, a lookup tool that cost a round trip per ingredient. Most solutions removed the opportunity to be wrong instead of to the model system prompt. The sections below take those problems in the order they appeared.
 
 \section{Keeping nutrients out of the model's output}
 \label{sec:impl-portion-ref}
@@ -10,7 +10,7 @@ The first output schema included a nutrient breakdown alongside every portion, t
 
 \begin{figure}[htbp]
     \centering
-    \resizebox{0.85\textwidth}{!}{\input{images/diagrams/portion_schema.tex}}
+    \input{images/diagrams/portion_schema.tex}
     \caption{The portion schema before and after.}
     \label{fig:diagram-portion-schema}
 \end{figure}
@@ -24,81 +24,81 @@ Because Open Food Facts is crowd-sourced (\Cref{sec:tools-food-data}), its raw e
 
 USDA FoodData Central is the opposite artefact: a laboratory-curated dataset in which a record lists the nutrients actually assayed. An absent nutrient there means the food does not meaningfully contain it, so it is read as a real zero. Missing values are therefore interpreted by source -- unknown for Open Food Facts, zero for USDA -- with the sole exception of a nutrient USDA does not model as a column (salt, which it reports only as sodium), which stays unknown.
 
-The aggregation layer must not flatten this distinction. Treating every absent field as zero when summing understates an Open Food Facts total while making it look like a real, complete measurement: a fibre total reading \qty{8}{\gram} because half the ingredients have no fibre data on file is indistinguishable, from the number alone, from a plan genuinely containing \qty{8}{\gram} of fibre. The totaller instead tracks, per nutrient, which portions carry no recorded value (by ingredient and by share of total mass), and reports the total with a coverage warning whenever any contributing food is missing data, naming up to three of the largest offending foods by mass so a downstream reader -- a human or the critic in the reflection loop -- knows which total to distrust and by how much. Because a USDA absence resolves to a genuine zero, these warnings fire almost only on the Open Food Facts half of the catalogue, where the real uncertainty lives. \Cref{alg:coverage} sketches the computation.
+The aggregation layer must not flatten this distinction. Treating every absent field as zero when summing understates an Open Food Facts total while making it look like a real, complete measurement: a fibre total reading \qty{8}{\gram} because half the ingredients have no fibre data on file is indistinguishable, from the number alone, from a plan genuinely containing \qty{8}{\gram} of fibre. The totaller instead tracks, per nutrient, which portions carry no recorded value (by ingredient and by share of total mass), and reports the total with a coverage warning whenever any contributing food is missing data, naming up to three of the offending foods so a downstream reader -- a human or the critic in the reflection loop -- knows which total to distrust and by how much. Because a USDA absence resolves to a genuine zero, these warnings fire almost only on the Open Food Facts half of the catalogue, where the real uncertainty lives. \Cref{alg:coverage} sketches the computation.
 
 \begin{algorithm}[htbp]
-\caption{Coverage-aware nutrient total with per-nutrient warnings}
+\caption{Coverage-aware nutrient total with per-nutrient warnings.}
 \label{alg:coverage}
 \begin{algorithmic}[1]
-\Function{TotalWithWarnings}{$portions$}
-    \State $totals \gets$ empty map from nutrient to exact rational sum
-    \State $missingMass \gets$ empty map from nutrient to (total mass, list of foods)
-    \For{each $portion$ in $portions$}
-        \For{each $nutrient$ tracked}
-            \If{$portion.food$ has a value for $nutrient$}
-                \State $totals[nutrient] \gets totals[nutrient] + portion.food[nutrient] \times \frac{portion.grams}{100}$
+\Function{TotalWithWarnings}{$\mathit{portions}$}
+    \State $\mathit{totals} \gets$ empty map from nutrient to exact rational sum
+    \State $\mathit{missingMass} \gets$ empty map from nutrient to (total mass, list of foods)
+    \For{each $\mathit{portion}$ in $\mathit{portions}$}
+        \For{each $\mathit{nutrient}$ tracked}
+            \If{$\mathit{portion}.\mathit{food}$ has a value for $\mathit{nutrient}$}
+                \State $\mathit{totals}[\mathit{nutrient}] \gets \mathit{totals}[\mathit{nutrient}] + \mathit{portion}.\mathit{food}[\mathit{nutrient}] \times \mathit{portion}.\mathit{grams} / 100$
             \Else
-                \State record $portion.grams$ and $portion.food.name$ under $missingMass[nutrient]$
+                \State record $\mathit{portion}.\mathit{grams}$ and $\mathit{portion}.\mathit{food}.\mathit{name}$ under $\mathit{missingMass}[\mathit{nutrient}]$
             \EndIf
         \EndFor
     \EndFor
-    \State $warnings \gets$ empty list
-    \For{each $nutrient$ with a nonempty $missingMass[nutrient]$}
+    \State $\mathit{warnings} \gets$ empty list
+    \For{each $\mathit{nutrient}$ with a nonempty $\mathit{missingMass}[\mathit{nutrient}]$}
         \State $\mathit{share} \gets$ missing mass as a fraction of the plan's total mass
-        \State append a warning naming $nutrient$, $\mathit{share}$, and up to three foods from $missingMass[nutrient]$
+        \State append a warning naming $\mathit{nutrient}$, $\mathit{share}$, and up to three foods from $\mathit{missingMass}[\mathit{nutrient}]$
     \EndFor
-    \State \Return $(totals, warnings)$
+    \State \Return $(\mathit{totals}, \mathit{warnings})$
 \EndFunction
 \end{algorithmic}
 \end{algorithm}
 
-Because the totaller uses the exact rational arithmetic of \Cref{sec:tools-aggregation}, a reported total differs from a complete measurement only by the contribution of the foods listed as missing, never by a compounding rounding error.
+Because the totaller uses exact rational arithmetic (\Cref{sec:design-totaller}), the foods listed as missing are the only thing standing between a reported total and a complete measurement, with no rounding term to reason about alongside them.
 
 \section{Choosing what text to embed per entry}
 \label{sec:impl-hybrid-search}
 
-The hybrid retrieval strategy -- a lexical channel, a dense channel, and reciprocal rank fusion over the two -- was settled in \Cref{sec:tools-retrieval} and wired into the lookup tool in \Cref{sec:design-hybrid-search}. What building the index forced a decision on is which text is fed to the embedding model per catalogue entry, since the dense channel is only as good as the string it embeds. Embedding only the product name discarded signal a name alone does not carry (a category, a brand); embedding the entire raw record diluted the vector with crowd-sourced noise (placeholder text, inconsistent formatting, untranslated languages in description fields). The document embedded per Open Food Facts entry is instead a short curated sentence assembled from the fields most likely to carry a food's identity -- English name, Polish name where it differs, a category phrase, and the brand -- so a mozzarella product reads as ``Mozzarella (Mozzarella light). A mozzarella product by Galbani.'' The USDA document is the analogous concatenation of description and category. The ingredient list, though shown truncated to the model on a lookup hit, is left out of the embedded text, since it is the noisiest field and the one most likely to pull an entry's vector toward an unrelated cluster.
+The hybrid retrieval strategy -- a lexical channel, a dense channel, and reciprocal rank fusion over the two -- was settled in \Cref{sec:tools-retrieval} and wired into the lookup tool in \Cref{sec:design-hybrid-search}. What building the index forced a decision on is which text is fed to the embedding model per catalogue entry, since the dense channel is only as good as the string it embeds. Embedding only the product name discarded signal a name alone does not carry (a category, a brand); embedding the entire raw record diluted the vector with crowd-sourced noise (placeholder text, inconsistent formatting, untranslated languages in description fields). The document embedded per Open Food Facts entry is instead a short curated sentence assembled from the fields most likely to carry a food's identity -- English name, Polish name where it differs, a category phrase, and the brand -- so a mozzarella product reads as \enquote{Mozzarella (Mozzarella light). A mozzarella product by Galbani.} The USDA document is the analogous concatenation of description and category. The ingredient list, though shown truncated to the model on a lookup hit, is left out of the embedded text, since it is the noisiest field and the one most likely to pull an entry's vector toward an unrelated cluster.
 
 \section{Tool ergonomics under a limited context budget}
 \label{sec:impl-tool-ergonomics}
 
-An early version of the lookup tool accepted one query per call. What makes that costly is the shape of a single tool call, drawn in \Cref{fig:diagram-tool-call-loop}: the runner sends the entire conversation to the model provider, the provider replies with a tool call and generation halts, the runner executes the lookup locally against DuckDB, and then the runner sends the entire conversation \emph{again} -- now longer by the tool call and its result -- back over the network for generation to resume. The two provider hops each re-upload the whole, growing conversation; the local database hop is negligible. Looking up ingredients one at a time therefore pays a full pair of network round trips per ingredient, and a single day's meals needs dozens.
+An early version of the lookup tool accepted one query per call. What makes that costly is the shape of a single tool call, drawn in \Cref{fig:diagram-tool-call-loop}. The runner sends the entire conversation to the model provider; the provider replies with a tool call and generation halts; the runner executes the lookup locally against DuckDB; then the runner sends the entire conversation \emph{again} -- now longer by the tool call and its result -- back over the network for generation to resume. The two provider hops each re-upload the whole, growing conversation. The local database hop is shorter than either of those, and is not what dominates the cost. Looking up ingredients one at a time therefore pays a full pair of network round trips per ingredient, and a single day's meals needs dozens.
 
 \begin{figure}[htbp]
     \centering
-    \resizebox{\textwidth}{!}{\input{images/diagrams/tool_call_loop.tex}}
+    \input{images/diagrams/tool_call_loop.tex}
     \caption{One food-lookup tool call.}
     \label{fig:diagram-tool-call-loop}
 \end{figure}
 
-The tool was changed to accept a batch of queries at once -- up to fifty per call -- so all of a meal's ingredients resolve in one round trip. Because the interface permits but does not compel this, the prompt reinforces it: the nutrition agent is instructed to ``search every ingredient in one batched \texttt{lookup\_foods} call'' and, where a follow-up is unavoidable, to ``minimize the number of follow-up calls'' by running them in bulk. A related change concerned the response shape: an early version returned a natural-language summary of the top matches, which the model parsed less reliably into exact codes and gram-scaled nutrient values than a compact, uniformly structured JSON result; the response format was switched to JSON. Finally, because a batch can request unboundedly many results, hits per query were capped -- a default of two per source and a hard ceiling above it -- trading a small risk of missing a marginally better match for a bounded contribution to the context budget.
+The tool was changed to accept a batch of queries at once -- up to fifty per call -- so all of a meal's ingredients resolve in one round trip. Because the interface permits but does not compel this, the prompt reinforces it: the nutrition agent is instructed to \enquote{Search every ingredient in one batched \texttt{lookup\_foods} call; re-search whatever did not match.} and, where a follow-up is unavoidable, to \enquote{minimize the number of follow-up calls.} A related change concerned the response shape: an early version returned a natural-language summary of the top matches, which the model parsed less reliably into exact codes and gram-scaled nutrient values than a compact, uniformly structured JSON result; the response format was switched to JSON. Finally, because a batch can request unboundedly many results, hits per query were capped -- a default of two per source and a hard ceiling above it -- trading a small risk of missing a marginally better match for a bounded contribution to the context budget.
 
 \section{Tuning the critique-and-refine loop}
 \label{sec:impl-critic-design}
 
-The loop's division of labour -- a tool-less, read-only critic that lists issues, and a separate refiner that acts on them -- was fixed in the design (\Cref{sec:tools-self-correction,sec:design-reflection}); what building it left open was how many refinement passes to allow, and what to do if the pair has not converged by then. An unbounded loop was rejected, since nothing guarantees a critic and refiner will ever agree and an unbounded budget is incompatible with \ref{req:interactive-runtime}. A fixed cap of three passes was chosen, falling back to the last refined plan if the cap is reached with issues outstanding. Three was chosen for two practical reasons. Each pass adds a full critic and refiner round trip, and reflection already roughly triples a run's wall-clock time and token spend (\Cref{sec:results-overhead}), so a larger cap would put a session outside \ref{req:interactive-runtime} and multiply the paid model usage an evaluation grid consumes beyond this project's budget. Within that limit, reading generated plans suggested three passes are usually enough: the objections a refiner can act on tend to be raised and resolved early.
+The loop's division of labour -- a tool-less, read-only critic that lists issues, and a separate refiner that acts on them -- was fixed in the design (\Cref{sec:tools-self-correction,sec:design-reflection}); what building it left open was how many refinement passes to allow, and what to do if the pair has not converged by then. An unbounded loop was rejected, since nothing guarantees a critic and refiner will ever agree and an unbounded budget is incompatible with \ref{req:interactive-runtime}. A fixed cap of three passes was chosen, falling back to the last refined plan if the cap is reached with issues outstanding. Three was chosen for two practical reasons. Each pass adds a full critic and refiner round trip, and reflection already roughly triples a run's wall-clock time and token spend (\Cref{def:token-spend,sec:results-overhead}), so a larger cap would put a session outside \ref{req:interactive-runtime} and multiply the paid model usage an evaluation grid consumes beyond this project's budget. Within that limit, reading generated plans suggested three passes are usually enough: the objections a refiner can act on tend to be raised and resolved early.
 
-A second question -- whether the critic should use a stronger model than the generator -- was investigated only partially. Using one model for generation, feedback and revision is the configuration the \textsc{Self-Refine} result this loop builds on was obtained under; that work ``uses a single LLM as the generator, refiner and the feedback provider''~\cite{madaan2023selfrefine}, so an equal-capability critic is the natural baseline. The pipeline supports a different model per role, but the ablation study in \Cref{cha:methodology} holds the critic and generator on the same model throughout to keep the experimental grid's independent variables manageable; \Cref{sec:conclusions-future-work} returns to a stronger reviewer as future work.
+A second question -- whether the critic should use a stronger model than the generator -- was investigated only partially. Using one model for generation, feedback and revision is the configuration the \textsc{Self-Refine} result this loop builds on was obtained under; that work \enquote{uses a single LLM as the generator, refiner and the feedback provider}~\cite{madaan2023selfrefine}, so an equal-capability critic is the natural comparison point for this loop. Each agent is constructed with an explicit model argument, so giving the critic a model of its own is a small change to the runner; the pipeline as built resolves one model specification and shares it across the generator, the critic and the refiner, and the ablation study in \Cref{cha:methodology} keeps it that way to hold the experimental grid's independent variables manageable. \Cref{sec:conclusions-future-work} returns to a stronger reviewer as future work.
 
 \section{Prompt-level fixes discovered through iteration}
 \label{sec:impl-prompt-fixes}
 
 The prompt architecture is set out in \Cref{sec:design-prompts}; the following changes were forced by reading generated plans, not by a priori design. Each was addressed with a targeted prompt change instead of a structural one.
 
-Early plans for users with no stated micronutrient concern sometimes combined several implicit risk factors -- a vegetarian pattern together with a woman of reproductive age, which jointly imply an elevated iron requirement neither factor implies alone -- without the rationale acknowledging it. The prompt was extended to instruct the agent to reason about micronutrient interactions arising from combinations of profile factors, not only from single factors in isolation.
+Early plans for users with no stated micronutrient concern sometimes combined several implicit risk factors -- a vegetarian pattern together with a woman of reproductive age, whose iron requirements compound into an interaction neither factor reveals in isolation -- without the rationale acknowledging it. The prompt was extended to instruct the agent to reason about micronutrient interactions arising from combinations of profile factors, not only from single factors in isolation.
 
-Related, early plans treated the rationale field purely as an explanation of choices already made, leaving no place to note that a target could be met only partly through food and would benefit from supplementation (vitamin~B12 alongside metformin, for instance). The rationale instructions were extended to invite such supplementation notes where relevant, instead of forcing the model to either omit the concern or push an unrealistic amount of a food into a recipe to hit a number on paper.
+Relatedly, early plans treated the rationale field purely as an explanation of choices already made, leaving no place to note that a target could be met only partly through food and may warrant monitoring and, where deficiency is detected, supplementation (vitamin~B12 alongside long-term metformin, for instance). The rationale instructions were extended to invite such notes where relevant, instead of forcing the model to either omit the concern or push an unrealistic amount of a food into a recipe to hit a number on paper.
 
-A third pattern concerned portion sizes not corresponding to how a food is sold or used: 90~g out of a 100~g pack, or 110~g when only 100~g is available. Instructing the model to prefer a whole package or a simple fraction of one measurably reduced this, though it remains a soft preference, since some ingredients genuinely are used in odd quantities.
+A third pattern concerned portion sizes that did not correspond to how a food is sold or used: \qty{90}{\gram} out of a \qty{100}{\gram} pack, or \qty{110}{\gram} when only \qty{100}{\gram} is available. The prompt was extended to ask the agent to allocate portions so every meal is a realistic size. Some ingredients -- spices, for instance -- genuinely are used in odd quantities, and the instruction leaves those alone.
 
-A fourth issue was specific to Open Food Facts, where an entry's name is whatever a contributor typed on the label. A hit can arrive with no English name, only a Polish one, or with a brand string where a product name should be; the reader falls back through that chain -- English name, Polish name, brand, then literal ``unknown'' -- so a food can reach the model under an unhelpful string that surfaces in a recipe. The prompt was extended to let the model compose its own display name from the rest of a hit's fields when the supplied name is unusable, while still requiring the underlying code to resolve in the database, subject to the no-invented-foods contract in \Cref{sec:design-no-invented-foods}. The curated USDA descriptions do not have this problem.
+A fourth issue was specific to Open Food Facts, where an entry's name is whatever a contributor typed on the label. A hit can arrive with no English name, only a Polish one, or with a brand string where a product name should be; the reader falls back through that chain -- English name, Polish name, brand, then literal \enquote{unknown} -- so a food can reach the model under an unhelpful string that surfaces in a recipe. The prompt was extended to let the model compose its own display name from the rest of a hit's fields when the supplied name is unusable, while still requiring the underlying code to resolve in the database, subject to the no-invented-foods contract in \Cref{sec:design-no-invented-foods}. The curated USDA descriptions do not have this problem.
 
-An empty request is handled by omitting the session-request section of the prompt entirely instead of inserting an empty one, since an omitted section reads as ``there is no additional request'' more reliably. The prompt is assembled per ablation variant so an ablated agent never reads about a tool it was denied (\Cref{sec:design-variant-config}).
+An empty request is handled by omitting the session-request section of the prompt entirely instead of inserting an empty one, since an omitted section reads as \enquote{there is no additional request} more reliably. The prompt is assembled per ablation variant so an ablated agent never reads about a tool it was denied (\Cref{sec:design-variant-config}).
 
 \section{Collecting a paid experimental grid incrementally}
 \label{sec:impl-eval-harness}
 
-A 225-run grid of paid model calls is routinely interrupted by rate limits or a deliberate stop, so an artefact is written only after its unit succeeds and the work outstanding is the set difference between the enumerated grid and the files already on disk. Re-invoking the collector therefore resumes without repeating completed work. The food knowledge base index is built once per (model, variant) and reused for every run sharing that pair: rebuilding it for each run would have dominated the harness's own running time.
+A \num{225}-run grid of paid model calls is routinely interrupted by rate limits or a deliberate stop, so an artefact is written only after that unit of work succeeds and the work outstanding is the set difference between the enumerated grid and the files already on disk. Re-invoking the collector therefore resumes without repeating completed work.
 
-\Cref{cha:worked-example} walks through one real session of the \emph{regular} scenario planned by \texttt{gemini-3.7-flash} with the totaller and reflection loop both active: the lookup response, the agent plan as emitted, the hydrated breakfast, the full day of meals, the day's totals against the frozen targets, the coverage caveats, and the patient-facing rationale.\label{sec:impl-worked-example} That session cost eight model requests and about 175{,}000 tokens over roughly 100 seconds of wall-clock time, with the agent making a single \texttt{lookup\_foods} call for its whole day of ingredients -- the batching behaviour \Cref{sec:impl-tool-ergonomics} was designed to encourage. Characterising cost and accuracy across models, variants and scenarios is the job of \Cref{cha:results}.
+\Cref{cha:worked-example} walks through one real session of the \texttt{regular} scenario planned by \texttt{gemini-3.7-flash} at high effort with the totaller and reflection loop both active: the lookup response, the agent plan as emitted, the hydrated breakfast, the full day of meals, the day's totals against the frozen targets, the coverage caveats, and the patient-facing rationale. That session cost about eight model requests and about \num{175000} tokens over roughly \qty{100}{\second} of wall-clock time, with the agent making a single \texttt{lookup\_foods} call for its whole day of ingredients -- the batching behaviour \Cref{sec:impl-tool-ergonomics} was designed to encourage. Characterising cost and accuracy across models, variants and scenarios is the job of \Cref{cha:results}.
 
