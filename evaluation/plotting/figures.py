@@ -594,9 +594,7 @@ def render_paired_scenarios(
             # Matplotlib's own log ticks mix decade and subdecade labels at two different
             # sizes and collide once the span is under two decades, so place them by hand.
             y_low, y_high = ax.get_ylim()
-            ax.yaxis.set_major_locator(
-                FixedLocator([tick for tick in _LOG_TICK_CANDIDATES if y_low <= tick <= y_high])
-            )
+            ax.yaxis.set_major_locator(FixedLocator([tick for tick in _LOG_TICK_CANDIDATES if y_low <= tick <= y_high]))
             ax.yaxis.set_minor_locator(NullLocator())
             ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:g}"))
 
