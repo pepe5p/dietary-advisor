@@ -3,7 +3,7 @@
 
 This appendix walks through one run of the pipeline of \Cref{cha:design}, in the order the pipeline itself takes: a lookup, the plan the model emitted from it, the hydrated result, the day's totals against target, the coverage caveats attached to them, and the explanation delivered alongside. It is the \texttt{regular} scenario (\Cref{sec:methodology-scenarios}: fixed macro targets of roughly \qty{2728}{\kcal}, \qty{124.8}{\gram} protein, \qty{386.7}{\gram} carbohydrate and \qty{75.8}{\gram} fat, and no free-form request), planned by \texttt{gemini-3.7-flash} at high effort with the totaller and reflection loop active. It is illustrative, not a measurement; systematic figures belong to \Cref{cha:results}.
 
-\Cref{lst:example-lookup} shows the lookup tool's response to a query for \texttt{rolled oats}, trimmed to one hit per source for typesetting. It returns both channels at once -- a branded Polish Open Food Facts entry and a generic USDA one -- each with per-\qty{100}{\gram} nutrients and the source-prefixed \texttt{code} the agent must copy verbatim. The listing is valid JSON: the raw tool payload's ellipsis markers and raw HTML in \texttt{ingredients\_text} were removed so it can be typeset as a listing.
+\Cref{lst:example-lookup} shows the lookup tool's response to a query for \texttt{rolled oats}, trimmed to one hit per source for typesetting. It returns both channels at once -- a branded Polish Open Food Facts entry and a generic USDA one -- each with per-\qty{100}{\gram} nutrients and the source-prefixed \texttt{code} the agent must copy verbatim.
 
 \lstinputlisting[caption={Lookup response for \texttt{rolled oats}, reformatted for typesetting.},label={lst:example-lookup}]{listings/example_lookup.json}
 
