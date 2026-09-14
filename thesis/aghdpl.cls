@@ -76,9 +76,9 @@ Opiekun pracy: & {\itshape \@supervisor}\\
 
 \def\thesistable{
 \begin{tabular}{p{45mm}l}
-Author: & {\itshape \@author}\\[-1mm]
-Degree programme: & {\itshape \@degreeprogramme}\\[-1mm]
-Supervisor: & {\itshape \@supervisor}\\
+Autor: & {\itshape \@author}\\[-1mm]
+Kierunek studiów: & {\itshape \@degreeprogramme}\\[-1mm]
+Opiekun pracy: & {\itshape \@supervisor}\\
 \end{tabular}
 }
 }
@@ -107,10 +107,10 @@ Supervisor: & {\itshape \@supervisor}\\
 {\sffamily\Large \@thesistype}
 \vspace*{9mm}
 
-{\sffamily\Large\itshape \@titlePL}
+{\sffamily\Large\itshape \@titleEN}
 \vspace*{1mm}
 
-{\sffamily\Large\itshape \@titleEN}
+{\sffamily\Large\itshape \@titlePL}
 \vspace{40mm}
 \end{center}
 
